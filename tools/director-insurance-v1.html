@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>등기임원 4대보험 환급대상 판정 툴 v1.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+<style>
+ body{font-family:'맑은 고딕',sans-serif;max-width:1400px;margin:20px auto;padding:0 16px;color:#222}
+ h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:6px}
+ h2{font-size:15px;margin-top:24px;color:#0a4}
+ .box{border:1px solid #ccc;padding:14px;border-radius:6px;margin:10px 0;background:#fafafa}
+ .row{display:flex;gap:20px;flex-wrap:wrap}
+ .row>div{flex:1;min-width:380px}
+ input[type=file]{padding:6px;border:1px dashed #888;width:100%;background:#fff}
+ button{background:#0a4;color:#fff;border:0;padding:10px 18px;font-size:14px;border-radius:4px;cursor:pointer;margin:6px 4px}
+ button:disabled{background:#999}
+ button.sec{background:#36c}
+ table{border-collapse:collapse;width:100%;font-size:12px;margin-top:8px;table-layout:fixed}
+ th,td{border:1px solid #bbb;padding:5px 7px;text-align:left;vertical-align:top;word-break:keep-all;overflow-wrap:break-word;white-space:normal}
+ th{background:#eef;position:sticky;top:0}
+ td.reason{font-size:11px;line-height:1.5}
+ td.reason div+div{margin-top:3px;padding-top:3px;border-top:1px dashed #ccc}
+ tr.j-cancel{background:#fdd}
+ tr.j-loss{background:#fec}
+ tr.j-fix{background:#fde}
+ tr.j-review{background:#ffd}
+ tr.j-ok{background:#eaf2fb}
+ tr.j-none{background:#eee;color:#666}
+ tr.j-expired{background:#ddd;color:#666}
+ tr.j-confirm{background:#fec8a0}
+ .legend span{display:inline-block;padding:3px 8px;margin:2px;border:1px solid #888;font-size:11px}
+ .small{font-size:11px;color:#666}
+ details{margin:6px 0}
+ pre{background:#f4f4f4;padding:8px;font-size:11px;overflow:auto;max-height:200px}
+</style>
+</head>
+<body>
+<div style="padding:10px 20px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
+  <a href="../index.html" style="font-size:13px;color:#2563eb;text-decoration:none;font-weight:600;">← 대시보드로 돌아가기</a>
+</div>
+<h1>등기임원 4대보험(고용/산재) 환급대상 자동 판정 툴 <span style="font-size:13px;color:#888">v1.0</span></h1>
+<p class="small">법인등기부등본 PDF + 근로자고용정보현황 PDF/Excel을 업로드하면 등기임원의 가입여부를 자동 매칭하여 <b>취득취소 / 상실신고 / 정상</b>을 판정합니다. 모든 처리는 브라우저 내에서만 수행되며 외부로 전송되지 않습니다.</p>
+
+<div class="box row">
+ <div>
+  <b>① 법인등기부등본 PDF</b><br>
+  <input type="file" id="pdfReg" accept="application/pdf">
+ </div>
+ <div>
+  <b>② 근로자고용정보현황 (PDF 또는 Excel/CSV)</b><br>
+  <input type="file" id="fileEmp" accept=".pdf,.xlsx,.xls,.csv">
+ </div>
+</div>
+<div style="text-align:center">
+ <button id="btnRun">▶ 분석 실행</button>
+ <button id="btnExport" class="sec" disabled>⬇ 결과 Excel 다운로드</button>
+</div>
+
+<div class="legend" style="margin-top:14px">
+ 판정 범례:
+ <span class="j-cancel" style="background:#fdd">취득취소</span>
+ <span class="j-loss" style="background:#fec">상실신고</span>
+ <span class="j-fix" style="background:#fde">상실일정정</span>
+ <span class="j-confirm" style="background:#fec8a0">사업장확인필요</span>
+ <span class="j-review" style="background:#ffd">검토필요</span>
+ <span class="j-ok" style="background:#eaf2fb">정상</span>
+ <span class="j-none" style="background:#eee">대상아님(미가입)</span>
+ <span class="j-expired" style="background:#ddd;color:#666">시효경과</span>
+ <span class="small" style="margin-left:8px">※ 보험료 소멸시효 3년 (취득취소 제외)</span>
+</div>
+
+<h2>대표이사 변경 이력 / 친족 분석</h2>
+<div id="ceoHist"><p class="small">분석 실행 후 표시됩니다.</p></div>
+
+<h2>판정 결과</h2>
+<div id="result"><p class="small">파일을 업로드하고 [분석 실행]을 눌러주세요.</p></div>
+
+<details><summary>📋 등기부 PDF 원본 텍스트 (추출 결과)</summary><pre id="dbgRegText"></pre></details>
+<details><summary>📋 추출된 등기임원</summary><div id="dbgOff"></div></details>
+<details><summary>📋 고용현황 PDF 원본 텍스트 (앞부분)</summary><pre id="dbgEmpText"></pre></details>
+<details><summary>📋 추출된 고용보험 가입자 (임원 매칭분만)</summary><div id="dbgEmp"></div></details>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// === PDF 텍스트 추출 ===
+function setStatus(msg){document.getElementById('result').innerHTML='<p>'+msg+'</p>';}
+
+async function ocrPdf(file){
+ setStatus('OCR 엔진 초기화 중... (최초 1회 한글 학습데이터 다운로드, 수십 MB)');
+ const worker=await Tesseract.createWorker('kor',1,{
+  logger:m=>{if(m.status==='recognizing text')setStatus(`OCR 진행: ${(m.progress*100).toFixed(0)}% (${file.name})`);}
+ });
+ const buf=await file.arrayBuffer();
+ const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+ let out='';
+ for(let i=1;i<=pdf.numPages;i++){
+  setStatus(`OCR 페이지 ${i}/${pdf.numPages} 렌더링 중...`);
+  const page=await pdf.getPage(i);
+  const vp=page.getViewport({scale:2.5});
+  const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+  await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+  const {data}=await worker.recognize(c);
+  out+=data.text+'\n\n';
+ }
+ await worker.terminate();
+ return out;
+}
+
+async function pdfToText(file){
+ const buf=await file.arrayBuffer();
+ const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+ let out='';
+ for(let i=1;i<=pdf.numPages;i++){
+  const page=await pdf.getPage(i);
+  const tc=await page.getTextContent();
+  // y좌표로 줄 묶기 (허용오차 3pt)
+  const items=tc.items.map(it=>({x:it.transform[4],y:it.transform[5],s:it.str}))
+                      .sort((a,b)=>b.y-a.y||a.x-b.x);
+  const lines=[]; let curY=null,cur=null;
+  items.forEach(it=>{
+   if(curY===null||Math.abs(it.y-curY)>3){cur=[];lines.push(cur);curY=it.y;}
+   cur.push(it);
+  });
+  lines.forEach(L=>{out+=L.map(o=>o.s).join(' ').replace(/\s+/g,' ').trim()+'\n';});
+  out+='\n';
+ }
+ return out;
+}
+
+// === 등기부 파싱 ===
+// 임원 헤더 라인 예: "대표이사 김영석 340929-*******  주소..."
+// 이벤트 라인: "1993 년 12 월 13 일 취임   년 월 일 등기"
+// 말소선(취소선)은 PDF 텍스트에서 구분 안 됨 → 같은 직위/이름/주민번호 블록 중 가장 마지막(최신) 블록을 "현행"으로 간주하고
+// 그 블록 내 이벤트 중 사임/퇴임/사망/임기만료/해임 이 있으면 퇴임자로 본다.
+function parseRegistry(text){
+ const posRe=/(대표이사|사내이사|사외이사|감사|이사)\s*([가-힣]{2,5})\s*(\d{6})\s*-?\s*\*+/;
+ const dateRe=/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*(취임|중임|퇴임|사임|해임|사망|임기만료)/g;
+ const lines=text.split('\n');
+ // 블록 분할
+ const blocks=[]; let cur=null;
+ lines.forEach(L=>{
+  const m=L.match(posRe);
+  if(m){ if(cur)blocks.push(cur); cur={pos:m[1],name:m[2],rrn:m[3],lines:[]}; }
+  else if(cur) cur.lines.push(L);
+ });
+ if(cur)blocks.push(cur);
+
+ // 동일 (name,rrn) 그룹의 마지막 블록만 사용
+ const lastByKey={};
+ blocks.forEach((b,i)=>{ lastByKey[b.name+b.rrn]=i; });
+ const officers={};
+ blocks.forEach((b,i)=>{
+  const key=b.name+b.rrn;
+  if(lastByKey[key]!==i) return; // 옛 블록 무시
+  const txt=b.lines.join('\n');
+  const events=[]; let mm;
+  while((mm=dateRe.exec(txt))){
+   events.push({date:`${mm[1]}-${String(mm[2]).padStart(2,'0')}-${String(mm[3]).padStart(2,'0')}`,type:mm[4]});
+  }
+  dateRe.lastIndex=0;
+  // 취임/중임 중 가장 빠른 일자 = 현 임기 시작 (단, 사임/퇴임 후 재취임이면 마지막 취임)
+  // 단순화: 마지막 "취임" 이후 사건들로 판단
+  let appoint=null,resign=null;
+  events.forEach(e=>{
+   if(e.type==='취임') appoint=e.date;
+   if(['퇴임','사임','해임','사망','임기만료'].includes(e.type)) resign=e.date;
+  });
+  // 가장 이른 취임/중임을 전체 임기시작으로 (보험 비교 기준)
+  const firstAppoint=events.find(e=>e.type==='취임'||e.type==='중임');
+  officers[key]={
+   pos:b.pos,name:b.name,rrn:b.rrn,
+   appoint: firstAppoint? firstAppoint.date : appoint,
+   resign: resign,
+   active: !resign,
+   events
+  };
+ });
+ return Object.values(officers);
+}
+
+// === 대표이사 변경 이력 + 친족 분석 ===
+// 1) 대표이사 블록만 별도 수집 (주소 포함, 말소블록 포함 모두 수집)
+// 2) 같은 인물의 사임/취임이 같은 날 발생하면 등기 재발행으로 보고 병합
+// 3) 인물별 임기 구간 산출, 시간순 정렬
+// 4) 서로 다른 인물 간 주소 유사도 계산 → 100% 친족확실 / ≥90% 의심 / 그 외 낮음
+function parseCeoHistory(text){
+ const ceoRe=/^대표이사\s+([가-힣]{2,5})\s+(\d{6})\s*-?\s*\*+\s*(.*)$/;
+ const anyPosRe=/^(대표이사|사내이사|사외이사|감사|이사)\s+[가-힣]{2,5}\s+\d{6}/;
+ const dateRe=/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*(취임|중임|퇴임|사임|해임|사망|임기만료|주소변경)/g;
+ const lines=text.split('\n');
+ const blocks=[]; let cur=null;
+ lines.forEach(L=>{
+  const m=L.match(ceoRe);
+  if(m){ if(cur)blocks.push(cur); cur={name:m[1],rrn:m[2],addr:(m[3]||'').trim(),body:''}; return; }
+  if(anyPosRe.test(L)){ if(cur){blocks.push(cur);cur=null;} return; }
+  if(cur){
+   if(/년.*월.*일/.test(L)) cur.body+=L+'\n';
+   else if(L.trim() && !/년.*월.*일/.test(cur.body)) cur.addr+=' '+L.trim(); // 주소 줄바꿈 이어붙임
+  }
+ });
+ if(cur)blocks.push(cur);
+
+ // 인물별 이벤트·주소 집계
+ const byPerson={};
+ blocks.forEach(b=>{
+  const k=b.name+b.rrn;
+  if(!byPerson[k]) byPerson[k]={name:b.name,rrn:b.rrn,addrs:[],events:[]};
+  if(b.addr) byPerson[k].addrs.push(b.addr.trim());
+  let mm; dateRe.lastIndex=0;
+  while((mm=dateRe.exec(b.body))){
+   byPerson[k].events.push({date:`${mm[1]}-${String(mm[2]).padStart(2,'0')}-${String(mm[3]).padStart(2,'0')}`,type:mm[4]});
+  }
+ });
+
+ // 인물별 임기 구간 산출
+ const TERM=['사임','퇴임','해임','사망','임기만료'];
+ const periods=[];
+ Object.values(byPerson).forEach(p=>{
+  // 중복 제거 + 정렬
+  const seen=new Set();
+  let ev=p.events.filter(e=>{const k=e.date+e.type;if(seen.has(k))return false;seen.add(k);return true;})
+                 .sort((a,b)=>a.date.localeCompare(b.date)||(a.type==='취임'?1:-1));
+  // 같은 날 종료+취임 → 등기 재발행으로 보고 둘 다 제거 (임기 연속)
+  const drop=new Set();
+  for(let i=0;i<ev.length-1;i++){
+   if(TERM.includes(ev[i].type) && ev[i+1].type==='취임' && ev[i].date===ev[i+1].date){
+    drop.add(i); drop.add(i+1);
+   }
+  }
+  ev=ev.filter((_,i)=>!drop.has(i));
+  let start=null;
+  ev.forEach(e=>{
+   if(e.type==='취임'){ if(!start) start=e.date; }
+   else if(TERM.includes(e.type)){
+    if(start){ periods.push({name:p.name,rrn:p.rrn,start,end:e.date,endType:e.type,addrs:p.addrs.slice()}); start=null; }
+   }
+  });
+  if(start) periods.push({name:p.name,rrn:p.rrn,start,end:null,endType:'재임중',addrs:p.addrs.slice()});
+ });
+ periods.sort((a,b)=>a.start.localeCompare(b.start)||a.name.localeCompare(b.name));
+ return periods;
+}
+
+// 주소 정규화 + Dice 계수 유사도
+function normAddr(s){
+ return (s||'').replace(/[\s,()\-.·]/g,'')
+               .replace(/광역시|특별시|특별자치시|특별자치도/g,'')
+               .toLowerCase();
+}
+function bigrams(s){const r=new Set();for(let i=0;i<s.length-1;i++)r.add(s.slice(i,i+2));return r;}
+function addrSim(a,b){
+ const A=normAddr(a),B=normAddr(b);
+ if(!A||!B)return 0;
+ if(A===B)return 1;
+ const ba=bigrams(A),bb=bigrams(B);
+ if(!ba.size||!bb.size)return 0;
+ let inter=0; ba.forEach(x=>{if(bb.has(x))inter++;});
+ return 2*inter/(ba.size+bb.size);
+}
+// 두 인물(여러 주소 보유 가능)의 최대 유사도
+function bestPairSim(addrsA,addrsB){
+ let best=0,pair=['',''];
+ (addrsA||[]).forEach(a=>(addrsB||[]).forEach(b=>{
+  const s=addrSim(a,b); if(s>best){best=s;pair=[a,b];}
+ }));
+ return {sim:best,a:pair[0],b:pair[1]};
+}
+function classifyKin(sim){
+ if(sim>=0.999) return {label:'친족 확실',color:'#fdd'};
+ if(sim>=0.90)  return {label:'의심 필요',color:'#ffd'};
+ if(sim>=0.60)  return {label:'낮음(부분일치)',color:'#eef'};
+ return {label:'낮음',color:'#fff'};
+}
+function renderCeoHistory(periods){
+ const host=document.getElementById('ceoHist');
+ if(!periods.length){host.innerHTML='<p class="small">대표이사 정보를 추출하지 못했습니다.</p>';return;}
+ // 임기 테이블
+ let h='<h3 style="font-size:13px;margin:8px 0 4px">▶ 대표이사 임기</h3>';
+ h+='<table><thead><tr><th style="width:10%">성명</th><th style="width:10%">주민번호</th><th style="width:11%">시작일</th><th style="width:11%">종료일</th><th style="width:8%">종료사유</th><th>주소(최근)</th></tr></thead><tbody>';
+ periods.forEach(p=>{
+  const lastAddr=p.addrs[p.addrs.length-1]||'';
+  h+=`<tr><td>${p.name}</td><td>${p.rrn}-*</td><td>${p.start}</td><td>${p.end||'현재'}</td><td>${p.endType}</td><td class="reason">${lastAddr}</td></tr>`;
+ });
+ h+='</tbody></table>';
+
+ // 변경 이력 요약
+ const distinct=[];
+ periods.forEach(p=>{ if(!distinct.find(x=>x.name===p.name&&x.rrn===p.rrn)) distinct.push(p); });
+ if(distinct.length>=2){
+  h+=`<p class="small" style="margin-top:6px">▶ 대표이사 변경: 총 <b>${distinct.length}</b>명 (${distinct.map(d=>d.name).join(' → ')})</p>`;
+ } else {
+  h+='<p class="small" style="margin-top:6px">▶ 대표이사 변경 이력 없음 (단일 대표)</p>';
+ }
+
+ // 친족 분석 (서로 다른 인물 간 주소 유사도)
+ if(distinct.length>=2){
+  // 인물별 모든 주소 집합
+  const persons={};
+  periods.forEach(p=>{
+   const k=p.name+p.rrn;
+   if(!persons[k]) persons[k]={name:p.name,rrn:p.rrn,addrs:[]};
+   p.addrs.forEach(a=>{if(a&&!persons[k].addrs.includes(a))persons[k].addrs.push(a);});
+  });
+  const arr=Object.values(persons);
+  h+='<h3 style="font-size:13px;margin:12px 0 4px">▶ 친족 의심 분석 (주소 유사도)</h3>';
+  h+='<table><thead><tr><th style="width:10%">대표이사 A</th><th>A 주소</th><th style="width:10%">대표이사 B</th><th>B 주소</th><th style="width:8%">유사도</th><th style="width:11%">분류</th></tr></thead><tbody>';
+  for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++){
+   const r=bestPairSim(arr[i].addrs,arr[j].addrs);
+   const c=classifyKin(r.sim);
+   h+=`<tr style="background:${c.color}"><td>${arr[i].name}</td><td class="reason">${r.a||'(주소 없음)'}</td><td>${arr[j].name}</td><td class="reason">${r.b||'(주소 없음)'}</td><td><b>${(r.sim*100).toFixed(1)}%</b></td><td><b>${c.label}</b></td></tr>`;
+  }
+  h+='</tbody></table>';
+  h+='<p class="small">※ 100% 일치 = 친족 확실, 90%이상 = 의심 필요. 주소가 시간차로 다른 표기(도로명/지번)일 수 있어 의심 이하라도 별도 확인 권장.</p>';
+ }
+ host.innerHTML=h;
+}
+
+// === 고용현황 파싱 (PDF 또는 Excel) ===
+// 보험구분(고용/산재)을 섹션 헤더로 추적해 각 행에 type을 부여
+function detectType(line, cur){
+ if(/산재|산업재해/.test(line)) return '산재';
+ if(/고용보험/.test(line)) return '고용';
+ return cur;
+}
+function parseEmpText(txt){
+ const lines=txt.split('\n');
+ // 형식1 (근로복지공단): 한 줄에 주민번호 마스킹+성명+취득일+상실일
+ const rows=[];
+ let curType='고용';
+ lines.forEach(L=>{
+  curType=detectType(L,curType);
+  const m=L.match(/(\d{6})\s*-?\s*\d?\s*\*+\s*([가-힣]{2,5})\s+(\d{4}[-./]\d{1,2}[-./]\d{1,2})(?:\s+(\d{4}[-./]\d{1,2}[-./]\d{1,2}))?/);
+  if(m) rows.push({rrn:m[1],name:m[2],acq:fmtDate(m[3]),loss:fmtDate(m[4]),type:curType});
+ });
+ if(rows.length>0) return rows;
+
+ // 형식2 (도원 어드민): 섹션 분리 → 주민번호+성명 리스트, 취득일+상실일 리스트를 같은 순서로 zip
+ const persons=[]; // {rrn,name,type}
+ const dates=[];   // {acq,loss,type}
+ curType='고용';
+ lines.forEach(L=>{
+  curType=detectType(L,curType);
+  const s=L.trim();
+  const pm=s.match(/^(\d{6})-(\d{7})\s+([가-힣]{2,6}|[A-Z][A-Z\s]+|[가-힣A-Za-z]+)/);
+  if(pm){ persons.push({rrn:pm[1],name:pm[3].trim(),type:curType}); return; }
+  const dm=s.match(/^[YN]\s+(?:\S.*?\s+)?(\d{4}-\d{2}-\d{2})(?:\s+(\d{4}-\d{2}-\d{2}))?/);
+  if(dm){ dates.push({acq:dm[1],loss:dm[2]||null,type:curType}); }
+ });
+ const n=Math.min(persons.length,dates.length);
+ const out=[];
+ for(let i=0;i<n;i++){
+  out.push({rrn:persons[i].rrn.slice(0,6),name:persons[i].name,acq:dates[i].acq,loss:dates[i].loss,type:persons[i].type||dates[i].type||'고용'});
+ }
+ return out;
+}
+async function parseEmployment(file){
+ const ext=file.name.toLowerCase().split('.').pop();
+ if(ext==='pdf'){
+  return parseEmpText(await pdfToText(file));
+ } else {
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
+  // 헤더 자동 감지
+  let hi=aoa.findIndex(r=>r&&r.some(c=>/성명|이름|근로자명/.test(c))&&r.some(c=>/취득|고용시작/.test(c)));
+  if(hi<0)hi=0;
+  const H=aoa[hi].map(c=>c||'');
+  const col=k=>H.findIndex(h=>new RegExp(k).test(h));
+  const ci={name:col('성명|이름|근로자명|근로자\\s*명'),rrn:col('주민'),acq:col('취득일|고용시작일|자격취득일'),loss:col('상실일|고용종료일|자격상실일'),type:col('보험구분|보험종류|구분')};
+  const rows=[];
+  for(let i=hi+1;i<aoa.length;i++){
+   const r=aoa[i];if(!r||!r[ci.name])continue;
+   const rrn=String(r[ci.rrn]||'').replace(/\D/g,'').slice(0,6);
+   const tv=ci.type>=0?String(r[ci.type]||''):'';
+   const type=/산재|산업재해/.test(tv)?'산재':'고용';
+   rows.push({name:String(r[ci.name]).trim(),rrn,acq:fmtDate(r[ci.acq]),loss:fmtDate(r[ci.loss]),type});
+  }
+  return rows;
+ }
+}
+function fmtDate(v){if(!v)return null;const s=String(v).trim();const m=s.match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:null;}
+
+// === 판정 로직 ===
+// 판정 분기 (등기임원 = 고용/산재 적용제외 원칙)
+//  · 취득취소  : 처음부터 가입대상이 아니었던 경우 (취임일 또는 그 이후에 취득신고)
+//  · 상실신고  : 가입 당시는 근로자였으나 임원취임으로 자격 종료됐는데 상실신고 누락
+//  · 상실일정정: 상실신고는 됐으나 상실일이 임원취임일보다 늦음
+//  · 정상(재취득): 임원 퇴임 후 근로자로 재가입 → 적법
+//  · 정상      : 임원취임 전에 이미 상실 등
+//  · 검토필요  : 직위/취임일 미확인, 사외이사 등
+//  · 미가입    : 해당 보험 가입이력 없음
+const J_RANK={'취득취소':7,'상실신고':6,'상실일정정':5,'사업장확인필요':4,'검토필요':3,'정상':2,'시효경과':1,'미가입':1,'대상아님':0};
+// 사임 후 짧은 기간 내 재취임 = 임기 만료 등기 누락 후 정리 가능성 (실질 연속근무 의심)
+const REAPPOINT_GAP_DAYS=365;
+// 보험상실일과 등기상 사임일의 허용 시차 (최종근무일 vs 퇴직처리일 기준차이)
+const LOSS_TOLERANCE_DAYS=1;
+function daysBetween(a,b){if(!a||!b)return null;return Math.round((new Date(b)-new Date(a))/86400000);}
+function buildOfficerPeriods(events){
+ const T=['사임','퇴임','해임','사망','임기만료'];
+ const ev=(events||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+ const ps=[]; let st=null;
+ ev.forEach(e=>{
+  if(e.type==='취임'){if(!st)st=e.date;}
+  else if(T.includes(e.type)){if(st){ps.push({start:st,end:e.date});st=null;}}
+ });
+ if(st)ps.push({start:st,end:null});
+ return ps;
+}
+// 사임 후 재취임 갭이 짧은 경우 (실질 연속근무 가능성)
+function findShortReappointGap(events){
+ const ps=buildOfficerPeriods(events);
+ for(let i=0;i<ps.length-1;i++){
+  if(ps[i].end && ps[i+1].start){
+   const d=daysBetween(ps[i].end,ps[i+1].start);
+   if(d!==null && d>=0 && d<=REAPPOINT_GAP_DAYS) return {prevEnd:ps[i].end,nextStart:ps[i+1].start,days:d};
+  }
+ }
+ return null;
+}
+// 특정 날짜가 임원 임기 구간 내에 있는지 (gap 이면 false)
+function inAnyPeriod(date,events){
+ const ps=buildOfficerPeriods(events);
+ return ps.some(p=>date>=p.start && (!p.end || date<=p.end));
+}
+// 보험료 징수권 소멸시효 3년 (고용보험및산업재해보상보험의보험료징수등에관한법률 §41)
+// 기준일(오늘) - 3년 이전 상실일은 소급 신고/정정 불가
+const STATUTE_YEARS=3;
+function statuteCutoff(){
+ const d=new Date(); d.setFullYear(d.getFullYear()-STATUTE_YEARS);
+ return d.toISOString().slice(0,10);
+}
+const CUTOFF=statuteCutoff();
+function judgeOne(off, r, label){
+ const exemptPos=['대표이사','사내이사','감사','이사'];
+ const isExempt=exemptPos.includes(off.pos);
+ if(off.pos==='사외이사') return {j:'검토필요',reason:`[${label}] 사외이사 - 상근/비상근 확인 필요 (비상근이면 적용제외)`};
+ if(!isExempt) return {j:'검토필요',reason:`[${label}] 직위 확인 필요`};
+ if(!off.appoint) return {j:'검토필요',reason:`[${label}] 임원 취임일 미확인`};
+ if(!r) return {j:'미가입',reason:`[${label}] 가입이력 없음`};
+ const acq=r.acq, loss=r.loss, app=off.appoint, res=off.resign;
+ if(res && acq && acq>res){
+  return {j:'정상',reason:`[${label}] 임원 퇴임(${res}) 이후 가입(${acq}) → 근로자 자격 재취득(적법)`,confirm:''};
+ }
+ const reGap=findShortReappointGap(off.events);
+ if(acq && acq>=app){
+  const endStr=loss?` ~ ${loss}`:' ~ 현재';
+  // 취득취소 후보 — 다만 acq가 임원 임기 구간 안에 있어야 확실. gap 사이에 있으면 실제로는 근로자 신분이었을 가능성
+  if(!inAnyPeriod(acq,off.events)){
+   return {j:'사업장확인필요',
+    reason:`[${label}] 보험취득일(${acq}) ≥ 최초 임원취임일(${app})이나, 해당 시점이 임원 임기 갭 구간(사임~재취임 사이)에 위치 → 취득취소 단정 불가`,
+    confirm:`취득일(${acq}) 시점에 임원 신분이었는지(보수 수령·이사회 참여 등) 사업장 확인 필요. 임원이었다면 취득취소, 아니면 정상`};
+  }
+  if(reGap){
+   return {j:'사업장확인필요',
+    reason:`[${label}] 보험취득일(${acq}) ≥ 임원취임일(${app}) → 1차 판정 취득취소. 다만 ${reGap.prevEnd} 사임 후 ${reGap.nextStart} 재취임(갭 ${reGap.days}일) 이력 존재`,
+    confirm:`임기 사이 갭이 짧음(${reGap.days}일) → 임기만료 후 재취임 절차일 가능성. 실질 연속근무 입증 시 취득취소(전기간), 단절 시 일부기간만 해당. 사업장 확인 필요. 환급구간 추정: ${acq}${endStr}`};
+  }
+  return {j:'취득취소',
+   reason:`[${label}] 보험취득일(${acq}) ≥ 임원취임일(${app}) → 처음부터 적용제외 대상. 취득 자체를 무효화(취득취소). 환급구간: ${acq}${endStr}`,
+   confirm:''};
+ }
+ if(acq && acq<app){
+  if(!loss){
+   if(app < CUTOFF){
+    return {j:'시효경과',reason:`[${label}] 근로자 가입(${acq}) 후 임원 취임(${app}) → 상실신고 누락이나 정정 상실일(${app})이 소멸시효(${STATUTE_YEARS}년, 기준 ${CUTOFF}) 경과 → 소급 신고 불가`,confirm:''};
+   }
+   if(reGap){
+    return {j:'사업장확인필요',
+     reason:`[${label}] 근로자 가입(${acq}) 후 임원 취임(${app}) → 1차 판정 상실신고. 단, ${reGap.prevEnd} 사임 후 ${reGap.nextStart} 재취임(갭 ${reGap.days}일) — 등기 정리용 형식적 사임 가능성`,
+     confirm:`임기 갭(${reGap.days}일)이 짧음. 실질 연속 임원근무가 확인되면 가입 자체가 부적법 → 취득취소 대상으로 변경. 보수 지급내역·이사회 출석·실무 직책 확인 필요`};
+   }
+   return {j:'상실신고',
+    reason:`[${label}] 근로자 가입(${acq}) 후 임원 취임(${app}) → 취임일에 근로자성 상실, 상실신고 누락. 환급구간: ${app} ~ 현재 (시효 내)`,
+    confirm:''};
+  }
+  if(loss<=app){
+   return {j:'정상',reason:`[${label}] 임원 취임(${app}) 이전(또는 당일)에 이미 상실(${loss}) → 처리 완료`,confirm:''};
+  }
+  // loss > app
+  const diff=daysBetween(app,loss);
+  if(diff!==null && diff<=LOSS_TOLERANCE_DAYS){
+   return {j:'사업장확인필요',
+    reason:`[${label}] 보험상실일(${loss})과 임원취임일(${app})의 차이가 ${diff}일 — 최종근무일 vs 퇴직처리일 기준차이로 추정`,
+    confirm:`사업장이 등기상 날짜를 최종근무일로 보는지/익일 처리일로 보는지 확인 필요. 동일 의미일 경우 정정 불요(정상 처리), 아닐 경우 상실일정정`};
+  }
+  if(app < CUTOFF){
+   return {j:'시효경과',reason:`[${label}] 가입(${acq}) 후 임원 취임(${app}), 상실일(${loss})이 취임일보다 늦으나 정정 상실일(${app})이 소멸시효(${STATUTE_YEARS}년, 기준 ${CUTOFF}) 경과 → 소급 정정 불가`,confirm:''};
+  }
+  if(reGap){
+   return {j:'사업장확인필요',
+    reason:`[${label}] 가입(${acq}) 후 임원 취임(${app}), 상실일(${loss})이 늦음 → 1차 판정 상실일정정. 단, ${reGap.prevEnd} 사임 후 ${reGap.nextStart} 재취임(갭 ${reGap.days}일) 존재`,
+    confirm:`임기 갭이 짧아 실질 연속근무 가능성. 입증되면 취득취소로 격상 가능. 환급구간 추정: ${app} ~ ${loss}`};
+  }
+  return {j:'상실일정정',
+   reason:`[${label}] 가입(${acq}) 후 임원 취임(${app}), 상실일(${loss})이 취임일보다 늦음 → 상실일을 ${app}로 정정. 환급구간: ${app} ~ ${loss} (시효 내)`,
+   confirm:''};
+ }
+ return {j:'검토필요',reason:`[${label}] 보험 취득일 미확인`,confirm:''};
+}
+function pickLatest(recs){
+ if(!recs.length) return null;
+ return recs.slice().sort((a,b)=>(b.acq||'').localeCompare(a.acq||''))[0];
+}
+function judge(off, recs){
+ const mine=recs.filter(r=>r.name===off.name && r.rrn===off.rrn);
+ const eRecs=mine.filter(r=>r.type==='고용');
+ const sRecs=mine.filter(r=>r.type==='산재');
+ const eRec=pickLatest(eRecs);
+ const sRec=pickLatest(sRecs);
+
+ if(!eRec && !sRec){
+  return [{...off,judgment:'대상아님',judgmentE:'-',judgmentS:'-',
+           reason:'고용·산재 모두 가입이력 없음',confirm:'',
+           eAcq:'',eLoss:'',sAcq:'',sLoss:''}];
+ }
+ const ej=judgeOne(off,eRec,'고용');
+ const sj=judgeOne(off,sRec,'산재');
+ // 색상은 둘 중 더 강한 액션 기준
+ const top = (J_RANK[ej.j]||0) >= (J_RANK[sj.j]||0) ? ej.j : sj.j;
+ const notes=[];
+ if(eRecs.length>1) notes.push(`고용 ${eRecs.length}건 중 최신 사용`);
+ if(sRecs.length>1) notes.push(`산재 ${sRecs.length}건 중 최신 사용`);
+ const reason = ej.reason + '\n' + sj.reason + (notes.length?'\n⚠ '+notes.join(' / '):'');
+ const confirms=[];
+ if(ej.confirm) confirms.push(`[고용] ${ej.confirm}`);
+ if(sj.confirm) confirms.push(`[산재] ${sj.confirm}`);
+ return [{
+  ...off,
+  judgment: top,
+  judgmentE: ej.j, judgmentS: sj.j,
+  reason, confirm: confirms.join('\n'),
+  eAcq:eRec?.acq||'', eLoss:eRec?.loss||'',
+  sAcq:sRec?.acq||'', sLoss:sRec?.loss||''
+ }];
+}
+
+// === 메인 ===
+let RESULTS=[];
+document.getElementById('btnRun').onclick=async()=>{
+ const f1=document.getElementById('pdfReg').files[0];
+ const f2=document.getElementById('fileEmp').files[0];
+ if(!f1||!f2){alert('두 파일을 모두 선택하세요');return;}
+ document.getElementById('result').innerHTML='<p>처리 중...</p>';
+ try{
+  setStatus('등기부 텍스트 추출 중...');
+  let regText=await pdfToText(f1);
+  if(regText.replace(/\s/g,'').length<200){
+   setStatus('텍스트 레이어 없음 → OCR 모드 전환');
+   regText=await ocrPdf(f1);
+  }
+  document.getElementById('dbgRegText').textContent=regText.slice(0,5000);
+  const officers=parseRegistry(regText);
+  const ceoPeriods=parseCeoHistory(regText);
+  renderCeoHistory(ceoPeriods);
+  let recs;
+  if(f2.name.toLowerCase().endsWith('.pdf')){
+   setStatus('고용현황 텍스트 추출 중...');
+   let empText=await pdfToText(f2);
+   if(empText.replace(/\s/g,'').length<200){empText=await ocrPdf(f2);}
+   document.getElementById('dbgEmpText').textContent=empText.slice(0,3000);
+   recs=parseEmpText(empText);
+  } else {
+   recs=await parseEmployment(f2);
+  }
+  // 디버그
+  document.getElementById('dbgOff').innerHTML=tableize(officers,['pos','name','rrn','appoint','resign','active']);
+  if(officers.length===0){
+   document.getElementById('result').innerHTML='<p style="color:red">⚠ 등기부에서 임원을 추출하지 못했습니다. 아래 [등기부 PDF 원본 텍스트] 패널을 열어 형식을 확인해 주세요.</p>';
+   return;
+  }
+  const matched=recs.filter(r=>officers.some(o=>o.name===r.name&&o.rrn===r.rrn));
+  document.getElementById('dbgEmp').innerHTML=tableize(matched,['type','name','rrn','acq','loss']);
+  // 판정
+  RESULTS=[];
+  officers.forEach(o=>{ judge(o,recs).forEach(j=>RESULTS.push(j)); });
+  renderResults();
+  document.getElementById('btnExport').disabled=false;
+ }catch(e){
+  document.getElementById('result').innerHTML='<p style="color:red">오류: '+e.message+'</p>';
+  console.error(e);
+ }
+};
+
+function renderResults(){
+ const cls={'취득취소':'j-cancel','상실신고':'j-loss','상실일정정':'j-fix','사업장확인필요':'j-confirm','검토필요':'j-review','정상':'j-ok','대상아님':'j-none','미가입':'j-none','시효경과':'j-expired'};
+ let h='<table><colgroup>'
+   +'<col style="width:6%"><col style="width:5%"><col style="width:8%"><col style="width:7%"><col style="width:7%">'
+   +'<col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%">'
+   +'<col style="width:6%"><col style="width:6%"><col style="width:14%"><col style="width:auto">'
+   +'</colgroup>'
+   +'<thead><tr>'
+   +'<th>직위</th><th>성명</th><th>주민번호</th><th>임원취임일</th><th>임원퇴임일</th>'
+   +'<th>고용 취득일</th><th>고용 상실일</th><th>산재 취득일</th><th>산재 상실일</th>'
+   +'<th>고용 판정</th><th>산재 판정</th><th>사유 / 환급구간</th><th>사업장 확인 필요사유</th>'
+   +'</tr></thead><tbody>';
+ RESULTS.forEach(r=>{
+  const reasonHtml = (r.reason||'').split('\n').map(s=>`<div>${s}</div>`).join('');
+  const confirmHtml = (r.confirm||'').split('\n').filter(Boolean).map(s=>`<div>${s}</div>`).join('') || '<span class="small">-</span>';
+  h+=`<tr class="${cls[r.judgment]||''}">`
+    +`<td>${r.pos}</td><td>${r.name}</td><td>${r.rrn}-*</td>`
+    +`<td>${r.appoint||''}</td><td>${r.resign||''}</td>`
+    +`<td>${r.eAcq||''}</td><td>${r.eLoss||''}</td>`
+    +`<td>${r.sAcq||''}</td><td>${r.sLoss||''}</td>`
+    +`<td><b>${r.judgmentE||'-'}</b></td><td><b>${r.judgmentS||'-'}</b></td>`
+    +`<td class="reason">${reasonHtml}</td>`
+    +`<td class="reason">${confirmHtml}</td>`
+    +`</tr>`;
+ });
+ h+='</tbody></table>';
+ // 요약
+ const cnt={};RESULTS.forEach(r=>cnt[r.judgment]=(cnt[r.judgment]||0)+1);
+ let sm='<p><b>요약:</b> ';Object.keys(cnt).forEach(k=>sm+=`${k} ${cnt[k]}건  `);sm+='</p>';
+ document.getElementById('result').innerHTML=sm+h;
+}
+
+function tableize(arr,cols){
+ if(!arr.length)return '<p class="small">없음</p>';
+ let h='<table><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+ arr.forEach(o=>{h+='<tr>'+cols.map(c=>`<td>${o[c]??''}</td>`).join('')+'</tr>';});
+ return h+'</table>';
+}
+
+document.getElementById('btnExport').onclick=()=>{
+ const ws=XLSX.utils.json_to_sheet(RESULTS.map(r=>({
+  직위:r.pos,성명:r.name,주민번호:r.rrn+'-*',
+  임원취임일:r.appoint||'',임원퇴임일:r.resign||'',
+  '고용 취득일':r.eAcq||'','고용 상실일':r.eLoss||'',
+  '산재 취득일':r.sAcq||'','산재 상실일':r.sLoss||'',
+  '고용 판정':r.judgmentE||'-','산재 판정':r.judgmentS||'-',
+  사유:r.reason,'사업장 확인 필요사유':r.confirm||''
+ })));
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'판정결과');
+ XLSX.writeFile(wb,'4대보험_환급대상_판정결과.xlsx');
+};
+</script>
+</body>
+</html>

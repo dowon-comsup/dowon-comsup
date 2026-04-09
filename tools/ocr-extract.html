@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>수기 스캔서류 OCR 추출 (Gemini / Claude)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<style>
+body{font-family:'Malgun Gothic',sans-serif;max-width:1200px;margin:20px auto;padding:0 16px;color:#222}
+h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:8px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
+label{font-weight:600;font-size:13px}
+input,select,button,textarea{font-size:13px;padding:6px 8px;border:1px solid #bbb;border-radius:4px}
+button{background:#2563eb;color:#fff;border:none;cursor:pointer;font-weight:600}
+button:disabled{background:#999;cursor:not-allowed}
+button.sec{background:#666}
+#log{background:#f4f4f4;padding:8px;font-size:12px;height:120px;overflow:auto;white-space:pre-wrap;border-radius:4px}
+.pages{display:flex;gap:8px;overflow-x:auto;margin:8px 0}
+.pages canvas{height:160px;border:1px solid #ccc}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:12px;margin-top:14px}
+.card{border:1px solid #d0d7e2;border-radius:8px;padding:12px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.card h3{margin:0 0 8px;font-size:14px;color:#1e3a8a;border-bottom:1px solid #e5e7eb;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.card h3 .badge{font-size:10px;background:#dbeafe;color:#1e40af;padding:2px 6px;border-radius:10px;font-weight:600}
+table.kv{width:100%;border-collapse:collapse;font-size:12px}
+table.kv td{padding:4px 6px;vertical-align:top;border-bottom:1px dashed #eee}
+table.kv td.k{width:42%;color:#555;font-weight:600;background:#fafbfc}
+table.kv td.v{color:#111;word-break:break-all}
+.empty{color:#bbb}
+.bool-y{color:#059669;font-weight:700}
+.bool-n{color:#9ca3af}
+.q{margin:6px 0;padding:6px 8px;background:#f9fafb;border-radius:4px;font-size:12px}
+.q b{color:#1f2937}
+.warn{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:8px;border-radius:6px;font-size:12px;margin-top:8px}
+.summary{background:#f0f9ff;border:1px solid #bae6fd;padding:10px;border-radius:6px;font-size:12px;line-height:1.6}
+.tabs{display:flex;gap:4px;margin-top:14px;border-bottom:2px solid #2563eb}
+.tab{padding:6px 14px;background:#e5e7eb;border-radius:6px 6px 0 0;cursor:pointer;font-size:12px;font-weight:600}
+.tab.active{background:#2563eb;color:#fff}
+.tabpane{display:none}
+.tabpane.active{display:block}
+pre#json{background:#fafafa;padding:8px;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:600px;overflow:auto;margin:0;border:1px solid #ddd;border-radius:4px}
+.list-item{padding:4px 6px;background:#f3f4f6;border-radius:3px;margin:2px 0;font-size:12px}
+</style>
+</head>
+<body>
+<div style="padding:10px 20px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
+  <a href="../index.html" style="font-size:13px;color:#2563eb;text-decoration:none;font-weight:600;">← 대시보드로 돌아가기</a>
+</div>
+<h1>📝 수기 스캔서류 OCR 추출 툴</h1>
+<p style="font-size:13px;color:#555">스캔된 수기 PDF를 업로드하면 비전 LLM이 페이지를 <b>병렬로 분할 호출</b>하여 인식 → 결과를 머지하고 항목별 카드 UI로 표시합니다.</p>
+
+<div class="row">
+  <label>API:</label>
+  <select id="provider">
+    <option value="gemini">Google Gemini (2.5 Pro / Flash)</option>
+    <option value="claude">Anthropic Claude (Sonnet 4.5)</option>
+  </select>
+  <select id="model"></select>
+</div>
+<div class="row">
+  <label>API Key:</label>
+  <input id="apikey" type="password" style="width:380px" placeholder="브라우저 로컬에만 저장됩니다">
+  <button class="sec" onclick="saveKey()">저장</button>
+</div>
+<div class="row">
+  <label>PDF:</label>
+  <input id="file" type="file" accept="application/pdf">
+  <label>해상도:</label>
+  <select id="scale"><option value="2">2x</option><option value="2.5" selected>2.5x</option><option value="3">3x</option></select>
+  <label>페이지/요청:</label>
+  <select id="chunk"><option value="1">1 (최대 병렬)</option><option value="2" selected>2</option><option value="3">3</option><option value="999">전체 1회</option></select>
+  <label>동시요청:</label>
+  <select id="concurrency"><option>2</option><option selected>4</option><option>6</option><option>8</option></select>
+  <button id="run" onclick="run()">🔍 인식 및 추출</button>
+</div>
+
+<div class="pages" id="pages"></div>
+<div id="log"></div>
+
+<div class="tabs">
+  <div class="tab active" onclick="tab('view')">📋 항목별 보기</div>
+  <div class="tab" onclick="tab('json')">{ } 원본 JSON</div>
+</div>
+<div id="pane-view" class="tabpane active">
+  <div id="cards" class="cards"></div>
+</div>
+<div id="pane-json" class="tabpane">
+  <pre id="json">대기중...</pre>
+  <div class="row"><button class="sec" onclick="copy('json')">JSON 복사</button></div>
+</div>
+
+<script>
+const MODELS={gemini:['gemini-2.5-pro','gemini-2.5-flash'],claude:['claude-sonnet-4-5','claude-opus-4-5']};
+const provEl=document.getElementById('provider'),modEl=document.getElementById('model');
+function refreshModels(){modEl.innerHTML='';MODELS[provEl.value].forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;modEl.appendChild(o)})}
+provEl.onchange=refreshModels;refreshModels();
+document.getElementById('apikey').value=localStorage.getItem('ocr_key_'+provEl.value)||'';
+provEl.addEventListener('change',()=>{document.getElementById('apikey').value=localStorage.getItem('ocr_key_'+provEl.value)||''});
+function saveKey(){localStorage.setItem('ocr_key_'+provEl.value,document.getElementById('apikey').value);log('키 저장됨')}
+function log(m){const l=document.getElementById('log');l.textContent+='['+new Date().toLocaleTimeString()+'] '+m+'\n';l.scrollTop=l.scrollHeight}
+function copy(id){navigator.clipboard.writeText(document.getElementById(id).textContent);log(id+' 복사됨')}
+function tab(t){['view','json'].forEach(x=>{document.getElementById('pane-'+x).classList.toggle('active',x===t)});document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',(i===0&&t==='view')||(i===1&&t==='json')))}
+
+const SCHEMA=`{
+  "사업장정보": {"상호명":str,"담당자":str,"담당자연락처":str,"주소":str,"이메일":str,"전화번호":str,"업태_종목":str,"상시근로자수":int,"사업자등록번호":str,"대표자":str,"대표자주민번호":str},
+  "진단_기초정보": {
+    "1_퇴직금지급방법":{"퇴직금":bool,"퇴직연금DC":bool,"퇴직연금DB":bool,"가입월":str},
+    "2_등기임원유무":{"있음":bool,"성명목록":[str],"가입중등기임원없음":bool,"법인아님":bool},
+    "3_대표이사동거친족":{"있음":bool,"성명":str,"비고":str},
+    "4_청년추가고용_특별고용촉진장려금_수령이력":{"있음":bool,"지원금명":str},
+    "5_취업규칙정년설정":{"있음":bool,"정년":int},
+    "6_최근1년_고용조정인원":{"있음":bool},
+    "7_최근3년_육아휴직자":{"있음":bool,"인원":int},
+    "8_여성가장근로자":{"있음":bool,"성명":str},
+    "9_향후6개월채용계획":{"있음":bool,"만15_39":int,"만60이상":int},
+    "10_주30시간이하단축가부":{"가능":bool,"가능인원":int},
+    "11_지사_공장_판매점_별도":{"있음":bool},
+    "12_장애인고용_3.1퍼센트_초과":{"해당":bool,"성명":str},
+    "13_중소기업해당":{"해당":bool}
+  },
+  "지원금_검토전_기초정보":{"기신청_지원금":[{"지원금명":str,"대상자":[str]}],"신청예정_지원금":[{"지원금명":str,"대상자":[str]}]},
+  "위임장":{"수임인_사무소명":str,"수임인_성명":str,"수임인_사업자등록번호":str,"위임인_상호":str,"위임인_사업자등록번호":str,"위임인_연락처":str,"위임인_주소":str},
+  "대리인선임신고서":{"사업장관리번호":str,"선임일":str,"신고일":str,"보험종류":{"고용보험":bool,"산재보험":bool}},
+  "신뢰도_낮은_필드":[str],
+  "원문_요약":str
+}`;
+
+function buildPrompt(pageNumsInfo){
+  return `당신은 한국어 수기(Handwriting) 문서 OCR 전문가입니다. 첨부된 스캔 이미지(${pageNumsInfo})는 노무법인이 사업장으로부터 받는 "지원금 및 4대보험 진단 기초정보", "위임장", "대리인 선임 신고서" 등 수기 작성 양식 일부입니다.
+
+수기로 작성된 한글/숫자/체크표시(✓,V,☑)를 정확히 인식하고 아래 JSON 스키마로만 응답하세요. 본 청크에 해당 항목이 없으면 해당 키는 null. 모르는 값도 null. 체크박스는 true/false. 추측 금지.
+
+${SCHEMA}
+
+JSON 외 다른 텍스트 절대 금지. 코드펜스도 금지.`;
+}
+
+let pageImages=[];
+document.getElementById('file').addEventListener('change',async e=>{
+  try{
+  const f=e.target.files[0];if(!f)return;
+  pageImages=[];document.getElementById('pages').innerHTML='';
+  log('PDF 로드: '+f.name+' ('+(f.size/1024).toFixed(0)+'KB)');
+  const buf=await f.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  const scale=parseFloat(document.getElementById('scale').value);
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const vp=page.getViewport({scale});
+    const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    pageImages.push(c.toDataURL('image/jpeg',0.85));
+    const t=document.createElement('canvas');t.width=vp.width/3;t.height=vp.height/3;
+    t.getContext('2d').drawImage(c,0,0,t.width,t.height);
+    document.getElementById('pages').appendChild(t);
+  }
+  log(pdf.numPages+' 페이지 렌더링 완료.');
+  }catch(err){log('PDF 오류: '+err.message);alert('PDF 로드 실패: '+err.message)}
+});
+
+// ============ 병렬 OCR ============
+async function run(){
+  if(!pageImages.length){alert('PDF 먼저 업로드');return}
+  const key=document.getElementById('apikey').value.trim();
+  if(!key){alert('API Key 입력');return}
+  const btn=document.getElementById('run');btn.disabled=true;btn.textContent='처리중...';
+  const t0=performance.now();
+  try{
+    const provider=provEl.value,model=modEl.value;
+    const chunkSize=parseInt(document.getElementById('chunk').value);
+    const concurrency=parseInt(document.getElementById('concurrency').value);
+    // 청크 분할
+    const chunks=[];
+    for(let i=0;i<pageImages.length;i+=chunkSize){
+      chunks.push({start:i+1,end:Math.min(i+chunkSize,pageImages.length),imgs:pageImages.slice(i,i+chunkSize)});
+    }
+    log(`${provider}/${model} | ${pageImages.length}p → ${chunks.length}청크 | 동시 ${concurrency}`);
+
+    const results=new Array(chunks.length);
+    let done=0,nextIdx=0;
+    async function worker(){
+      while(true){
+        const idx=nextIdx++;if(idx>=chunks.length)return;
+        const ck=chunks[idx];
+        const info=`p${ck.start}${ck.end>ck.start?'-'+ck.end:''}`;
+        try{
+          log(`▶ 청크 ${idx+1}/${chunks.length} (${info}) 시작`);
+          const raw=provider==='gemini'
+            ? await callGemini(key,model,ck.imgs,info)
+            : await callClaude(key,model,ck.imgs,info);
+          let txt=raw.trim().replace(/^```json\s*/,'').replace(/```$/,'').trim();
+          let parsed;try{parsed=JSON.parse(txt)}catch(e){parsed={_parse_error:e.message,_raw:raw}}
+          results[idx]=parsed;done++;
+          log(`✓ 청크 ${idx+1} 완료 (${done}/${chunks.length})`);
+        }catch(e){
+          log(`✗ 청크 ${idx+1} 실패: ${e.message}`);
+          results[idx]={_error:e.message};done++;
+        }
+      }
+    }
+    await Promise.all(Array.from({length:Math.min(concurrency,chunks.length)},worker));
+
+    // 머지
+    const merged=mergeResults(results);
+    const dt=((performance.now()-t0)/1000).toFixed(1);
+    log(`전체 완료 (${dt}s)`);
+    document.getElementById('json').textContent=JSON.stringify(merged,null,2);
+    renderCards(merged);
+  }catch(e){log('오류: '+e.message);alert(e.message)}
+  finally{btn.disabled=false;btn.textContent='🔍 인식 및 추출'}
+}
+
+// 깊이 머지 — null/빈값 무시, 배열은 concat-uniq, bool은 true 우선
+function mergeResults(arr){
+  const out={};
+  for(const r of arr){if(r&&!r._error&&!r._parse_error)deepMerge(out,r)}
+  out._chunks=arr;
+  return out;
+}
+function isEmpty(v){return v==null||v===''||(Array.isArray(v)&&v.length===0)}
+function deepMerge(dst,src){
+  if(src==null||typeof src!=='object')return;
+  for(const k of Object.keys(src)){
+    const sv=src[k];
+    if(isEmpty(sv))continue;
+    const dv=dst[k];
+    if(Array.isArray(sv)){
+      if(!Array.isArray(dv)){dst[k]=sv.slice()}
+      else{
+        for(const it of sv){
+          const key=typeof it==='object'?JSON.stringify(it):it;
+          if(!dv.some(x=>(typeof x==='object'?JSON.stringify(x):x)===key))dv.push(it);
+        }
+      }
+    }else if(typeof sv==='object'){
+      if(typeof dv!=='object'||dv==null)dst[k]={};
+      deepMerge(dst[k],sv);
+    }else if(typeof sv==='boolean'){
+      dst[k]=(dv===true)||sv;
+    }else{
+      if(isEmpty(dv))dst[k]=sv;
+    }
+  }
+}
+
+// ============ API 호출 ============
+async function callGemini(key,model,imgs,info){
+  const parts=[{text:buildPrompt(info)}];
+  imgs.forEach(d=>parts.push({inline_data:{mime_type:'image/jpeg',data:d.split(',')[1]}}));
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:0,responseMimeType:'application/json'}})
+  });
+  const j=await r.json();
+  if(!r.ok)throw new Error(JSON.stringify(j).slice(0,300));
+  return j.candidates[0].content.parts[0].text;
+}
+async function callClaude(key,model,imgs,info){
+  const content=[{type:'text',text:buildPrompt(info)}];
+  imgs.forEach(d=>content.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:d.split(',')[1]}}));
+  const r=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model,max_tokens:8000,temperature:0,messages:[{role:'user',content}]})
+  });
+  const j=await r.json();
+  if(!r.ok)throw new Error(JSON.stringify(j).slice(0,300));
+  return j.content[0].text;
+}
+
+// ============ 카드 UI 렌더 ============
+function v(x){return isEmpty(x)?'<span class="empty">-</span>':escapeHtml(String(x))}
+function b(x){return x===true?'<span class="bool-y">✓ 예</span>':x===false?'<span class="bool-n">✗ 아니오</span>':'<span class="empty">-</span>'}
+function escapeHtml(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function kvTable(obj,labels){
+  let h='<table class="kv">';
+  for(const k of Object.keys(labels)){h+=`<tr><td class="k">${labels[k]}</td><td class="v">${v(obj?.[k])}</td></tr>`}
+  return h+'</table>';
+}
+function renderCards(p){
+  const root=document.getElementById('cards');root.innerHTML='';
+  if(!p){root.innerHTML='<div class="card">결과 없음</div>';return}
+
+  // 사업장정보
+  const s=p.사업장정보||{};
+  add('🏢 사업장 정보',kvTable(s,{
+    상호명:'상호명',대표자:'대표자',사업자등록번호:'사업자등록번호',
+    대표자주민번호:'대표자 주민번호',업태_종목:'업태/종목',상시근로자수:'상시근로자수',
+    주소:'주소',전화번호:'전화번호',이메일:'이메일',
+    담당자:'담당자',담당자연락처:'담당자 연락처'
+  }));
+
+  // 진단 13문항
+  const d=p.진단_기초정보||{};
+  const Q=[
+    ['1_퇴직금지급방법','1. 퇴직금 지급방법',o=>`퇴직금 ${b(o.퇴직금)} · DC ${b(o.퇴직연금DC)} · DB ${b(o.퇴직연금DB)}<br>가입월: ${v(o.가입월)}`],
+    ['2_등기임원유무','2. 등기임원',o=>`있음 ${b(o.있음)} · 가입 등기임원 없음 ${b(o.가입중등기임원없음)} · 법인아님 ${b(o.법인아님)}<br>성명: ${v((o.성명목록||[]).join(', '))}`],
+    ['3_대표이사동거친족','3. 대표이사 동거친족',o=>`${b(o.있음)} 성명: ${v(o.성명)} 비고: ${v(o.비고)}`],
+    ['4_청년추가고용_특별고용촉진장려금_수령이력','4. 청년추가고용/특별고용촉진 수령이력',o=>`${b(o.있음)} 지원금명: ${v(o.지원금명)}`],
+    ['5_취업규칙정년설정','5. 취업규칙 정년',o=>`${b(o.있음)} 정년: ${v(o.정년)}`],
+    ['6_최근1년_고용조정인원','6. 최근 1년 고용조정',o=>b(o.있음)],
+    ['7_최근3년_육아휴직자','7. 최근 3년 육아휴직',o=>`${b(o.있음)} 인원: ${v(o.인원)}`],
+    ['8_여성가장근로자','8. 여성가장 근로자',o=>`${b(o.있음)} 성명: ${v(o.성명)}`],
+    ['9_향후6개월채용계획','9. 향후 6개월 채용계획',o=>`${b(o.있음)} · 만15-39: ${v(o.만15_39)} · 만60+: ${v(o.만60이상)}`],
+    ['10_주30시간이하단축가부','10. 주30시간↓ 단축가부',o=>`${b(o.가능)} 가능인원: ${v(o.가능인원)}`],
+    ['11_지사_공장_판매점_별도','11. 지사/공장/판매점 별도',o=>b(o.있음)],
+    ['12_장애인고용_3.1퍼센트_초과','12. 장애인 3.1% 초과',o=>`${b(o.해당)} 성명: ${v(o.성명)}`],
+    ['13_중소기업해당','13. 중소기업 해당',o=>b(o.해당)],
+  ];
+  let qh='';
+  for(const [k,label,fn] of Q){const o=d[k]||{};qh+=`<div class="q"><b>${label}</b><br>${fn(o)}</div>`}
+  add('📋 진단 기초정보 (13문항)',qh);
+
+  // 지원금
+  const z=p.지원금_검토전_기초정보||{};
+  const renderList=arr=>(arr&&arr.length)?arr.map(it=>`<div class="list-item"><b>${v(it.지원금명)}</b><br>대상자: ${v((it.대상자||[]).join(', '))}</div>`).join(''):'<span class="empty">-</span>';
+  add('💰 지원금 검토 정보',
+    `<div style="font-size:12px"><b>기신청 지원금</b>${renderList(z.기신청_지원금)}<br><b>신청예정 지원금</b>${renderList(z.신청예정_지원금)}</div>`);
+
+  // 위임장
+  const w=p.위임장||{};
+  add('📝 위임장',kvTable(w,{
+    수임인_사무소명:'수임인 사무소명',수임인_성명:'수임인 성명',수임인_사업자등록번호:'수임인 사업자번호',
+    위임인_상호:'위임인 상호',위임인_사업자등록번호:'위임인 사업자번호',
+    위임인_연락처:'위임인 연락처',위임인_주소:'위임인 주소'
+  }));
+
+  // 대리인선임
+  const a=p.대리인선임신고서||{};
+  add('🪪 대리인 선임 신고서',
+    kvTable(a,{사업장관리번호:'사업장 관리번호',선임일:'선임일',신고일:'신고일'})+
+    `<div style="margin-top:6px;font-size:12px">고용보험 ${b(a.보험종류?.고용보험)} · 산재보험 ${b(a.보험종류?.산재보험)}</div>`);
+
+  // 요약/경고
+  let extra='';
+  if(p.원문_요약)extra+=`<div class="summary">${escapeHtml(p.원문_요약)}</div>`;
+  if(p.신뢰도_낮은_필드&&p.신뢰도_낮은_필드.length)extra+=`<div class="warn">⚠ 확인 필요: ${p.신뢰도_낮은_필드.map(escapeHtml).join(', ')}</div>`;
+  if(extra)add('📌 요약 / 확인 필요',extra);
+
+  function add(title,html){
+    const c=document.createElement('div');c.className='card';
+    c.innerHTML=`<h3>${title}</h3>${html}`;
+    root.appendChild(c);
+  }
+}
+</script>
+</body>
+</html>
