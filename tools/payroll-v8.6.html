@@ -1738,13 +1738,20 @@ function classifyPage(p) {
   if(isPayslipLikely) { payScore += 6; reasons.push('명세서표식(+6)'); }
 
   // --- 2. 제목 키워드 (header) ---
-  const payHeaderRe = /급\s*여\s*대\s*장|급여대장|급여\s*명세|급여명세서|임금\s*대장|임금\s*명세|지급\s*명세/;
+  // v8.6+: 단순 키워드 OR 매칭으로 변경. 헤더에 (임금|급여|월급|봉급) 또는 (대장|명세서|명세) 중
+  // 어느 하나라도 들어있으면 급여 문서로 간주. OCR 깨짐/공백 삽입에 강함.
+  // 기존 결합형은 강한 신호로 추가 가점.
+  const payHeaderWordRe = /임\s*금|급\s*여|월\s*급|봉\s*급|대\s*장|명\s*세\s*서|명\s*세/;
+  const payHeaderStrongRe = /(?:급\s*여|임\s*금|월\s*급|봉\s*급)[^\n]{0,6}(?:대\s*장|명\s*세)|(?:대\s*장|명\s*세)[^\n]{0,6}(?:급\s*여|임\s*금)/;
+  const payHeaderRe = payHeaderWordRe; // 본문 검사 호환용 alias
   const trfHeaderRe = /영\s*수\s*증|자동\s*이체|이체\s*영수|대량\s*입금|입금\s*내역|이체\s*내역|이체\s*확인|입금\s*확인/;
-  if(has(payHeaderRe, header)) { payScore += 4; reasons.push('급여제목(+4)'); }
+  if(has(payHeaderStrongRe, header)) { payScore += 5; reasons.push('급여제목강(+5)'); }
+  else if(has(payHeaderWordRe, header)) { payScore += 3; reasons.push('급여제목약(+3)'); }
   if(has(trfHeaderRe, header)) { trfScore += 4; reasons.push('이체제목(+4)'); }
 
   // --- 3. 본문 키워드 ---
-  if(has(payHeaderRe, fullText) && !has(payHeaderRe, header)) { payScore += 2; reasons.push('급여본문(+2)'); }
+  if(has(payHeaderStrongRe, fullText) && !has(payHeaderStrongRe, header)) { payScore += 3; reasons.push('급여본문강(+3)'); }
+  else if(has(payHeaderWordRe, fullText) && !has(payHeaderWordRe, header)) { payScore += 1; reasons.push('급여본문약(+1)'); }
   if(has(trfHeaderRe, fullText) && !has(trfHeaderRe, header)) { trfScore += 2; reasons.push('이체본문(+2)'); }
 
   // --- 4. 페이지 비율 (보조 지표) ---
@@ -1828,44 +1835,63 @@ function classifyPage(p) {
     }
   } else {
     // ★ 급여대장/명세서
-    // v8.7 0순위: 임금산정기간 YYYY-MM-DD ~ YYYY-MM-DD (명세서 핵심)
-    const periodMatch = fullText.replace(/\s/g,'').match(/임금산정기간[:\s]*(\d{4})[-\/.](\d{1,2})[-\/.]\d{1,2}/);
-    if(periodMatch) mm = [null, periodMatch[1], periodMatch[2]];
+    // v8.6+ 0순위: 파일명에서 YYYY-MM / YYYY.MM / YYYY_MM / YYYYMM 추출 (가장 신뢰도 높음)
+    // 예: "2023.05임금대장.pdf", "2023-05_급여대장.pdf", "202305_payroll.pdf"
+    if(p.fileName) {
+      const fnm = p.fileName.match(/(20\d{2})[-_.\s]?(0[1-9]|1[0-2])(?!\d)/);
+      if(fnm) mm = [null, fnm[1], fnm[2]];
+    }
+    // v8.6+ 0.05순위: "출력일시"/"인쇄일자"/"발행일자" 라인은 월 식별에서 제외 (오인식 방지)
+    // OCR이 공백을 끼워 넣을 수 있으므로 글자별 \s* 허용
+    const cleanedText = fullText.replace(/(?:출\s*력|인\s*쇄|발\s*행|작\s*성)\s*(?:일\s*시|일\s*자)[^\n]{0,40}/g, ' ');
+    const cleanedHeader = header.replace(/(?:출\s*력|인\s*쇄|발\s*행|작\s*성)\s*(?:일\s*시|일\s*자)[^\n]{0,40}/g, ' ');
+    // v8.6+ 0.1순위: 임금/급여대장 헤더의 "(YYYY-MM)" 패턴 — OCR 공백 깨짐 허용
+    // \d{4} 대신 \d\s*\d\s*\d\s*\d 로 연도 중간 공백도 허용 ("(202 3-05)")
+    if(!mm) {
+      const titleYM = cleanedHeader.match(/(?:임\s*금|급\s*여)\s*(?:대\s*장|명\s*세)[^\n]{0,15}\(?\s*(\d\s*\d\s*\d\s*\d)\s*[-\/.\s]\s*(\d\s*\d?)\s*\)?/)
+                   || cleanedHeader.match(/\(\s*(\d\s*\d\s*\d\s*\d)\s*[-\/.]\s*(\d\s*\d?)\s*\)/);
+      if(titleYM) mm = [null, titleYM[1].replace(/\s/g,''), titleYM[2].replace(/\s/g,'')];
+    }
+    // v8.7 0.1순위: 임금산정기간 YYYY-MM-DD ~ YYYY-MM-DD (명세서 핵심)
+    if(!mm) {
+      const periodMatch = cleanedText.replace(/\s/g,'').match(/임금산정기간[:\s]*(\d{4})[-\/.](\d{1,2})[-\/.]\d{1,2}/);
+      if(periodMatch) mm = [null, periodMatch[1], periodMatch[2]];
+    }
     // v8.7 0.5순위: "YYYY년 M월 급여지급 및 공제내역"
-    if(!mm) mm = fullText.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*급여\s*지급\s*및\s*공제\s*내역/);
+    if(!mm) mm = cleanedText.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*급여\s*지급\s*및\s*공제\s*내역/);
     // 1순위: 헤더에서 "YYYY년 M월 급여/분/귀속/대장/명세"
-    if(!mm) mm = header.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(?:분|급여|귀속|임금|대장|명세)/);
+    if(!mm) mm = cleanedHeader.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(?:분|급여|귀속|임금|대장|명세)/);
     // 1.5순위: "YYYY년 MM월분 급여대장" 형태 (월분 패턴)
-    if(!mm) mm = header.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*분/);
+    if(!mm) mm = cleanedHeader.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*분/);
     // 2순위: 헤더에서 "YYYY년 M월"
-    if(!mm) mm = header.match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);
+    if(!mm) mm = cleanedHeader.match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);
     // 3순위: 헤더에서 "YY년 M월"
     if(!mm) {
-      const shortM = header.match(/(\d{2})\s*년\s*(\d{1,2})\s*월/);
+      const shortM = cleanedHeader.match(/(\d{2})\s*년\s*(\d{1,2})\s*월/);
       if(shortM) mm = [null, String(+shortM[1]+2000), shortM[2]];
     }
     // 4순위: 전체에서 "YYYY년 M월 급여/분"
-    if(!mm) mm = fullText.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(?:분|급여|귀속|임금|대장|명세)/);
+    if(!mm) mm = cleanedText.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(?:분|급여|귀속|임금|대장|명세)/);
     // 5순위: 지급년월일 필드 (v4.5: OCR 오인식 대응 강화)
     if(!mm) {
-      const payDate = fullText.match(/지급\s*(?:년|넌|연)?\s*월\s*일[^\d]*(\d{4})\s*(?:년|넌|연)?\s*(\d{1,2})\s*월/);
+      const payDate = cleanedText.match(/지급\s*(?:년|넌|연)?\s*월\s*일[^\d]*(\d{4})\s*(?:년|넌|연)?\s*(\d{1,2})\s*월/);
       if(payDate) mm = [null, payDate[1], payDate[2]];
     }
     // 5.5순위: "지급년월 YYYY-MM" 또는 "귀속년월 YYYY-MM" 패턴
     if(!mm) {
-      const m55 = fullText.match(/(?:지급|귀속)\s*년\s*월[^\d]*(\d{4})[-\/\.\s](\d{1,2})/);
+      const m55 = cleanedText.match(/(?:지급|귀속)\s*년\s*월[^\d]*(\d{4})[-\/\.\s](\d{1,2})/);
       if(m55) mm = [null, m55[1], m55[2]];
     }
     // 6순위: 전체에서 "YYYY년 M월"
-    if(!mm) mm = fullText.match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);
+    if(!mm) mm = cleanedText.match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);
     // 7순위: "YYYY-MM-DD"
     if(!mm) {
-      const dateM = fullText.match(/(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})/);
+      const dateM = cleanedText.match(/(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})/);
       if(dateM) mm = [null, dateM[1], dateM[2]];
     }
     // 8순위: 2자리 연도
     if(!mm) {
-      const shortM = fullText.match(/(\d{2})\s*년\s*(\d{1,2})\s*월/);
+      const shortM = cleanedText.match(/(\d{2})\s*년\s*(\d{1,2})\s*월/);
       if(shortM) mm = [null, String(+shortM[1]+2000), shortM[2]];
     }
   }
