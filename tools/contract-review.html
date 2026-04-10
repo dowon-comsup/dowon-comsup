@@ -117,7 +117,7 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
 <!-- Upload zone -->
 <div class="upload-zone" id="uploadZone">
   <h3>PDF 파일을 드래그하거나 클릭하여 업로드</h3>
-  <p>사실증명서, 졸업증명서, 병력증명서, 근로계약서 등 관련 서류 PDF를 모두 업로드해주세요 (복수 파일 가능)</p>
+  <p>사실증명서, 졸업증명서, 근로계약서 등 관련 서류 PDF를 모두 업로드해주세요 (복수 파일 가능)</p>
   <input type="file" id="fileInput" accept="application/pdf" multiple>
 </div>
 <ul class="file-list" id="fileList"></ul>
@@ -310,8 +310,6 @@ function buildPrompt(){
 - start_date: 입사일 (YYYY-MM-DD)
 - company_name: 사업장명
 - birth_date: 생년월일 (YYYY-MM-DD, 확인 가능 시)
-- gender: 성별 ("남"/"여"/null)
-
 ### 2. 서류 존재 여부 (documents)
 각 서류가 업로드된 PDF에 포함되어 있는지 판단:
 
@@ -324,11 +322,6 @@ function buildPrompt(){
   - 판단기준: 학교명, 졸업일자, 학위명 포함
   - found: true/false
   - detail: 판단 근거 (학교명, 학위 등)
-
-- military_certificate: 병력증명서
-  - required: 생년월일 기준 만 34세 이상 + 성별 남성인 경우에만 true (오늘 날짜: ${new Date().toISOString().slice(0,10)})
-  - found: true/false/null (해당없음이면 null)
-  - detail: 판단 근거
 
 - employment_contract: 근로계약서
   - 판단기준: "근로계약서" 제목 포함
@@ -393,11 +386,9 @@ function buildPrompt(){
   "start_date": "",
   "company_name": "",
   "birth_date": "",
-  "gender": "",
   "documents": {
     "fact_certificate": {"found": false, "detail": ""},
     "graduation_certificate": {"found": false, "detail": ""},
-    "military_certificate": {"required": false, "found": null, "detail": ""},
     "employment_contract": {"found": false, "detail": ""}
   },
   "contract_analysis": null | {
@@ -436,8 +427,7 @@ function renderResults(r){
   infoBar.style.display='flex';
   infoBar.innerHTML='';
   const infos=[
-    ['근로자','worker_name'],['입사일','start_date'],['사업장','company_name'],
-    ['생년월일','birth_date'],['성별','gender']
+    ['근로자','worker_name'],['입사일','start_date'],['사업장','company_name'],['생년월일','birth_date']
   ];
   infos.forEach(([label,key])=>{
     if(r[key]){
@@ -466,7 +456,6 @@ function renderDocCards(docs, r){
   const items=[
     {key:'fact_certificate',label:'사실증명서',desc:'국세청 발급 사실증명',icon:'📄'},
     {key:'graduation_certificate',label:'졸업증명서',desc:'학교명/졸업일/학위',icon:'🎓'},
-    {key:'military_certificate',label:'병력증명서',desc:'만34세↑ 남성만 필수',icon:'🪖'},
     {key:'employment_contract',label:'근로계약서',desc:'근로계약서 원본',icon:'📝'}
   ];
 
@@ -474,18 +463,8 @@ function renderDocCards(docs, r){
     const d=docs[item.key];
     let cls,statusText;
 
-    if(item.key==='military_certificate'){
-      if(!d.required){
-        cls='na'; statusText='해당없음';
-      }else if(d.found){
-        cls='found'; statusText='있음';
-      }else{
-        cls='missing'; statusText='없음';
-      }
-    }else{
-      cls=d.found?'found':'missing';
-      statusText=d.found?'있음':'없음';
-    }
+    cls=d.found?'found':'missing';
+    statusText=d.found?'있음':'없음';
 
     const statusIcon=cls==='found'?'✅':cls==='missing'?'❌':'⚠️';
     container.innerHTML+=`<div class="doc-card ${cls}">
@@ -579,7 +558,6 @@ function renderSummary(r){
   // Check missing docs
   if(!docs.fact_certificate.found) issues++;
   if(!docs.graduation_certificate.found) issues++;
-  if(docs.military_certificate.required && !docs.military_certificate.found) issues++;
   if(!docs.employment_contract.found) issues++;
 
   // Check contract issues
