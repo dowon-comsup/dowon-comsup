@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>등기임원 4대보험 환급대상 판정 툴 v1.0</title>
+<title>등기임원 4대보험 환급대상 판정 툴 v1.1</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
@@ -34,14 +34,31 @@
  .small{font-size:11px;color:#666}
  details{margin:6px 0}
  pre{background:#f4f4f4;padding:8px;font-size:11px;overflow:auto;max-height:200px}
+ .file-list{list-style:none;padding:0;margin:6px 0}
+ .file-list li{display:flex;align-items:center;gap:8px;padding:5px 8px;margin:3px 0;background:#fff;border:1px solid #ddd;border-radius:4px;font-size:12px}
+ .file-list li .fname{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .file-list li .fmeta{color:#666;font-size:11px}
+ .file-list li button{padding:2px 8px;font-size:11px;margin:0;background:#d44;min-width:auto}
+ .biz-section{border:2px solid #36c;border-radius:8px;padding:14px;margin:16px 0}
+ .biz-header{display:flex;align-items:center;gap:12px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ccc}
+ .biz-header h3{margin:0;font-size:14px;color:#36c}
+ .biz-header .biz-meta{font-size:12px;color:#555}
+ .tab-bar{display:flex;gap:0;border-bottom:2px solid #36c;margin-top:16px}
+ .tab-bar button{background:#eef;color:#333;border:1px solid #ccc;border-bottom:none;padding:8px 16px;font-size:13px;cursor:pointer;border-radius:6px 6px 0 0;margin:0;position:relative;bottom:-1px}
+ .tab-bar button.active{background:#fff;color:#36c;font-weight:700;border-color:#36c;border-bottom:2px solid #fff}
+ tr.j-historical{opacity:0.75}
+ tr.j-historical td:first-child{border-left:3px solid #999}
+ .period-badge{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;margin-top:2px}
+ .period-badge.current{background:#dfd;color:#060;border:1px solid #090}
+ .period-badge.past{background:#eee;color:#666;border:1px solid #999}
 </style>
 </head>
 <body>
 <div style="padding:10px 20px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
   <a href="../index.html" style="font-size:13px;color:#2563eb;text-decoration:none;font-weight:600;">← 대시보드로 돌아가기</a>
 </div>
-<h1>등기임원 4대보험(고용/산재) 환급대상 자동 판정 툴 <span style="font-size:13px;color:#888">v1.0</span></h1>
-<p class="small">법인등기부등본 PDF + 근로자고용정보현황 PDF/Excel을 업로드하면 등기임원의 가입여부를 자동 매칭하여 <b>취득취소 / 상실신고 / 정상</b>을 판정합니다. 모든 처리는 브라우저 내에서만 수행되며 외부로 전송되지 않습니다.</p>
+<h1>등기임원 4대보험(고용/산재) 환급대상 자동 판정 툴 <span style="font-size:13px;color:#888">v1.1</span></h1>
+<p class="small">법인등기부등본 PDF + 근로자고용정보현황 PDF/Excel을 업로드하면 등기임원의 가입여부를 자동 매칭하여 <b>취득취소 / 상실신고 / 정상</b>을 판정합니다.<br>복수 사업장(지사 등)의 고용현황을 각각 업로드하면 사업장 관리번호별로 분리 판정합니다. 모든 처리는 브라우저 내에서만 수행되며 외부로 전송되지 않습니다.</p>
 
 <div class="box row">
  <div>
@@ -49,8 +66,10 @@
   <input type="file" id="pdfReg" accept="application/pdf">
  </div>
  <div>
-  <b>② 근로자고용정보현황 (PDF 또는 Excel/CSV)</b><br>
-  <input type="file" id="fileEmp" accept=".pdf,.xlsx,.xls,.csv">
+  <b>② 근로자고용정보현황 (PDF 또는 Excel/CSV) — 복수 파일 가능</b><br>
+  <input type="file" id="fileEmp" accept=".pdf,.xlsx,.xls,.csv" multiple>
+  <ul class="file-list" id="empFileList"></ul>
+  <p class="small" id="empFileHint">복수 사업장인 경우 파일을 여러 번 선택하여 추가할 수 있습니다.</p>
  </div>
 </div>
 <div style="text-align:center">
@@ -80,7 +99,9 @@
 <details><summary>📋 등기부 PDF 원본 텍스트 (추출 결과)</summary><pre id="dbgRegText"></pre></details>
 <details><summary>📋 추출된 등기임원</summary><div id="dbgOff"></div></details>
 <details><summary>📋 고용현황 PDF 원본 텍스트 (앞부분)</summary><pre id="dbgEmpText"></pre></details>
-<details><summary>📋 추출된 고용보험 가입자 (임원 매칭분만)</summary><div id="dbgEmp"></div></details>
+<details><summary>📋 추출된 보험 가입자 — 고용보험 (임원 매칭분)</summary><div id="dbgEmpE"></div></details>
+<details><summary>📋 추출된 보험 가입자 — 산재보험 (임원 매칭분)</summary><div id="dbgEmpS"></div></details>
+<details><summary>📋 추출된 보험 가입자 — 전체 (임원 매칭분)</summary><div id="dbgEmp"></div></details>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -136,8 +157,10 @@ async function pdfToText(file){
 // 말소선(취소선)은 PDF 텍스트에서 구분 안 됨 → 같은 직위/이름/주민번호 블록 중 가장 마지막(최신) 블록을 "현행"으로 간주하고
 // 그 블록 내 이벤트 중 사임/퇴임/사망/임기만료/해임 이 있으면 퇴임자로 본다.
 function parseRegistry(text){
- const posRe=/(대표이사|사내이사|사외이사|감사|이사)\s*([가-힣]{2,5})\s*(\d{6})\s*-?\s*\*+/;
+ // 이사장은 이사보다 먼저 매칭되어야 함 (substring 오매칭 방지)
+ const posRe=/(이사장|대표이사|사내이사|사외이사|감사|이사)\s*([가-힣]{2,5})\s*(\d{6})\s*-?\s*\*+/;
  const dateRe=/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*(취임|중임|퇴임|사임|해임|사망|임기만료)/g;
+ const TERM=['사임','퇴임','해임','사망','임기만료'];
  const lines=text.split('\n');
  // 블록 분할
  const blocks=[]; let cur=null;
@@ -148,37 +171,81 @@ function parseRegistry(text){
  });
  if(cur)blocks.push(cur);
 
- // 동일 (name,rrn) 그룹의 마지막 블록만 사용
- const lastByKey={};
- blocks.forEach((b,i)=>{ lastByKey[b.name+b.rrn]=i; });
- const officers={};
- blocks.forEach((b,i)=>{
+ // 동일 (name,rrn) 그룹의 모든 블록 이벤트를 병합 (마지막 블록의 직위 사용)
+ const grouped={};
+ blocks.forEach(b=>{
   const key=b.name+b.rrn;
-  if(lastByKey[key]!==i) return; // 옛 블록 무시
-  const txt=b.lines.join('\n');
+  if(!grouped[key]) grouped[key]={pos:b.pos,name:b.name,rrn:b.rrn,allLines:[]};
+  grouped[key].pos=b.pos; // 마지막 블록의 직위를 사용
+  grouped[key].allLines.push(...b.lines);
+ });
+ const result=[];
+ Object.entries(grouped).forEach(([key,g])=>{
+  const txt=g.allLines.join('\n');
   const events=[]; let mm;
   while((mm=dateRe.exec(txt))){
    events.push({date:`${mm[1]}-${String(mm[2]).padStart(2,'0')}-${String(mm[3]).padStart(2,'0')}`,type:mm[4]});
   }
   dateRe.lastIndex=0;
-  // 취임/중임 중 가장 빠른 일자 = 현 임기 시작 (단, 사임/퇴임 후 재취임이면 마지막 취임)
-  // 단순화: 마지막 "취임" 이후 사건들로 판단
-  let appoint=null,resign=null;
-  events.forEach(e=>{
-   if(e.type==='취임') appoint=e.date;
-   if(['퇴임','사임','해임','사망','임기만료'].includes(e.type)) resign=e.date;
+  // 중복 이벤트 제거 (같은 날짜+같은 유형)
+  const seen=new Set();
+  const uniqEvents=events.filter(e=>{const k=e.date+e.type;if(seen.has(k))return false;seen.add(k);return true;});
+  // 정렬: 날짜순, 같은 날이면 종료 이벤트가 취임보다 앞에 오도록
+  uniqEvents.sort((a,b)=>a.date.localeCompare(b.date)||(TERM.includes(a.type)?-1:1));
+  // 같은 날 사임/퇴임 + 취임이 모두 있으면 → 등기 재발행(연속 임기)으로 간주, 둘 다 제거
+  const drop=new Set();
+  for(let i=0;i<uniqEvents.length-1;i++){
+   if(TERM.includes(uniqEvents[i].type) && (uniqEvents[i+1].type==='취임'||uniqEvents[i+1].type==='중임') && uniqEvents[i].date===uniqEvents[i+1].date){
+    drop.add(i); drop.add(i+1);
+   }
+  }
+  const merged=uniqEvents.filter((_,i)=>!drop.has(i));
+
+  // 임기 구간 분리: 취임~사임/퇴임을 각각 별도 구간으로
+  const periods=[]; let pStart=null;
+  merged.forEach(e=>{
+   if(e.type==='취임'||e.type==='중임'){ if(!pStart) pStart=e.date; }
+   else if(TERM.includes(e.type)){
+    if(pStart){ periods.push({start:pStart,end:e.date,endType:e.type}); pStart=null; }
+   }
   });
-  // 가장 이른 취임/중임을 전체 임기시작으로 (보험 비교 기준)
-  const firstAppoint=events.find(e=>e.type==='취임'||e.type==='중임');
-  officers[key]={
-   pos:b.pos,name:b.name,rrn:b.rrn,
-   appoint: firstAppoint? firstAppoint.date : appoint,
-   resign: resign,
-   active: !resign,
-   events
-  };
+  if(pStart) periods.push({start:pStart,end:null,endType:null}); // 현재 재임 중
+
+  if(periods.length<=1){
+   // 단일 임기 또는 임기 정보 없음 → 기존 방식
+   const firstAppoint=merged.find(e=>e.type==='취임'||e.type==='중임');
+   let appoint=null,resign=null;
+   merged.forEach(e=>{
+    if(e.type==='취임') appoint=e.date;
+    if(TERM.includes(e.type)) resign=e.date;
+   });
+   result.push({
+    pos:g.pos,name:g.name,rrn:g.rrn,
+    appoint: firstAppoint? firstAppoint.date : appoint,
+    resign: resign,
+    active: !resign,
+    events: merged,
+    periodIdx:0, totalPeriods:1, isLatestPeriod:true, isHistorical:false
+   });
+  } else {
+   // 복수 임기: 각 구간을 별도 officer 엔트리로
+   periods.forEach((p,idx)=>{
+    const isLatest=(idx===periods.length-1);
+    result.push({
+     pos:g.pos,name:g.name,rrn:g.rrn,
+     appoint: p.start,
+     resign: p.end,
+     active: !p.end,
+     events: merged, // 전체 이벤트 유지 (크로스 참조용)
+     periodIdx:idx, totalPeriods:periods.length,
+     isLatestPeriod:isLatest,
+     isHistorical:!isLatest,
+     periodLabel:`${idx+1}/${periods.length}차 임기`
+    });
+   });
+  }
  });
- return Object.values(officers);
+ return result;
 }
 
 // === 대표이사 변경 이력 + 친족 분석 ===
@@ -187,8 +254,8 @@ function parseRegistry(text){
 // 3) 인물별 임기 구간 산출, 시간순 정렬
 // 4) 서로 다른 인물 간 주소 유사도 계산 → 100% 친족확실 / ≥90% 의심 / 그 외 낮음
 function parseCeoHistory(text){
- const ceoRe=/^대표이사\s+([가-힣]{2,5})\s+(\d{6})\s*-?\s*\*+\s*(.*)$/;
- const anyPosRe=/^(대표이사|사내이사|사외이사|감사|이사)\s+[가-힣]{2,5}\s+\d{6}/;
+ const ceoRe=/^(?:대표이사|이사장)\s+([가-힣]{2,5})\s+(\d{6})\s*-?\s*\*+\s*(.*)$/;
+ const anyPosRe=/^(이사장|대표이사|사내이사|사외이사|감사|이사)\s+[가-힣]{2,5}\s+\d{6}/;
  const dateRe=/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*(취임|중임|퇴임|사임|해임|사망|임기만료|주소변경)/g;
  const lines=text.split('\n');
  const blocks=[]; let cur=null;
@@ -244,6 +311,59 @@ function parseCeoHistory(text){
  return periods;
 }
 
+// === 공동대표이사 감지 ===
+// periods 배열에서 임기 구간이 겹치는 대표이사 쌍을 감지
+// 반환: {isCoCeo:bool, coCeoPeriods:[{names,from,to}], coCeoMap:{nameRrn: [{partner,from,to}]}}
+function detectCoCeo(periods){
+ if(!periods.length) return {isCoCeo:false,coCeoPeriods:[],coCeoMap:{}};
+ // 서로 다른 인물의 재임 구간 중 겹치는 구간 추출
+ const distinct=[];
+ periods.forEach(p=>{if(!distinct.find(x=>x.name===p.name&&x.rrn===p.rrn))distinct.push({name:p.name,rrn:p.rrn});});
+ if(distinct.length<2) return {isCoCeo:false,coCeoPeriods:[],coCeoMap:{}};
+
+ // 인물별 재임 구간 집합
+ const byPerson={};
+ periods.forEach(p=>{
+  const k=p.name+p.rrn;
+  if(!byPerson[k]) byPerson[k]={name:p.name,rrn:p.rrn,spans:[]};
+  byPerson[k].spans.push({start:p.start,end:p.end||'9999-12-31'});
+ });
+ const persons=Object.values(byPerson);
+
+ const overlaps=[];
+ const coCeoMap={}; // nameRrn → [{partner,from,to}]
+ for(let i=0;i<persons.length;i++){
+  for(let j=i+1;j<persons.length;j++){
+   const A=persons[i], B=persons[j];
+   // A의 각 구간 × B의 각 구간에서 겹치는 부분 계산
+   A.spans.forEach(sa=>{
+    B.spans.forEach(sb=>{
+     const from=sa.start>sb.start?sa.start:sb.start;
+     const to=sa.end<sb.end?sa.end:sb.end;
+     if(from<to){ // 겹침 존재
+      const toDisplay=to==='9999-12-31'?null:to;
+      overlaps.push({names:[A.name,B.name],rrns:[A.rrn,B.rrn],from,to:toDisplay});
+      // 양방향 맵
+      const kA=A.name+A.rrn, kB=B.name+B.rrn;
+      if(!coCeoMap[kA]) coCeoMap[kA]=[];
+      if(!coCeoMap[kB]) coCeoMap[kB]=[];
+      coCeoMap[kA].push({partner:B.name,partnerRrn:B.rrn,from,to:toDisplay});
+      coCeoMap[kB].push({partner:A.name,partnerRrn:A.rrn,from,to:toDisplay});
+     }
+    });
+   });
+  }
+ }
+ overlaps.sort((a,b)=>a.from.localeCompare(b.from));
+ return {isCoCeo:overlaps.length>0, coCeoPeriods:overlaps, coCeoMap};
+}
+
+// 특정 임원이 공동대표인지 판단 (officers 리스트 기반, 현재 재임 중인 대표이사 수)
+function checkActiveCoCeo(officers){
+ const activeCeos=officers.filter(o=>(o.pos==='대표이사'||o.pos==='이사장')&&o.active);
+ return {isActive:activeCeos.length>=2, count:activeCeos.length, names:activeCeos.map(c=>c.name)};
+}
+
 // 주소 정규화 + Dice 계수 유사도
 function normAddr(s){
  return (s||'').replace(/[\s,()\-.·]/g,'')
@@ -274,7 +394,7 @@ function classifyKin(sim){
  if(sim>=0.60)  return {label:'낮음(부분일치)',color:'#eef'};
  return {label:'낮음',color:'#fff'};
 }
-function renderCeoHistory(periods){
+function renderCeoHistory(periods,officers){
  const host=document.getElementById('ceoHist');
  if(!periods.length){host.innerHTML='<p class="small">대표이사 정보를 추출하지 못했습니다.</p>';return;}
  // 임기 테이블
@@ -285,6 +405,28 @@ function renderCeoHistory(periods){
   h+=`<tr><td>${p.name}</td><td>${p.rrn}-*</td><td>${p.start}</td><td>${p.end||'현재'}</td><td>${p.endType}</td><td class="reason">${lastAddr}</td></tr>`;
  });
  h+='</tbody></table>';
+
+ // 공동대표이사 분석
+ const coCeo=detectCoCeo(periods);
+ const activeCoCeo=officers?checkActiveCoCeo(officers):null;
+
+ if(coCeo.isCoCeo){
+  h+='<h3 style="font-size:13px;margin:12px 0 4px;color:#c50">▶ 공동대표이사 감지</h3>';
+  if(activeCoCeo && activeCoCeo.isActive){
+   h+=`<p style="margin:4px 0;padding:8px 12px;background:#ffeedd;border:1px solid #e8a;border-radius:4px;font-size:13px"><b>현재 공동대표 ${activeCoCeo.count}인 체제</b>: ${activeCoCeo.names.join(', ')}</p>`;
+  }
+  h+='<table><thead><tr><th style="width:12%">대표이사 A</th><th style="width:12%">대표이사 B</th><th style="width:13%">공동 재임 시작</th><th style="width:13%">공동 재임 종료</th><th>비고</th></tr></thead><tbody>';
+  coCeo.coCeoPeriods.forEach(ov=>{
+   const isCurrent=!ov.to;
+   const bg=isCurrent?'background:#ffeedd':'';
+   const note=isCurrent?'<b>현재 공동대표</b>':'과거 공동대표';
+   h+=`<tr style="${bg}"><td>${ov.names[0]}</td><td>${ov.names[1]}</td><td>${ov.from}</td><td>${ov.to||'현재'}</td><td>${note}</td></tr>`;
+  });
+  h+='</tbody></table>';
+  h+='<p class="small">※ 공동대표이사는 각각 독립적으로 회사를 대표하므로, 고용/산재보험 적용제외 여부를 개별 판단합니다. 공동대표 간 친족관계 여부도 함께 확인하세요.</p>';
+ } else {
+  h+='<p class="small" style="margin-top:6px;color:#090">▶ 공동대표이사: 해당 없음 (단독 대표 체제)</p>';
+ }
 
  // 변경 이력 요약
  const distinct=[];
@@ -319,10 +461,28 @@ function renderCeoHistory(periods){
 }
 
 // === 고용현황 파싱 (PDF 또는 Excel) ===
-// 보험구분(고용/산재)을 섹션 헤더로 추적해 각 행에 type을 부여
+// 보험구분(고용/산재)을 섹션 헤더·행 내 키워드로 추적해 각 행에 type을 부여
 function detectType(line, cur){
- if(/산재|산업재해/.test(line)) return '산재';
- if(/고용보험/.test(line)) return '고용';
+ const s=line.replace(/\s+/g,'');
+ // 명시적 보험구분 필드 (예: "보험구분: 산재보험", "보험구분 산재")
+ if(/보험구분[:：\s]*산재/.test(s)) return '산재';
+ if(/보험구분[:：\s]*고용/.test(s)) return '고용';
+ // 섹션 헤더 (예: "산재보험 피보험자격 이력", "고용보험 근로자 현황")
+ if(/산재보험.{0,6}(근로자|피보험|가입자|자격|현황|내역|조회)/.test(s)) return '산재';
+ if(/고용보험.{0,6}(근로자|피보험|가입자|자격|현황|내역|조회)/.test(s)) return '고용';
+ // "산업재해보상보험"
+ if(/산업재해보상보험/.test(s)) return '산재';
+ // 양쪽 모두 포함된 타이틀("고용·산재보험 현황" 등)은 전환하지 않음
+ const has산재=/산재보험|산재\s*보험/.test(line);
+ const has고용=/고용보험|고용\s*보험/.test(line);
+ if(has산재 && !has고용) return '산재';
+ if(has고용 && !has산재) return '고용';
+ // 단독 키워드 (데이터행 내 보험구분 컬럼값 "산재", "고용" 등)
+ // — 주민번호(6자리숫자)가 없는 비-데이터행에서만 전환 (오탐 방지)
+ if(!/\d{6}/.test(line)){
+  if(/산재/.test(line) && !/고용/.test(line)) return '산재';
+  if(/고용/.test(line) && !/산재/.test(line)) return '고용';
+ }
  return cur;
 }
 function parseEmpText(txt){
@@ -332,27 +492,63 @@ function parseEmpText(txt){
  let curType='고용';
  lines.forEach(L=>{
   curType=detectType(L,curType);
-  const m=L.match(/(\d{6})\s*-?\s*\d?\s*\*+\s*([가-힣]{2,5})\s+(\d{4}[-./]\d{1,2}[-./]\d{1,2})(?:\s+(\d{4}[-./]\d{1,2}[-./]\d{1,2}))?/);
-  if(m) rows.push({rrn:m[1],name:m[2],acq:fmtDate(m[3]),loss:fmtDate(m[4]),type:curType});
+  // 패턴A: 주민번호-마스킹 성명 날짜 (기존)
+  let m=L.match(/(\d{6})\s*-?\s*\d?\s*\*+\s*([가-힣]{2,5})\s+(\d{4}[-./]\d{1,2}[-./]\d{1,2})(?:\s+(\d{4}[-./]\d{1,2}[-./]\d{1,2}))?/);
+  // 패턴B: 성명이 주민번호 앞에 오는 형식 ("홍길동 800101-1******  2020-01-01")
+  if(!m){
+   const mb=L.match(/([가-힣]{2,5})\s+(\d{6})\s*-?\s*\d?\s*\*+\s+(\d{4}[-./]\d{1,2}[-./]\d{1,2})(?:\s+(\d{4}[-./]\d{1,2}[-./]\d{1,2}))?/);
+   if(mb) m=[mb[0],mb[2],mb[1],mb[3],mb[4]];
+  }
+  // 패턴C: 이름과 날짜 사이에 추가 필드(직종 등)가 있는 형식
+  if(!m){
+   const mc=L.match(/(\d{6})\s*-?\s*\d?\s*\*+\s*([가-힣]{2,5})\s+\S+\s+(\d{4}[-./]\d{1,2}[-./]\d{1,2})(?:\s+(\d{4}[-./]\d{1,2}[-./]\d{1,2}))?/);
+   if(mc) m=mc;
+  }
+  if(m){
+   // 행 자체에서 보험구분 감지 (컬럼값으로 "산재"/"고용"이 포함된 경우)
+   let rowType=curType;
+   const before=L.slice(0,m.index||0), after=L.slice((m.index||0)+m[0].length);
+   const ctx=before+' '+after;
+   if(/산재/.test(ctx)&&!/고용/.test(ctx)) rowType='산재';
+   else if(/고용/.test(ctx)&&!/산재/.test(ctx)) rowType='고용';
+   rows.push({rrn:m[1],name:m[2],acq:fmtDate(m[3]),loss:fmtDate(m[4]),type:rowType});
+  }
  });
  if(rows.length>0) return rows;
 
  // 형식2 (도원 어드민): 섹션 분리 → 주민번호+성명 리스트, 취득일+상실일 리스트를 같은 순서로 zip
- const persons=[]; // {rrn,name,type}
- const dates=[];   // {acq,loss,type}
+ const persons=[]; // {rrn,name,type,defaultType}
+ const dates=[];   // {acq,loss,type,defaultType}
  curType='고용';
+ let personTypeChanged=false, dateTypeChanged=false;
  lines.forEach(L=>{
+  const prevType=curType;
   curType=detectType(L,curType);
+  const typeJustChanged=(curType!==prevType);
   const s=L.trim();
   const pm=s.match(/^(\d{6})-(\d{7})\s+([가-힣]{2,6}|[A-Z][A-Z\s]+|[가-힣A-Za-z]+)/);
-  if(pm){ persons.push({rrn:pm[1],name:pm[3].trim(),type:curType}); return; }
+  if(pm){
+   if(typeJustChanged) personTypeChanged=true;
+   persons.push({rrn:pm[1],name:pm[3].trim(),type:curType,explicit:personTypeChanged});
+   return;
+  }
   const dm=s.match(/^[YN]\s+(?:\S.*?\s+)?(\d{4}-\d{2}-\d{2})(?:\s+(\d{4}-\d{2}-\d{2}))?/);
-  if(dm){ dates.push({acq:dm[1],loss:dm[2]||null,type:curType}); }
+  if(dm){
+   if(typeJustChanged) dateTypeChanged=true;
+   dates.push({acq:dm[1],loss:dm[2]||null,type:curType,explicit:dateTypeChanged});
+  }
  });
  const n=Math.min(persons.length,dates.length);
  const out=[];
  for(let i=0;i<n;i++){
-  out.push({rrn:persons[i].rrn.slice(0,6),name:persons[i].name,acq:dates[i].acq,loss:dates[i].loss,type:persons[i].type||dates[i].type||'고용'});
+  // 타입 결정: 명시적으로 전환된 쪽 우선, 둘 다 명시적이면 dates 우선 (섹션 헤더가 데이터 직전에 위치하므로)
+  let type='고용';
+  const pEx=persons[i].explicit, dEx=dates[i].explicit;
+  if(dEx) type=dates[i].type;
+  else if(pEx) type=persons[i].type;
+  else if(persons[i].type===dates[i].type) type=persons[i].type;
+  else type=dates[i].type; // dates가 시간순으로 더 늦게 파싱되므로 더 정확할 가능성
+  out.push({rrn:persons[i].rrn.slice(0,6),name:persons[i].name,acq:dates[i].acq,loss:dates[i].loss,type});
  }
  return out;
 }
@@ -370,14 +566,38 @@ async function parseEmployment(file){
   if(hi<0)hi=0;
   const H=aoa[hi].map(c=>c||'');
   const col=k=>H.findIndex(h=>new RegExp(k).test(h));
-  const ci={name:col('성명|이름|근로자명|근로자\\s*명'),rrn:col('주민'),acq:col('취득일|고용시작일|자격취득일'),loss:col('상실일|고용종료일|자격상실일'),type:col('보험구분|보험종류|구분')};
+  const ci={name:col('성명|이름|근로자명|근로자\\s*명'),rrn:col('주민'),acq:col('취득일|고용시작일|자격취득일'),loss:col('상실일|고용종료일|자격상실일'),type:col('보험구분|보험종류|보험\\s*구분|구분')};
+  // 시트명에서 보험구분 감지 (시트별로 분리된 경우)
+  const sheetType=/산재|산업재해/.test(wb.SheetNames[0])?'산재':'고용';
   const rows=[];
   for(let i=hi+1;i<aoa.length;i++){
    const r=aoa[i];if(!r||!r[ci.name])continue;
    const rrn=String(r[ci.rrn]||'').replace(/\D/g,'').slice(0,6);
    const tv=ci.type>=0?String(r[ci.type]||''):'';
-   const type=/산재|산업재해/.test(tv)?'산재':'고용';
+   let type=sheetType; // 기본값: 시트명 기반
+   if(/산재|산업재해|산재보험|산업재해보상/.test(tv)) type='산재';
+   else if(/고용|고용보험/.test(tv)) type='고용';
    rows.push({name:String(r[ci.name]).trim(),rrn,acq:fmtDate(r[ci.acq]),loss:fmtDate(r[ci.loss]),type});
+  }
+  // 멀티 시트: 추가 시트에서도 산재/고용 데이터 추출
+  if(wb.SheetNames.length>1){
+   for(let si=1;si<wb.SheetNames.length;si++){
+    const sn=wb.SheetNames[si];
+    const extraType=/산재|산업재해/.test(sn)?'산재':(/고용/.test(sn)?'고용':null);
+    if(!extraType) continue;
+    const ws2=wb.Sheets[sn];
+    const aoa2=XLSX.utils.sheet_to_json(ws2,{header:1,raw:false});
+    let hi2=aoa2.findIndex(r=>r&&r.some(c=>/성명|이름|근로자/.test(c))&&r.some(c=>/취득|고용시작/.test(c)));
+    if(hi2<0) continue;
+    const H2=aoa2[hi2].map(c=>c||'');
+    const col2=k=>H2.findIndex(h=>new RegExp(k).test(h));
+    const ci2={name:col2('성명|이름|근로자'),rrn:col2('주민'),acq:col2('취득일|고용시작일|자격취득일'),loss:col2('상실일|고용종료일|자격상실일')};
+    for(let j=hi2+1;j<aoa2.length;j++){
+     const r=aoa2[j];if(!r||!r[ci2.name])continue;
+     const rrn2=String(r[ci2.rrn]||'').replace(/\D/g,'').slice(0,6);
+     rows.push({name:String(r[ci2.name]).trim(),rrn:rrn2,acq:fmtDate(r[ci2.acq]),loss:fmtDate(r[ci2.loss]),type:extraType});
+    }
+   }
   }
   return rows;
  }
@@ -435,7 +655,7 @@ function statuteCutoff(){
 }
 const CUTOFF=statuteCutoff();
 function judgeOne(off, r, label){
- const exemptPos=['대표이사','사내이사','감사','이사'];
+ const exemptPos=['대표이사','이사장','사내이사','감사','이사'];
  const isExempt=exemptPos.includes(off.pos);
  if(off.pos==='사외이사') return {j:'검토필요',reason:`[${label}] 사외이사 - 상근/비상근 확인 필요 (비상근이면 적용제외)`};
  if(!isExempt) return {j:'검토필요',reason:`[${label}] 직위 확인 필요`};
@@ -505,8 +725,47 @@ function pickLatest(recs){
  if(!recs.length) return null;
  return recs.slice().sort((a,b)=>(b.acq||'').localeCompare(a.acq||''))[0];
 }
+// 특정 임기 구간과 겹치는 보험 가입이력 필터
+function filterRecsForPeriod(recs, appoint, resign){
+ if(!appoint) return recs;
+ return recs.filter(r=>{
+  if(!r.acq) return true;
+  const end=resign||'9999-12-31';
+  // 가입이력이 임기 구간과 겹치는 경우 포함
+  const rEnd=r.loss||'9999-12-31';
+  return r.acq<=end && rEnd>=appoint;
+ });
+}
 function judge(off, recs){
  const mine=recs.filter(r=>r.name===off.name && r.rrn===off.rrn);
+
+ // 과거 임기: 해당 구간의 보험이력만 필터링하여 크로스체크
+ if(off.isHistorical){
+  const periodMine=filterRecsForPeriod(mine, off.appoint, off.resign);
+  const eRecs=periodMine.filter(r=>r.type==='고용');
+  const sRecs=periodMine.filter(r=>r.type==='산재');
+  const eRec=pickLatest(eRecs);
+  const sRec=pickLatest(sRecs);
+  if(!eRec && !sRec){
+   return [{...off,judgment:'대상아님',judgmentE:'-',judgmentS:'-',
+    reason:`[${off.periodLabel}] 해당 임기(${off.appoint} ~ ${off.resign}) 구간 내 고용·산재 가입이력 없음`,
+    confirm:'',eAcq:'',eLoss:'',sAcq:'',sLoss:''}];
+  }
+  const ej=judgeOne(off,eRec,'고용');
+  const sj=judgeOne(off,sRec,'산재');
+  const top=(J_RANK[ej.j]||0)>=(J_RANK[sj.j]||0)?ej.j:sj.j;
+  let reason=`[${off.periodLabel}: ${off.appoint} ~ ${off.resign}]\n`+ej.reason+'\n'+sj.reason;
+  reason+=`\n⚠ 과거 임기 — 고용현황 크로스체크 결과이며, 현행 임기(${off.totalPeriods}/${off.totalPeriods}차)와 별도로 확인 필요`;
+  const confirms=[];
+  if(ej.confirm) confirms.push(`[고용] ${ej.confirm}`);
+  if(sj.confirm) confirms.push(`[산재] ${sj.confirm}`);
+  confirms.push(`[과거임기] 해당 구간(${off.appoint}~${off.resign}) 중 보험 가입이력이 존재하므로 환급 대상 여부 별도 확인 필요`);
+  return [{...off,judgment:top,judgmentE:ej.j,judgmentS:sj.j,
+   reason,confirm:confirms.join('\n'),
+   eAcq:eRec?.acq||'',eLoss:eRec?.loss||'',sAcq:sRec?.acq||'',sLoss:sRec?.loss||''}];
+ }
+
+ // 현행 임기 (또는 단일 임기): 기존 로직
  const eRecs=mine.filter(r=>r.type==='고용');
  const sRecs=mine.filter(r=>r.type==='산재');
  const eRec=pickLatest(eRecs);
@@ -524,10 +783,20 @@ function judge(off, recs){
  const notes=[];
  if(eRecs.length>1) notes.push(`고용 ${eRecs.length}건 중 최신 사용`);
  if(sRecs.length>1) notes.push(`산재 ${sRecs.length}건 중 최신 사용`);
- const reason = ej.reason + '\n' + sj.reason + (notes.length?'\n⚠ '+notes.join(' / '):'');
+ let reason = ej.reason + '\n' + sj.reason + (notes.length?'\n⚠ '+notes.join(' / '):'');
+ // 복수 임기일 경우 현행 임기 표시
+ if(off.totalPeriods>1) reason=`[${off.periodLabel}: ${off.appoint} ~ 현재]\n`+reason;
  const confirms=[];
  if(ej.confirm) confirms.push(`[고용] ${ej.confirm}`);
  if(sj.confirm) confirms.push(`[산재] ${sj.confirm}`);
+ // 공동대표 정보 추가
+ if(off.isCoCeo && (off.pos==='대표이사'||off.pos==='이사장')){
+  const partners=off.coCeoPartners.map(p=>p.partner).filter((v,i,a)=>a.indexOf(v)===i);
+  reason+=`\n※ 공동대표이사 — 공동대표: ${partners.join(', ')}`;
+  if(off.isActiveCoCeo){
+   confirms.push(`[공동대표] 현재 공동대표 체제. 공동대표 간 친족관계 여부 및 실질 근로 제공 여부(보수·출근·업무지시) 별도 확인 필요`);
+  }
+ }
  return [{
   ...off,
   judgment: top,
@@ -538,14 +807,100 @@ function judge(off, recs){
  }];
 }
 
+// === 사업장 정보 추출 ===
+// PDF 텍스트에서 사업장관리번호, 사업장명 추출
+function extractBizInfo(text){
+ const info={bizNo:'',bizName:''};
+ // 관리번호: "XXX-XX-XXXXX-X" 또는 "XXX-XX-XXXXX" 형태
+ const noM=text.match(/(?:사업장\s*)?(?:관리\s*번호|관리번호)\s*[:：]?\s*(\d{3,6}\s*-\s*\d{2}\s*-\s*\d{4,6}(?:\s*-\s*\d)?)/);
+ if(noM) info.bizNo=noM[1].replace(/\s/g,'');
+ // 사업장명
+ const nmM=text.match(/사업장\s*(?:명칭?|명)\s*[:：]?\s*([^\n]{2,40}?)(?:\s{2,}|\t|$)/);
+ if(nmM) info.bizName=nmM[1].trim();
+ return info;
+}
+// Excel에서 사업장 정보 추출 (헤더 영역 스캔)
+function extractBizInfoFromSheet(aoa){
+ const info={bizNo:'',bizName:''};
+ const scanRows=Math.min(aoa.length,15);
+ for(let i=0;i<scanRows;i++){
+  const row=aoa[i];if(!row)continue;
+  const line=row.map(c=>String(c||'')).join(' ');
+  if(!info.bizNo){
+   const m=line.match(/(?:관리\s*번호)\s*[:：]?\s*(\d{3,6}-\d{2}-\d{4,6}(?:-\d)?)/);
+   if(m) info.bizNo=m[1].replace(/\s/g,'');
+  }
+  if(!info.bizName){
+   const m=line.match(/사업장\s*(?:명칭?|명)\s*[:：]?\s*([^\t]{2,30})/);
+   if(m) info.bizName=m[1].trim();
+  }
+ }
+ return info;
+}
+
+// === 복수 파일 관리 ===
+const empFiles=[]; // [{file, label, bizNo, bizName}]
+const fileListEl=document.getElementById('empFileList');
+const fileInput=document.getElementById('fileEmp');
+
+function renderFileList(){
+ fileListEl.innerHTML='';
+ if(!empFiles.length){
+  document.getElementById('empFileHint').style.display='';
+  return;
+ }
+ document.getElementById('empFileHint').style.display='none';
+ empFiles.forEach((f,i)=>{
+  const li=document.createElement('li');
+  const label=f.bizNo?(f.bizName?`${f.bizName} (${f.bizNo})`:f.bizNo):(f.bizName||f.file.name);
+  li.innerHTML=`<span class="fname">${f.file.name}</span>`
+   +`<span class="fmeta">${label}</span>`
+   +`<button onclick="removeEmpFile(${i})">✕</button>`;
+  fileListEl.appendChild(li);
+ });
+}
+function removeEmpFile(idx){
+ empFiles.splice(idx,1);
+ renderFileList();
+}
+// 파일 선택 시 누적 추가
+fileInput.addEventListener('change',async()=>{
+ const files=Array.from(fileInput.files);
+ for(const file of files){
+  // 중복 방지
+  if(empFiles.some(f=>f.file.name===file.name&&f.file.size===file.size)) continue;
+  const entry={file,label:file.name,bizNo:'',bizName:''};
+  // 사업장 정보 미리 추출 시도
+  try{
+   const ext=file.name.toLowerCase().split('.').pop();
+   if(ext==='pdf'){
+    const txt=await pdfToText(file);
+    const info=extractBizInfo(txt);
+    entry.bizNo=info.bizNo; entry.bizName=info.bizName;
+   } else {
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false});
+    const info=extractBizInfoFromSheet(aoa);
+    entry.bizNo=info.bizNo; entry.bizName=info.bizName;
+   }
+  }catch(e){console.warn('사업장정보 사전추출 실패:',e);}
+  entry.label=entry.bizNo?(entry.bizName?`${entry.bizName} (${entry.bizNo})`:entry.bizNo):file.name;
+  empFiles.push(entry);
+ }
+ renderFileList();
+ fileInput.value=''; // 같은 파일 재선택 허용
+});
+
 // === 메인 ===
-let RESULTS=[];
+let ALL_BIZ_RESULTS={}; // {bizKey: {bizNo,bizName,fileName,results:[],recs:[],officers}}
+
 document.getElementById('btnRun').onclick=async()=>{
  const f1=document.getElementById('pdfReg').files[0];
- const f2=document.getElementById('fileEmp').files[0];
- if(!f1||!f2){alert('두 파일을 모두 선택하세요');return;}
+ if(!f1||!empFiles.length){alert('등기부 PDF와 고용현황 파일을 모두 선택하세요');return;}
  document.getElementById('result').innerHTML='<p>처리 중...</p>';
  try{
+  // 1) 등기부 파싱 (공통)
   setStatus('등기부 텍스트 추출 중...');
   let regText=await pdfToText(f1);
   if(regText.replace(/\s/g,'').length<200){
@@ -555,29 +910,80 @@ document.getElementById('btnRun').onclick=async()=>{
   document.getElementById('dbgRegText').textContent=regText.slice(0,5000);
   const officers=parseRegistry(regText);
   const ceoPeriods=parseCeoHistory(regText);
-  renderCeoHistory(ceoPeriods);
-  let recs;
-  if(f2.name.toLowerCase().endsWith('.pdf')){
-   setStatus('고용현황 텍스트 추출 중...');
-   let empText=await pdfToText(f2);
-   if(empText.replace(/\s/g,'').length<200){empText=await ocrPdf(f2);}
-   document.getElementById('dbgEmpText').textContent=empText.slice(0,3000);
-   recs=parseEmpText(empText);
-  } else {
-   recs=await parseEmployment(f2);
-  }
-  // 디버그
-  document.getElementById('dbgOff').innerHTML=tableize(officers,['pos','name','rrn','appoint','resign','active']);
+  // 공동대표 감지 + officers에 플래그 부여
+  const coCeoInfo=detectCoCeo(ceoPeriods);
+  const activeCoCeoInfo=checkActiveCoCeo(officers);
+  officers.forEach(o=>{
+   const k=o.name+o.rrn;
+   o.isCoCeo=!!(coCeoInfo.coCeoMap[k]&&coCeoInfo.coCeoMap[k].length>0);
+   o.coCeoPartners=coCeoInfo.coCeoMap[k]||[];
+   o.isActiveCoCeo=(o.pos==='대표이사'||o.pos==='이사장')&&o.active&&activeCoCeoInfo.isActive;
+  });
+  renderCeoHistory(ceoPeriods,officers);
+  document.getElementById('dbgOff').innerHTML=tableize(officers,['pos','name','rrn','appoint','resign','active','isCoCeo','periodLabel']);
   if(officers.length===0){
    document.getElementById('result').innerHTML='<p style="color:red">⚠ 등기부에서 임원을 추출하지 못했습니다. 아래 [등기부 PDF 원본 텍스트] 패널을 열어 형식을 확인해 주세요.</p>';
    return;
   }
-  const matched=recs.filter(r=>officers.some(o=>o.name===r.name&&o.rrn===r.rrn));
-  document.getElementById('dbgEmp').innerHTML=tableize(matched,['type','name','rrn','acq','loss']);
-  // 판정
-  RESULTS=[];
-  officers.forEach(o=>{ judge(o,recs).forEach(j=>RESULTS.push(j)); });
-  renderResults();
+
+  // 2) 각 고용현황 파일별 파싱 + 판정
+  ALL_BIZ_RESULTS={};
+  let dbgEmpTextAll='';
+  for(let fi=0;fi<empFiles.length;fi++){
+   const ef=empFiles[fi];
+   const f2=ef.file;
+   setStatus(`고용현황 파싱 중... (${fi+1}/${empFiles.length}) ${f2.name}`);
+
+   let recs, empText='';
+   const ext=f2.name.toLowerCase().split('.').pop();
+   if(ext==='pdf'){
+    empText=await pdfToText(f2);
+    if(empText.replace(/\s/g,'').length<200){empText=await ocrPdf(f2);}
+    recs=parseEmpText(empText);
+    // 사업장 정보 재추출 (파싱 시 더 정확)
+    if(!ef.bizNo){const info=extractBizInfo(empText);ef.bizNo=info.bizNo;ef.bizName=info.bizName;}
+   } else {
+    recs=await parseEmployment(f2);
+    // Excel에서 사업장 정보 재추출
+    if(!ef.bizNo){
+     try{
+      const buf=await f2.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array'});
+      const aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false});
+      const info=extractBizInfoFromSheet(aoa);
+      ef.bizNo=info.bizNo;ef.bizName=info.bizName;
+     }catch(e){}
+    }
+   }
+   dbgEmpTextAll+=`\n===== [${f2.name}] =====\n`+empText.slice(0,2000);
+
+   // 사업장 키 결정
+   const bizKey=ef.bizNo||`file_${fi}`;
+   const bizLabel=ef.bizNo?(ef.bizName?`${ef.bizName} (${ef.bizNo})`:ef.bizNo):f2.name;
+
+   // 판정 실행
+   const results=[];
+   officers.forEach(o=>{ judge(o,recs).forEach(j=>{j.bizKey=bizKey;j.bizLabel=bizLabel;results.push(j);}); });
+
+   ALL_BIZ_RESULTS[bizKey]={bizNo:ef.bizNo,bizName:ef.bizName,fileName:f2.name,results,recs,officers};
+  }
+  document.getElementById('dbgEmpText').textContent=dbgEmpTextAll.slice(0,5000);
+
+  // 3) 디버그 패널 (전체 통합)
+  const allRecs=Object.values(ALL_BIZ_RESULTS).flatMap(b=>b.recs);
+  const matched=allRecs.filter(r=>officers.some(o=>o.name===r.name&&o.rrn===r.rrn));
+  const matchedE=matched.filter(r=>r.type==='고용'), matchedS=matched.filter(r=>r.type==='산재');
+  const allE=allRecs.filter(r=>r.type==='고용'), allS=allRecs.filter(r=>r.type==='산재');
+  document.getElementById('dbgEmpE').innerHTML=`<p class="small">고용보험 전체 ${allE.length}건 중 임원 매칭 ${matchedE.length}건</p>`+tableize(matchedE,['type','name','rrn','acq','loss']);
+  document.getElementById('dbgEmpS').innerHTML=`<p class="small">산재보험 전체 ${allS.length}건 중 임원 매칭 ${matchedS.length}건</p>`+tableize(matchedS,['type','name','rrn','acq','loss']);
+  document.getElementById('dbgEmp').innerHTML=`<p class="small">전체 ${allRecs.length}건 (고용 ${allE.length} / 산재 ${allS.length}) → 임원 매칭 ${matched.length}건</p>`+tableize(matched,['type','name','rrn','acq','loss']);
+  if(allS.length===0){
+   document.getElementById('dbgEmpS').innerHTML+='<p style="color:#c50;font-size:12px">⚠ 산재보험 가입이력이 추출되지 않았습니다.</p>';
+  }
+
+  // 4) 결과 렌더링
+  renderFileList(); // 사업장 정보 갱신 반영
+  renderAllResults();
   document.getElementById('btnExport').disabled=false;
  }catch(e){
   document.getElementById('result').innerHTML='<p style="color:red">오류: '+e.message+'</p>';
@@ -585,7 +991,86 @@ document.getElementById('btnRun').onclick=async()=>{
  }
 };
 
-function renderResults(){
+// === 사업장별 결과 렌더링 ===
+function renderAllResults(){
+ const bizKeys=Object.keys(ALL_BIZ_RESULTS);
+ const host=document.getElementById('result');
+
+ if(bizKeys.length===1){
+  // 단일 사업장: 기존처럼 플랫 렌더링
+  const biz=ALL_BIZ_RESULTS[bizKeys[0]];
+  const header=biz.bizNo?`<p style="margin:4px 0"><b>사업장:</b> ${biz.bizName||''} <span class="small">${biz.bizNo}</span> — 파일: ${biz.fileName}</p>`:'';
+  host.innerHTML=header+renderSummary(biz.results)+renderResultTable(biz.results);
+  return;
+ }
+
+ // 복수 사업장: 탭 UI
+ let tabH='<div class="tab-bar" id="bizTabs">';
+ tabH+=`<button class="active" data-biz="__ALL__">전체 통합</button>`;
+ bizKeys.forEach((k,i)=>{
+  const b=ALL_BIZ_RESULTS[k];
+  const label=b.bizNo?(b.bizName||b.bizNo):b.fileName;
+  tabH+=`<button data-biz="${k}">${label}</button>`;
+ });
+ tabH+='</div>';
+ tabH+='<div id="bizTabContent"></div>';
+ host.innerHTML=tabH;
+
+ // 탭 클릭 핸들러
+ document.querySelectorAll('#bizTabs button').forEach(btn=>{
+  btn.onclick=()=>{
+   document.querySelectorAll('#bizTabs button').forEach(b=>b.classList.remove('active'));
+   btn.classList.add('active');
+   const key=btn.dataset.biz;
+   const contentEl=document.getElementById('bizTabContent');
+   if(key==='__ALL__'){
+    renderAllTab(contentEl);
+   } else {
+    renderBizTab(contentEl,key);
+   }
+  };
+ });
+ // 초기: 전체 통합 탭
+ renderAllTab(document.getElementById('bizTabContent'));
+}
+
+function renderAllTab(el){
+ const bizKeys=Object.keys(ALL_BIZ_RESULTS);
+ let html='';
+ // 전체 통합 요약
+ const allResults=bizKeys.flatMap(k=>ALL_BIZ_RESULTS[k].results);
+ html+=renderSummary(allResults);
+ // 사업장별 섹션
+ bizKeys.forEach(k=>{
+  const biz=ALL_BIZ_RESULTS[k];
+  const label=biz.bizNo?(biz.bizName?`${biz.bizName} (${biz.bizNo})`:biz.bizNo):biz.fileName;
+  html+=`<div class="biz-section">`;
+  html+=`<div class="biz-header"><h3>${label}</h3><span class="biz-meta">파일: ${biz.fileName}</span></div>`;
+  html+=renderSummary(biz.results);
+  html+=renderResultTable(biz.results);
+  html+=`</div>`;
+ });
+ el.innerHTML=html;
+}
+
+function renderBizTab(el,bizKey){
+ const biz=ALL_BIZ_RESULTS[bizKey];
+ const label=biz.bizNo?(biz.bizName?`${biz.bizName} (${biz.bizNo})`:biz.bizNo):biz.fileName;
+ let html=`<div style="margin:10px 0"><b>사업장:</b> ${label} <span class="small">파일: ${biz.fileName}</span></div>`;
+ html+=renderSummary(biz.results);
+ html+=renderResultTable(biz.results);
+ el.innerHTML=html;
+}
+
+function renderSummary(results){
+ const cnt={};results.forEach(r=>cnt[r.judgment]=(cnt[r.judgment]||0)+1);
+ let sm='<p style="margin:6px 0"><b>요약:</b> ';
+ Object.keys(cnt).forEach(k=>sm+=`${k} ${cnt[k]}건  `);
+ sm+=`<span class="small">(총 ${results.length}명)</span></p>`;
+ return sm;
+}
+
+function renderResultTable(results){
  const cls={'취득취소':'j-cancel','상실신고':'j-loss','상실일정정':'j-fix','사업장확인필요':'j-confirm','검토필요':'j-review','정상':'j-ok','대상아님':'j-none','미가입':'j-none','시효경과':'j-expired'};
  let h='<table><colgroup>'
    +'<col style="width:6%"><col style="width:5%"><col style="width:8%"><col style="width:7%"><col style="width:7%">'
@@ -597,11 +1082,14 @@ function renderResults(){
    +'<th>고용 취득일</th><th>고용 상실일</th><th>산재 취득일</th><th>산재 상실일</th>'
    +'<th>고용 판정</th><th>산재 판정</th><th>사유 / 환급구간</th><th>사업장 확인 필요사유</th>'
    +'</tr></thead><tbody>';
- RESULTS.forEach(r=>{
+ results.forEach(r=>{
   const reasonHtml = (r.reason||'').split('\n').map(s=>`<div>${s}</div>`).join('');
   const confirmHtml = (r.confirm||'').split('\n').filter(Boolean).map(s=>`<div>${s}</div>`).join('') || '<span class="small">-</span>';
-  h+=`<tr class="${cls[r.judgment]||''}">`
-    +`<td>${r.pos}</td><td>${r.name}</td><td>${r.rrn}-*</td>`
+  const histCls=r.isHistorical?' j-historical':'';
+  const periodBadge=r.totalPeriods>1?`<br><span class="period-badge ${r.isHistorical?'past':'current'}">${r.periodLabel||''}</span>`:'';
+  const coCeoBadge=r.isActiveCoCeo?'<br><span style="font-size:10px;color:#c50;font-weight:700">공동대표</span>':'';
+  h+=`<tr class="${cls[r.judgment]||''}${histCls}">`
+    +`<td>${r.pos}${coCeoBadge}${periodBadge}</td><td>${r.name}</td><td>${r.rrn}-*</td>`
     +`<td>${r.appoint||''}</td><td>${r.resign||''}</td>`
     +`<td>${r.eAcq||''}</td><td>${r.eLoss||''}</td>`
     +`<td>${r.sAcq||''}</td><td>${r.sLoss||''}</td>`
@@ -611,10 +1099,7 @@ function renderResults(){
     +`</tr>`;
  });
  h+='</tbody></table>';
- // 요약
- const cnt={};RESULTS.forEach(r=>cnt[r.judgment]=(cnt[r.judgment]||0)+1);
- let sm='<p><b>요약:</b> ';Object.keys(cnt).forEach(k=>sm+=`${k} ${cnt[k]}건  `);sm+='</p>';
- document.getElementById('result').innerHTML=sm+h;
+ return h;
 }
 
 function tableize(arr,cols){
@@ -624,16 +1109,38 @@ function tableize(arr,cols){
  return h+'</table>';
 }
 
+// === Excel 다운로드 (사업장별 시트) ===
 document.getElementById('btnExport').onclick=()=>{
- const ws=XLSX.utils.json_to_sheet(RESULTS.map(r=>({
-  직위:r.pos,성명:r.name,주민번호:r.rrn+'-*',
+ const wb=XLSX.utils.book_new();
+ const bizKeys=Object.keys(ALL_BIZ_RESULTS);
+
+ // 전체 통합 시트
+ const allResults=bizKeys.flatMap(k=>ALL_BIZ_RESULTS[k].results);
+ const allWs=XLSX.utils.json_to_sheet(allResults.map(r=>({
+  사업장:r.bizLabel||'',직위:r.pos+(r.isActiveCoCeo?' (공동대표)':'')+(r.periodLabel?' ['+r.periodLabel+']':''),성명:r.name,주민번호:r.rrn+'-*',
   임원취임일:r.appoint||'',임원퇴임일:r.resign||'',
   '고용 취득일':r.eAcq||'','고용 상실일':r.eLoss||'',
   '산재 취득일':r.sAcq||'','산재 상실일':r.sLoss||'',
   '고용 판정':r.judgmentE||'-','산재 판정':r.judgmentS||'-',
   사유:r.reason,'사업장 확인 필요사유':r.confirm||''
  })));
- const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'판정결과');
+ XLSX.utils.book_append_sheet(wb,allWs,'전체통합');
+
+ // 사업장별 시트
+ bizKeys.forEach(k=>{
+  const biz=ALL_BIZ_RESULTS[k];
+  const sheetName=(biz.bizName||biz.bizNo||biz.fileName).slice(0,31).replace(/[\\/*?:\[\]]/g,'');
+  const ws=XLSX.utils.json_to_sheet(biz.results.map(r=>({
+   직위:r.pos+(r.isActiveCoCeo?' (공동대표)':''),성명:r.name,주민번호:r.rrn+'-*',
+   임원취임일:r.appoint||'',임원퇴임일:r.resign||'',
+   '고용 취득일':r.eAcq||'','고용 상실일':r.eLoss||'',
+   '산재 취득일':r.sAcq||'','산재 상실일':r.sLoss||'',
+   '고용 판정':r.judgmentE||'-','산재 판정':r.judgmentS||'-',
+   사유:r.reason,'사업장 확인 필요사유':r.confirm||''
+  })));
+  XLSX.utils.book_append_sheet(wb,ws,sheetName);
+ });
+
  XLSX.writeFile(wb,'4대보험_환급대상_판정결과.xlsx');
 };
 </script>
