@@ -221,6 +221,9 @@ async function runAnalysis(){
       result=JSON.parse(m[1]);
     }catch(e){throw new Error('AI 응답 파싱 실패: '+e.message+'\n\n원문:\n'+raw.slice(0,500))}
 
+    // 후처리: 정규직 판단 모순 보정
+    postProcessResult(result);
+
     setProgress(100,'완료');
     renderResults(result,targetName);
     $('results').style.display='block';
@@ -235,6 +238,27 @@ async function runAnalysis(){
 }
 
 function setProgress(p,m){$('progressFill').style.width=p+'%';$('statusText').textContent=m||''}
+
+// 후처리: AI가 evidence와 result를 모순되게 반환하는 경우 보정
+function postProcessResult(r){
+  if(!r.contract_analysis?.employment_type) return;
+  const et=r.contract_analysis.employment_type;
+  const ev=(et.evidence||'').toLowerCase();
+  const cp=(et.contract_period||'');
+
+  // 1. 계약기간에 종료일 패턴이 있으면 무조건 기간제
+  const hasEndDate=/\d{4}.*년.*\d{1,2}.*월.*\d{1,2}.*일.*까지/.test(cp)||/까지/.test(cp);
+
+  // 2. evidence에서 "기간제"라고 판단했는데 result가 정규직인 경우
+  const evidenceSaysFixed=/기간제/.test(ev);
+
+  if(et.result==='정규직'||et.result==='정규직_추정'){
+    if(hasEndDate||evidenceSaysFixed){
+      et.result='기간제';
+      et.evidence=(et.evidence||'')+' [시스템 보정: 계약 종료일이 명시되어 있어 기간제로 재판정]';
+    }
+  }
+}
 
 // ========== Prompt ==========
 function buildPrompt(targetName){
@@ -261,18 +285,22 @@ function buildPrompt(targetName){
 
 ### C. 근로계약서 상세 분석 (contract_analysis) — 근로계약서가 없으면 null
 
-#### C-1. employment_type (정규직 여부) ★★★ 매우 중요 ★★★
+#### C-1. employment_type (정규직 여부) ★★★ 최우선 판단 ★★★
 청년일자리도약장려금은 정규직 채용이 필수 요건입니다.
 
-판단기준:
-- 계약기간에 시작일과 종료일이 모두 명시 → "기간제" (부적격)
-- "기간의 정함이 없음", "정년까지" → "정규직" (적격)
-- 계약기간 조항 자체가 없음 → "정규직_추정"
-- "자동종료", "갱신", "만료" 문구 있음 → "기간제_가능성"
-- 제목에 "기간제" 포함 → "기간제"
-- "원칙적으로 N년으로 하고 연장 가능" 같은 문구 → "기간제" (계약기간이 정해져 있으므로)
+**핵심 원칙: 계약 종료일이 존재하면 무조건 "기간제"입니다. 예외 없음.**
 
-출력: result, evidence(원문 인용), contract_period(있다면)
+판단 규칙 (위에서 아래로 우선 적용):
+1. 계약기간에 종료일(~년 ~월 ~일 까지)이 있다 → result: "기간제" (무조건)
+2. "원칙적으로 N년", "연장 가능", "갱신 가능" 등 문구가 있어도 종료일이 명시되어 있으면 → result: "기간제"
+3. 제목에 "기간제" 포함 → result: "기간제"
+4. "기간의 정함이 없음", "정년까지" 등 → result: "정규직"
+5. 계약기간 조항 자체가 없음 → result: "정규직_추정"
+6. 위 어느 것에도 해당 안 됨 → result: "판단불가"
+
+**절대 주의: result 값과 evidence 판단이 일치해야 합니다. evidence에서 "기간제"라고 분석했으면 result도 반드시 "기간제"로 설정하세요. 모순 금지.**
+
+출력: result("정규직"/"기간제"/"정규직_추정"/"기간제_가능성"/"판단불가"), evidence(원문 인용), contract_period(있다면)
 
 #### C-2. minimum_wage (최저임금 준수)
 2025년 최저임금: 시급 10,030원 / 월환산(209시간) 2,096,270원
