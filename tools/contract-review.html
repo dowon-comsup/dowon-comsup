@@ -10,61 +10,42 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;max-width:1200px;margin:0 auto;padding:0 16px 60px;color:#222;background:#fff}
 a{color:var(--primary);text-decoration:none}
-
-/* Top bar */
 .topbar{padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:20px}
 .topbar a{font-size:13px;font-weight:600;color:#2563eb}
-
 h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:4px}
 .subtitle{font-size:12px;color:var(--gray);margin-bottom:20px}
-
-/* API Key & Input */
-.api-section{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
-.api-section label{font-size:13px;font-weight:600;white-space:nowrap;min-width:130px}
-.api-section input{flex:1;min-width:280px;padding:8px 12px;border:2px solid var(--border);border-radius:8px;font-size:13px}
-.api-section input[type=password]{font-family:monospace}
-.api-section input:focus{border-color:var(--primary);outline:none}
-.api-section .status{font-size:11px;color:var(--gray)}
-
-/* Upload area */
+.input-section{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.input-section label{font-size:13px;font-weight:600;white-space:nowrap;min-width:130px}
+.input-section input{flex:1;min-width:280px;padding:8px 12px;border:2px solid var(--border);border-radius:8px;font-size:13px}
+.input-section input[type=password]{font-family:monospace}
+.input-section input:focus{border-color:var(--primary);outline:none}
+.input-section .status{font-size:11px;color:var(--gray)}
 .upload-zone{border:2px dashed #94a3b8;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);margin-bottom:16px}
 .upload-zone:hover,.upload-zone.dragover{border-color:var(--primary);background:var(--primary-light)}
 .upload-zone h3{font-size:15px;color:#334155;margin-bottom:6px}
 .upload-zone p{font-size:12px;color:var(--gray)}
 .upload-zone input{display:none}
-
-/* File list */
 .file-list{list-style:none;margin-bottom:16px}
 .file-list li{display:flex;align-items:center;gap:8px;padding:8px 12px;margin:4px 0;background:#fff;border:1px solid var(--border);border-radius:8px;font-size:13px}
 .file-list li .fname{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .file-list li .fsize{color:var(--gray);font-size:11px}
 .file-list li .remove{background:var(--danger);color:#fff;border:none;padding:3px 10px;border-radius:4px;font-size:11px;cursor:pointer}
-
-/* Buttons */
 .btn-row{text-align:center;margin:16px 0}
 button{font-size:13px;padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:600;transition:all .2s}
 button:disabled{opacity:.5;cursor:not-allowed}
 .btn-primary{background:var(--primary);color:#fff;font-size:15px;padding:12px 32px}
 .btn-primary:hover:not(:disabled){background:var(--primary-dark)}
-
-/* Progress */
 .progress-bar{height:6px;background:#e2e8f0;border-radius:3px;margin:12px 0;overflow:hidden;display:none}
 .progress-bar .fill{height:100%;background:var(--primary);transition:width .3s;width:0}
 #statusText{font-size:12px;color:var(--gray);text-align:center;min-height:18px}
-
-/* Summary banner */
 .summary-banner{padding:16px 20px;border-radius:10px;margin:20px 0;font-size:15px;font-weight:700;display:none}
 .summary-banner.ok{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7}
 .summary-banner.warn{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
 .summary-banner.error{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
-
-/* Info bar */
 .info-bar{display:flex;gap:16px;flex-wrap:wrap;padding:14px 18px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;margin-bottom:20px;display:none}
 .info-bar .info-item{font-size:13px}
 .info-bar .info-item .label{color:var(--gray);font-size:11px}
 .info-bar .info-item .value{font-weight:700;color:#0c4a6e}
-
-/* Document check cards */
 .doc-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:24px}
 .doc-card{border:1px solid var(--border);border-radius:10px;padding:16px;background:#fff;box-shadow:var(--card-shadow);display:flex;align-items:flex-start;gap:12px}
 .doc-card .icon{font-size:28px;flex-shrink:0;line-height:1}
@@ -72,28 +53,20 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .doc-card .content p{font-size:11px;color:var(--gray);line-height:1.4}
 .doc-card.found{border-color:#6ee7b7;background:#f0fdf4}
 .doc-card.missing{border-color:#fca5a5;background:#fef2f2}
-.doc-card.na{border-color:#fcd34d;background:#fffbeb}
-
-/* Analysis sections */
-.analysis-section{border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;background:#fff;box-shadow:var(--card-shadow)}
-.analysis-section h3{font-size:15px;color:var(--primary-dark);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-.analysis-section h3 .badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+.section{border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;background:#fff;box-shadow:var(--card-shadow)}
+.section h3{font-size:15px;color:var(--primary-dark);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.section h3 .badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
 .badge-ok{background:#d1fae5;color:#065f46}
 .badge-warn{background:#fef3c7;color:#92400e}
 .badge-fail{background:#fee2e2;color:#991b1b}
 .badge-na{background:#e5e7eb;color:#374151}
-
-.detail-row{display:flex;gap:8px;margin:6px 0;font-size:13px;align-items:baseline}
-.detail-row .label{color:var(--gray);min-width:140px;flex-shrink:0;font-weight:600}
-.detail-row .value{color:#111}
-
-/* Checklist */
+.row{display:flex;gap:8px;margin:6px 0;font-size:13px;align-items:baseline}
+.row .lbl{color:var(--gray);min-width:140px;flex-shrink:0;font-weight:600}
+.row .val{color:#111}
 .checklist{list-style:none}
 .checklist li{padding:6px 0;font-size:13px;border-bottom:1px dashed var(--border);display:flex;align-items:center;gap:8px}
 .checklist li:last-child{border-bottom:none}
-.checklist .check-icon{font-size:16px;flex-shrink:0}
-
-/* Log */
+.checklist .ci{font-size:16px;flex-shrink:0}
 details{margin:8px 0}
 summary{font-size:13px;cursor:pointer;color:var(--gray)}
 pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:300px;border-radius:6px;white-space:pre-wrap;word-break:break-all}
@@ -101,38 +74,31 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
 </head>
 <body>
 
-<div class="topbar">
-  <a href="../index.html">&larr; 대시보드로 돌아가기</a>
-</div>
+<div class="topbar"><a href="../index.html">&larr; 대시보드로 돌아가기</a></div>
 
 <h1>청년일자리도약장려금 서류 판독 도구 <span style="font-size:13px;color:#888">V1</span></h1>
-<p class="subtitle">PDF 서류를 업로드하면 Claude AI가 서류 존재 여부, 정규직 판단, 최저임금 준수, 필수 기재사항, 사업자등록증명·학력확인서·동의서 검증을 자동 수행합니다.</p>
+<p class="subtitle">요청 대상자 이름과 PDF 서류를 업로드하면, 6종 서류 존재 여부 · 정규직 판단 · 최저임금 준수 · 학력확인 · 동의서 완비 등을 자동 판독합니다.</p>
 
-<!-- API Key -->
-<div class="api-section">
+<!-- Inputs -->
+<div class="input-section">
   <label>Anthropic API Key:</label>
-  <input type="password" id="apiKey" placeholder="sk-ant-..." value="">
+  <input type="password" id="apiKey" placeholder="sk-ant-...">
   <span class="status" id="apiKeyStatus"></span>
 </div>
-
-<!-- Target Name -->
-<div class="api-section">
+<div class="input-section">
   <label>요청 대상자 이름:</label>
-  <input type="text" id="targetName" placeholder="예: 황인경" value="">
+  <input type="text" id="targetName" placeholder="예: 황인경">
 </div>
 
-<!-- Upload zone -->
+<!-- Upload -->
 <div class="upload-zone" id="uploadZone">
   <h3>PDF 파일을 드래그하거나 클릭하여 업로드</h3>
-  <p>졸업증명서, 근로계약서, 사업자등록증명, 학력확인서, 동의서 등 관련 서류 PDF를 모두 업로드해주세요 (복수 파일 가능)</p>
+  <p>졸업증명서 · 근로계약서 · 사업자등록증명 · 학력확인서 · 동의서 등 (복수 파일 가능, 한 PDF에 여러 서류 포함 가능)</p>
   <input type="file" id="fileInput" accept="application/pdf" multiple>
 </div>
 <ul class="file-list" id="fileList"></ul>
 
-<div class="btn-row">
-  <button class="btn-primary" id="btnAnalyze" disabled>분석 실행</button>
-</div>
-
+<div class="btn-row"><button class="btn-primary" id="btnAnalyze" disabled>분석 실행</button></div>
 <div class="progress-bar" id="progressBar"><div class="fill" id="progressFill"></div></div>
 <div id="statusText"></div>
 
@@ -142,57 +108,47 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
   <div class="info-bar" id="infoBar"></div>
   <h2 style="font-size:16px;margin:20px 0 12px">서류 존재 여부</h2>
   <div class="doc-cards" id="docCards"></div>
-  <div id="contractAnalysis"></div>
-  <div id="additionalChecks"></div>
+  <div id="analysisArea"></div>
 </div>
 
 <details style="margin-top:24px"><summary>API 응답 원문 (디버그)</summary><pre class="log" id="debugLog">분석 실행 후 표시됩니다.</pre></details>
 
 <script>
-// ========== State ==========
-let uploadedFiles = []; // {file, name, size}
-const $ = id => document.getElementById(id);
+let uploadedFiles=[];
+const $=id=>document.getElementById(id);
 
-// ========== API Key persistence ==========
-(function initKey(){
-  const saved = localStorage.getItem('ANTHROPIC_API_KEY');
-  if(saved) $('apiKey').value = saved;
-  $('apiKey').addEventListener('input', ()=>{
+// API Key persistence
+(function(){
+  const s=localStorage.getItem('ANTHROPIC_API_KEY');
+  if(s)$('apiKey').value=s;
+  $('apiKey').addEventListener('input',()=>{
     const k=$('apiKey').value.trim();
-    localStorage.setItem('ANTHROPIC_API_KEY', k);
-    $('apiKeyStatus').textContent = k ? 'Key 저장됨' : '';
+    localStorage.setItem('ANTHROPIC_API_KEY',k);
+    $('apiKeyStatus').textContent=k?'Key 저장됨':'';
     updateBtn();
   });
-  if(saved) $('apiKeyStatus').textContent = 'Key 저장됨';
+  if(s)$('apiKeyStatus').textContent='Key 저장됨';
 })();
 
-// ========== File Upload ==========
-const zone = $('uploadZone');
-const fileInput = $('fileInput');
-
-zone.addEventListener('click', ()=> fileInput.click());
-zone.addEventListener('dragover', e=>{e.preventDefault();zone.classList.add('dragover')});
-zone.addEventListener('dragleave', ()=>zone.classList.remove('dragover'));
-zone.addEventListener('drop', e=>{
-  e.preventDefault(); zone.classList.remove('dragover');
-  addFiles(e.dataTransfer.files);
-});
-fileInput.addEventListener('change', ()=> addFiles(fileInput.files));
-
-$('targetName').addEventListener('input', updateBtn);
+// File upload
+const zone=$('uploadZone'),fi=$('fileInput');
+zone.addEventListener('click',()=>fi.click());
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover')});
+zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
+zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');addFiles(e.dataTransfer.files)});
+fi.addEventListener('change',()=>addFiles(fi.files));
+$('targetName').addEventListener('input',updateBtn);
 
 function addFiles(files){
   for(const f of files){
-    if(f.type!=='application/pdf'){alert(f.name+' : PDF 파일만 업로드 가능합니다.');continue}
-    if(uploadedFiles.some(u=>u.name===f.name&&u.size===f.size)) continue;
-    uploadedFiles.push({file:f, name:f.name, size:f.size});
+    if(f.type!=='application/pdf'){alert(f.name+': PDF만 가능');continue}
+    if(uploadedFiles.some(u=>u.name===f.name&&u.size===f.size))continue;
+    uploadedFiles.push({file:f,name:f.name,size:f.size});
   }
-  renderFileList();
-  updateBtn();
+  renderFileList();updateBtn();
 }
-
 function renderFileList(){
-  const ul=$('fileList'); ul.innerHTML='';
+  const ul=$('fileList');ul.innerHTML='';
   uploadedFiles.forEach((f,i)=>{
     const li=document.createElement('li');
     li.innerHTML=`<span class="fname">${esc(f.name)}</span><span class="fsize">${(f.size/1024).toFixed(0)} KB</span><button class="remove" data-i="${i}">삭제</button>`;
@@ -202,260 +158,169 @@ function renderFileList(){
     uploadedFiles.splice(+e.target.dataset.i,1);renderFileList();updateBtn();
   }));
 }
-
 function updateBtn(){
-  $('btnAnalyze').disabled = !(uploadedFiles.length>0 && $('apiKey').value.trim() && $('targetName').value.trim());
+  $('btnAnalyze').disabled=!(uploadedFiles.length>0&&$('apiKey').value.trim()&&$('targetName').value.trim());
 }
 updateBtn();
 
-// ========== PDF to base64 ==========
 async function pdfToBase64(file){
   return new Promise((res,rej)=>{
-    const reader=new FileReader();
-    reader.onload=()=> res(reader.result.split(',')[1]);
-    reader.onerror=rej;
-    reader.readAsDataURL(file);
+    const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);
   });
 }
 
-// ========== Claude API Call ==========
-async function callClaude(apiKey, contents){
-  const r = await fetch('https://api.anthropic.com/v1/messages',{
+async function callClaude(apiKey,contents){
+  const r=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key':apiKey,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true'
-    },
-    body:JSON.stringify({
-      model:'claude-sonnet-4-20250514',
-      max_tokens:8000,
-      temperature:0,
-      messages:[{role:'user',content:contents}]
-    })
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:8000,temperature:0,messages:[{role:'user',content:contents}]})
   });
   const j=await r.json();
-  if(!r.ok) throw new Error(JSON.stringify(j).slice(0,500));
+  if(!r.ok)throw new Error(JSON.stringify(j).slice(0,500));
   return j.content[0].text;
 }
 
-// ========== Main Analysis ==========
-$('btnAnalyze').addEventListener('click', runAnalysis);
+// Main
+$('btnAnalyze').addEventListener('click',runAnalysis);
 
 async function runAnalysis(){
   const apiKey=$('apiKey').value.trim();
   const targetName=$('targetName').value.trim();
   if(!apiKey){alert('API Key를 입력하세요.');return}
   if(!targetName){alert('요청 대상자 이름을 입력하세요.');return}
-  if(!uploadedFiles.length){alert('PDF 파일을 업로드하세요.');return}
+  if(!uploadedFiles.length){alert('PDF를 업로드하세요.');return}
 
   $('btnAnalyze').disabled=true;
   $('progressBar').style.display='block';
   $('results').style.display='none';
-  setProgress(5,'PDF 파일 변환 중...');
+  setProgress(5,'PDF 변환 중...');
 
   try{
-    // Convert all PDFs to base64
-    const pdfContents = [];
+    const pdfContents=[];
     for(let i=0;i<uploadedFiles.length;i++){
-      setProgress(5+Math.round(20*i/uploadedFiles.length), `PDF 변환 중 (${i+1}/${uploadedFiles.length})...`);
-      const b64 = await pdfToBase64(uploadedFiles[i].file);
-      pdfContents.push({name:uploadedFiles[i].name, base64:b64});
+      setProgress(5+Math.round(20*i/uploadedFiles.length),`PDF 변환 중 (${i+1}/${uploadedFiles.length})...`);
+      pdfContents.push({name:uploadedFiles[i].name,base64:await pdfToBase64(uploadedFiles[i].file)});
     }
 
     setProgress(30,'Claude AI 분석 중... (1~2분 소요)');
 
-    // Build message content
-    const content = [];
+    const content=[];
     pdfContents.forEach(p=>{
-      content.push({
-        type:'document',
-        source:{type:'base64',media_type:'application/pdf',data:p.base64}
-      });
+      content.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:p.base64}});
       content.push({type:'text',text:`[위 PDF 파일명: ${p.name}]`});
     });
-
     content.push({type:'text',text:buildPrompt(targetName)});
 
-    const raw = await callClaude(apiKey, content);
-    $('debugLog').textContent = raw;
-
+    const raw=await callClaude(apiKey,content);
+    $('debugLog').textContent=raw;
     setProgress(90,'결과 파싱 중...');
 
-    // Parse JSON from response
     let result;
     try{
-      const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/) || raw.match(/(\{[\s\S]*\})/);
-      result = JSON.parse(jsonMatch[1]);
-    }catch(e){
-      throw new Error('AI 응답 파싱 실패: '+e.message+'\n\n원문:\n'+raw.slice(0,500));
-    }
+      const m=raw.match(/```json\s*([\s\S]*?)\s*```/)||raw.match(/(\{[\s\S]*\})/);
+      result=JSON.parse(m[1]);
+    }catch(e){throw new Error('AI 응답 파싱 실패: '+e.message+'\n\n원문:\n'+raw.slice(0,500))}
 
     setProgress(100,'완료');
-    renderResults(result, targetName);
+    renderResults(result,targetName);
     $('results').style.display='block';
-
   }catch(e){
     alert('분석 오류: '+e.message);
     console.error(e);
-    $('debugLog').textContent = e.message;
+    $('debugLog').textContent=e.message;
   }finally{
     $('btnAnalyze').disabled=false;
     setTimeout(()=>{$('progressBar').style.display='none';$('statusText').textContent=''},2000);
   }
 }
 
-function setProgress(pct,msg){
-  $('progressFill').style.width=pct+'%';
-  $('statusText').textContent=msg||'';
-}
+function setProgress(p,m){$('progressFill').style.width=p+'%';$('statusText').textContent=m||''}
 
 // ========== Prompt ==========
 function buildPrompt(targetName){
-  return `당신은 한국 노동법 전문가이며, 청년일자리도약장려금 서류 검토 담당자입니다. 업로드된 PDF 서류들을 분석하여 아래 항목을 JSON으로 반환하세요.
+  return `당신은 한국 노동법 전문가이며, 청년일자리도약장려금 서류 검토 담당자입니다.
+업로드된 PDF 서류들을 분석하여 아래 JSON 구조를 정확히 채워 반환하세요.
 
 **요청 대상자 이름: "${targetName}"**
 
-## 분석 항목
+## 분석 요구사항
 
-### 1. 기본 정보 추출
-- worker_name: 근로자 이름 (근로계약서 또는 기타 서류에서 추출)
-- start_date: 입사일 (YYYY-MM-DD)
+### A. 기본 정보 추출
+- worker_name: 근로자 이름 (근로계약서 또는 기타 서류에서)
+- start_date: 입사일/채용일 (YYYY-MM-DD)
 - company_name: 사업장명
-- birth_date: 생년월일 (YYYY-MM-DD, 확인 가능 시)
+- birth_date: 생년월일 (YYYY-MM-DD, 있으면)
 
-### 2. 서류 존재 여부 (documents)
-각 서류가 업로드된 PDF에 포함되어 있는지 판단:
+### B. 서류 존재 여부 (documents) — 6종 각각 found(true/false), detail(판단근거)
+1. fact_certificate (사실증명서): 국세청 발급, "사실증명" 제목, 세무서장 직인
+2. graduation_certificate (졸업증명서): 학교명, 졸업일자 포함
+3. employment_contract (근로계약서): "근로계약서" 제목
+4. business_registration (사업자등록증명): "사업자등록증명" 제목, 사업자등록번호 포함
+5. education_confirmation (학력확인서): "최종 학력에 대한 자기 확인서" 제목
+6. participation_consent (사업참여 동의서): "개인정보 수집·이용·제공" 관련 동의서
 
-- fact_certificate: 사실증명서
-  - 판단기준: 국세청 발급, "사실증명" 또는 "사실 증명" 제목, 세무서장 직인 존재
-  - found: true/false
-  - detail: 판단 근거 설명
+### C. 근로계약서 상세 분석 (contract_analysis) — 근로계약서가 없으면 null
 
-- graduation_certificate: 졸업증명서
-  - 판단기준: 학교명, 졸업일자, 학위명 포함
-  - found: true/false
-  - detail: 판단 근거 (학교명, 학위 등)
+#### C-1. employment_type (정규직 여부) ★★★ 매우 중요 ★★★
+청년일자리도약장려금은 정규직 채용이 필수 요건입니다.
 
-- employment_contract: 근로계약서
-  - 판단기준: "근로계약서" 제목 포함
-  - found: true/false
-  - detail: 판단 근거
-
-- business_registration: 사업자등록증명
-  - 판단기준: "사업자등록증명" 또는 "사업자 등록 증명" 제목, 사업자등록번호, 상호, 대표자 정보 포함
-  - found: true/false
-  - detail: 판단 근거
-
-- education_confirmation: 최종 학력에 대한 자기 확인서 (학력확인서)
-  - 판단기준: "최종 학력에 대한 자기 확인서" 제목, 학력 체크표 포함
-  - found: true/false
-  - detail: 판단 근거
-
-- participation_consent: 개인정보 수집·이용·제공 및 고유식별정보 처리에 관한 동의서 (사업참여 동의서)
-  - 판단기준: "개인정보 수집·이용·제공" 제목, 청년일자리도약장려금 관련 내용
-  - found: true/false
-  - detail: 판단 근거
-
-### 3. 근로계약서 상세 분석 (contract_analysis) - 근로계약서가 있을 때만
-근로계약서가 없으면 contract_analysis: null
-
-#### 3-1. employment_type (정규직 여부)
 판단기준:
-- 계약기간 항목에 종료일(~년 ~월 ~일)이 명시 → "기간제"
-- "기간의 정함이 없음", "정년까지" 등 → "정규직"
-- 계약기간 항목 없음 → "정규직_추정" (주의)
-- "자동종료", "갱신", "만료" 문구 → "기간제_가능성"
-- 제목이 "기간제 근로계약서" → "기간제"
+- 계약기간에 시작일과 종료일이 모두 명시 → "기간제" (부적격)
+- "기간의 정함이 없음", "정년까지" → "정규직" (적격)
+- 계약기간 조항 자체가 없음 → "정규직_추정"
+- "자동종료", "갱신", "만료" 문구 있음 → "기간제_가능성"
+- 제목에 "기간제" 포함 → "기간제"
+- "원칙적으로 N년으로 하고 연장 가능" 같은 문구 → "기간제" (계약기간이 정해져 있으므로)
 
-출력:
-- result: "정규직"/"기간제"/"정규직_추정"/"기간제_가능성"/"판단불가"
-- evidence: 근거가 된 원문 문구
-- contract_period: 계약기간 (있다면)
+출력: result, evidence(원문 인용), contract_period(있다면)
 
-#### 3-2. minimum_wage (최저임금 준수)
+#### C-2. minimum_wage (최저임금 준수)
 2025년 최저임금: 시급 10,030원 / 월환산(209시간) 2,096,270원
-
-추출항목:
-- monthly_salary: 계약서 기재 월급여 (숫자)
-- hourly_wage: 계약서 기재 시급 (숫자, 있다면)
-- weekly_hours: 소정근로시간 (주 몇 시간, 기본 40)
-- monthly_hours: 월 환산 소정근로시간 (209시간이 기본, 주 40시간 외라면 재계산)
-
-판단:
-- 시급 직접 기재 시: 시급 >= 10,030원 여부
-- 월급여만 있으면: 월급여 / 월환산시간 >= 10,030원
+- monthly_salary, hourly_wage, weekly_hours, monthly_hours
 - result: "준수"/"위반"/"확인불가"
-- calculated_hourly: 계산된 시급
-- evidence: 계산 근거
+- calculated_hourly, evidence
 
-#### 3-3. required_items (필수 기재사항)
-근로기준법 제17조 기준:
-- wage_components: 임금의 구성항목, 계산방법, 지급방법
+#### C-3. required_items (필수 기재사항 — 근로기준법 §17)
+- is_part_time: 단시간 근로자 여부
+- wage_components: 임금 구성항목·계산방법·지급방법
 - working_hours: 소정근로시간
 - holidays: 휴일
 - annual_leave: 연차 유급휴가
-- workplace_duties: 취업 장소 및 종사 업무
+- workplace_duties: 취업 장소·종사 업무
+- daily_schedule: (단시간 근로자만) 근로일·근로일별 근로시간
 
-단시간 근로자 추가 (주 15시간 미만일 때만 체크):
-- daily_schedule: 근로일 및 근로일별 근로시간
+각각 found(true/false), detail
 
-각 항목:
-- found: true/false
-- detail: 해당 내용 요약 또는 미기재 사유
+### D. 사업자등록증명 검증 (business_reg_check) — 없으면 null
+- doc_company: 사업자등록증명의 상호(법인명)
+- contract_company: 근로계약서의 회사명
+- match: 동일 여부 (true/false)
+- detail: 판단 근거
 
-- is_part_time: 단시간 근로자 여부 (true/false)
+### E. 학력확인서 검증 (edu_check) — 없으면 null
 
-### 4. 사업자등록증명 검증 (business_registration_check) - 사업자등록증명이 있을 때만
-없으면 business_registration_check: null
+학력확인서의 체크표를 분석:
+- highschool_checked: 고등학교 행에서 체크된 항목 (졸업/수료/중퇴/휴학/졸업예정/재학중/미체크)
+- university_checked: 대학(원)교 행에서 체크된 항목
+- has_problem: "휴학" 또는 "재학중"에 체크가 있으면 true → 확인 필요
+- yes_no_checked: 5번 질문(재학중인 사실이 있습니까?) "예"/"아니오"/"미체크"/"판별불가"
+- yes_no_problem: "예"에 체크 → true(확인필요), "아니오" → false(정상)
+- result: "정상"/"확인필요"
+- detail: 종합 판단 근거
 
-- company_name_on_doc: 사업자등록증명에 기재된 상호(법인명)
-- company_name_on_contract: 근로계약서에 기재된 회사명
-- company_name_match: 두 회사명이 동일한지 (true/false)
-- company_name_match_detail: 판단 근거 설명
+### F. 동의서 검증 (consent_check) — 없으면 null
 
-### 5. 학력확인서 검증 (education_confirmation_check) - 학력확인서가 있을 때만
-없으면 education_confirmation_check: null
+동의서 하단의 필수 기입 확인:
+- checkboxes_ok: 동의 체크박스(수집이용/제공/고유식별정보) 모두 체크 여부 (true/false)
+- checkboxes_detail: 각 항목 체크 상태 설명
+- date_filled: 날짜 기입 여부 (true/false)
+- date_detail: 기입된 날짜 또는 미기입
+- signature_ok: 서명/날인 존재 여부 (true/false)
+- signature_detail: 판단 근거
+- result: "정상"/"확인필요"
+- detail: 종합 판단 근거
 
-학력확인서(최종 학력에 대한 자기 확인서)의 학력 체크표를 분석합니다.
-
-- education_table: 학력 체크표 분석 결과
-  - highschool_status: 고등학교 행에서 체크된 항목 (졸업/수료/중퇴/휴학/졸업예정/재학중 중 하나, 체크 없으면 "미체크")
-  - university_status: 대학(원)교 행에서 체크된 항목 (위와 동일)
-  - has_suspension_or_enrolled: "휴학" 또는 "재학중" 에 체크가 있는지 (true이면 확인 필요)
-  - detail: 판단 근거 설명
-
-- yes_no_checkbox: 바로 아래 "예/아니오" 체크박스 분석
-  - checked: "예" 또는 "아니오" 또는 "미체크" 또는 "판별불가"
-  - needs_review: 확인이 필요한지 (true/false)
-  - detail: 판단 근거 ("예"에 체크되어 있으면 확인 필요, "아니오"면 정상)
-
-- overall_result: "정상"/"확인필요"
-- overall_detail: 종합 판단 근거
-
-### 6. 사업참여 동의서 검증 (participation_consent_check) - 동의서가 있을 때만
-없으면 participation_consent_check: null
-
-동의서 하단의 필수 기입란을 확인합니다:
-
-- consent_checkboxes: 동의 체크박스(수집·이용 동의, 제공 동의, 고유식별정보처리 동의) 에 모두 체크가 있는지
-  - all_checked: true/false
-  - detail: 어떤 항목에 체크가 있고 없는지 설명
-
-- date_filled: 날짜가 기입되어 있는지
-  - filled: true/false
-  - detail: 기입된 날짜 또는 미기입 사유
-
-- signature_present: 서명/날인이 있는지
-  - present: true/false
-  - detail: 판단 근거
-
-- overall_result: "정상"/"확인필요"
-- overall_detail: 종합 판단 근거
-
-## 응답 형식
-반드시 아래 JSON 구조로만 응답하세요. 다른 텍스트 없이 JSON만 출력하세요:
+## 응답: 반드시 아래 JSON 하나만 출력하세요. 다른 텍스트 절대 불가.
 
 \`\`\`json
 {
@@ -471,388 +336,254 @@ function buildPrompt(targetName){
     "education_confirmation": {"found": false, "detail": ""},
     "participation_consent": {"found": false, "detail": ""}
   },
-  "contract_analysis": null,
-  "business_registration_check": null,
-  "education_confirmation_check": null,
-  "participation_consent_check": null
-}
-\`\`\`
-
-contract_analysis가 있을 때:
-\`\`\`json
-"contract_analysis": {
-  "employment_type": {
-    "result": "",
-    "evidence": "",
-    "contract_period": ""
+  "contract_analysis": {
+    "employment_type": {"result": "", "evidence": "", "contract_period": ""},
+    "minimum_wage": {"monthly_salary": 0, "hourly_wage": null, "weekly_hours": 40, "monthly_hours": 209, "result": "", "calculated_hourly": 0, "evidence": ""},
+    "required_items": {
+      "is_part_time": false,
+      "wage_components": {"found": false, "detail": ""},
+      "working_hours": {"found": false, "detail": ""},
+      "holidays": {"found": false, "detail": ""},
+      "annual_leave": {"found": false, "detail": ""},
+      "workplace_duties": {"found": false, "detail": ""},
+      "daily_schedule": {"found": false, "detail": ""}
+    }
   },
-  "minimum_wage": {
-    "monthly_salary": 0,
-    "hourly_wage": null,
-    "weekly_hours": 40,
-    "monthly_hours": 209,
-    "result": "",
-    "calculated_hourly": 0,
-    "evidence": ""
+  "business_reg_check": {
+    "doc_company": "",
+    "contract_company": "",
+    "match": false,
+    "detail": ""
   },
-  "required_items": {
-    "is_part_time": false,
-    "wage_components": {"found": false, "detail": ""},
-    "working_hours": {"found": false, "detail": ""},
-    "holidays": {"found": false, "detail": ""},
-    "annual_leave": {"found": false, "detail": ""},
-    "workplace_duties": {"found": false, "detail": ""},
-    "daily_schedule": {"found": false, "detail": ""}
+  "edu_check": {
+    "highschool_checked": "",
+    "university_checked": "",
+    "has_problem": false,
+    "yes_no_checked": "",
+    "yes_no_problem": false,
+    "result": "",
+    "detail": ""
+  },
+  "consent_check": {
+    "checkboxes_ok": false,
+    "checkboxes_detail": "",
+    "date_filled": false,
+    "date_detail": "",
+    "signature_ok": false,
+    "signature_detail": "",
+    "result": "",
+    "detail": ""
   }
 }
 \`\`\`
 
-business_registration_check가 있을 때:
-\`\`\`json
-"business_registration_check": {
-  "company_name_on_doc": "",
-  "company_name_on_contract": "",
-  "company_name_match": false,
-  "company_name_match_detail": ""
-}
-\`\`\`
-
-education_confirmation_check가 있을 때:
-\`\`\`json
-"education_confirmation_check": {
-  "education_table": {
-    "highschool_status": "",
-    "university_status": "",
-    "has_suspension_or_enrolled": false,
-    "detail": ""
-  },
-  "yes_no_checkbox": {
-    "checked": "",
-    "needs_review": false,
-    "detail": ""
-  },
-  "overall_result": "",
-  "overall_detail": ""
-}
-\`\`\`
-
-participation_consent_check가 있을 때:
-\`\`\`json
-"participation_consent_check": {
-  "consent_checkboxes": {
-    "all_checked": false,
-    "detail": ""
-  },
-  "date_filled": {
-    "filled": false,
-    "detail": ""
-  },
-  "signature_present": {
-    "present": false,
-    "detail": ""
-  },
-  "overall_result": "",
-  "overall_detail": ""
-}
-\`\`\``;
+해당 서류가 없으면 contract_analysis, business_reg_check, edu_check, consent_check 각각 null로 설정하세요.`;
 }
 
-// ========== Render Results ==========
+// ========== Render ==========
 function renderResults(r, targetName){
   // Info bar
-  const infoBar=$('infoBar');
-  infoBar.style.display='flex';
-  infoBar.innerHTML='';
-  const infos=[
-    ['요청 대상자', null, targetName],
-    ['근로자','worker_name'],['입사일','start_date'],['사업장','company_name'],['생년월일','birth_date']
-  ];
-  infos.forEach(([label,key,override])=>{
-    const val = override || r[key];
-    if(val){
-      infoBar.innerHTML+=`<div class="info-item"><div class="label">${label}</div><div class="value">${esc(val)}</div></div>`;
-    }
-  });
+  const ib=$('infoBar');
+  ib.style.display='flex';
+  ib.innerHTML='';
+  addInfo(ib,'요청 대상자',targetName);
+  if(r.worker_name)addInfo(ib,'근로자(서류)',r.worker_name);
+  if(r.start_date)addInfo(ib,'입사일',r.start_date);
+  if(r.company_name)addInfo(ib,'사업장',r.company_name);
+  if(r.birth_date)addInfo(ib,'생년월일',r.birth_date);
 
-  // Name match check
-  const nameMatch = r.worker_name && targetName && r.worker_name.replace(/\s/g,'') === targetName.replace(/\s/g,'');
-  if(r.worker_name && !nameMatch){
-    infoBar.innerHTML+=`<div class="info-item"><div class="label">이름 일치 여부</div><div class="value" style="color:var(--danger)">불일치 (서류: ${esc(r.worker_name)} / 요청: ${esc(targetName)})</div></div>`;
+  // Name match
+  const nameOk=r.worker_name&&targetName&&r.worker_name.replace(/\s/g,'')===targetName.replace(/\s/g,'');
+  if(r.worker_name&&!nameOk){
+    addInfo(ib,'이름 일치','불일치!','var(--danger)');
   }
 
-  // Document cards
-  renderDocCards(r.documents, r);
+  // Doc cards
+  renderDocCards(r.documents);
+
+  // Analysis area
+  const area=$('analysisArea');
+  area.innerHTML='';
 
   // Contract analysis
-  const ca=$('contractAnalysis');
-  ca.innerHTML='';
   if(r.contract_analysis){
-    ca.innerHTML+=renderEmploymentType(r.contract_analysis.employment_type);
-    ca.innerHTML+=renderMinimumWage(r.contract_analysis.minimum_wage);
-    ca.innerHTML+=renderRequiredItems(r.contract_analysis.required_items);
+    const ca=r.contract_analysis;
+    if(ca.employment_type) area.innerHTML+=renderEmploymentType(ca.employment_type);
+    if(ca.minimum_wage) area.innerHTML+=renderMinWage(ca.minimum_wage);
+    if(ca.required_items) area.innerHTML+=renderReqItems(ca.required_items);
   }
 
-  // Additional checks
-  const ac=$('additionalChecks');
-  ac.innerHTML='';
-  if(r.business_registration_check){
-    ac.innerHTML+=renderBusinessRegistrationCheck(r.business_registration_check);
-  }
-  if(r.education_confirmation_check){
-    ac.innerHTML+=renderEducationConfirmationCheck(r.education_confirmation_check);
-  }
-  if(r.participation_consent_check){
-    ac.innerHTML+=renderParticipationConsentCheck(r.participation_consent_check);
-  }
+  // Business reg check
+  if(r.business_reg_check) area.innerHTML+=renderBizCheck(r.business_reg_check);
 
-  // Summary banner
-  renderSummary(r);
+  // Education check
+  if(r.edu_check) area.innerHTML+=renderEduCheck(r.edu_check);
+
+  // Consent check
+  if(r.consent_check) area.innerHTML+=renderConsentCheck(r.consent_check);
+
+  // Summary
+  renderSummary(r,nameOk);
 }
 
-function renderDocCards(docs, r){
-  const container=$('docCards'); container.innerHTML='';
+function addInfo(container,label,value,color){
+  container.innerHTML+=`<div class="info-item"><div class="label">${label}</div><div class="value" ${color?`style="color:${color}"`:''}>${esc(value)}</div></div>`;
+}
+
+function renderDocCards(docs){
+  const c=$('docCards');c.innerHTML='';
   const items=[
-    {key:'fact_certificate',label:'사실증명서',desc:'국세청 발급 사실증명',icon:'📄'},
-    {key:'graduation_certificate',label:'졸업증명서',desc:'학교명/졸업일/학위',icon:'🎓'},
-    {key:'employment_contract',label:'근로계약서',desc:'근로계약서 원본',icon:'📝'},
-    {key:'business_registration',label:'사업자등록증명',desc:'사업자등록증명 원본',icon:'🏢'},
-    {key:'education_confirmation',label:'학력확인서',desc:'최종 학력 자기 확인서',icon:'📋'},
-    {key:'participation_consent',label:'사업참여 동의서',desc:'개인정보 동의서',icon:'✍️'}
+    ['fact_certificate','사실증명서','📄'],
+    ['graduation_certificate','졸업증명서','🎓'],
+    ['employment_contract','근로계약서','📝'],
+    ['business_registration','사업자등록증명','🏢'],
+    ['education_confirmation','학력확인서','📋'],
+    ['participation_consent','사업참여 동의서','✍️']
   ];
-
-  items.forEach(item=>{
-    const d=docs[item.key];
-    if(!d) return;
-    let cls,statusText;
-
-    cls=d.found?'found':'missing';
-    statusText=d.found?'있음':'없음';
-
-    const statusIcon=cls==='found'?'✅':'❌';
-    container.innerHTML+=`<div class="doc-card ${cls}">
-      <div class="icon">${item.icon}</div>
-      <div class="content">
-        <h4>${statusIcon} ${item.label} — ${statusText}</h4>
-        <p>${esc(d.detail||'')}</p>
-      </div>
-    </div>`;
+  items.forEach(([key,label,icon])=>{
+    const d=docs?.[key];if(!d)return;
+    const cls=d.found?'found':'missing';
+    const si=d.found?'✅':'❌';
+    c.innerHTML+=`<div class="doc-card ${cls}"><div class="icon">${icon}</div><div class="content"><h4>${si} ${label} — ${d.found?'있음':'없음'}</h4><p>${esc(d.detail||'')}</p></div></div>`;
   });
 }
 
 function renderEmploymentType(et){
-  if(!et) return '';
-  const badge=et.result==='정규직'?'badge-ok':
-    et.result==='기간제'?'badge-warn':
-    et.result.includes('추정')?'badge-warn':'badge-na';
-  const resultLabel={
-    '정규직':'정규직','기간제':'기간제(계약직)',
-    '정규직_추정':'정규직 추정 (주의)','기간제_가능성':'기간제 가능성',
-    '판단불가':'판단불가'
-  }[et.result]||et.result;
-
-  return `<div class="analysis-section">
-    <h3>📋 정규직 여부 판단 <span class="badge ${badge}">${esc(resultLabel)}</span></h3>
-    <div class="detail-row"><span class="label">판정 결과</span><span class="value">${esc(resultLabel)}</span></div>
-    ${et.contract_period?`<div class="detail-row"><span class="label">계약기간</span><span class="value">${esc(et.contract_period)}</span></div>`:''}
-    <div class="detail-row"><span class="label">근거 문구</span><span class="value">${esc(et.evidence||'-')}</span></div>
+  const map={'정규직':['badge-ok','정규직 (적격)'],'기간제':['badge-fail','기간제 (부적격)'],'정규직_추정':['badge-warn','정규직 추정 (확인 필요)'],'기간제_가능성':['badge-warn','기간제 가능성 (확인 필요)'],'판단불가':['badge-na','판단불가']};
+  const [badge,label]=map[et.result]||['badge-na',et.result];
+  return `<div class="section">
+    <h3>📋 정규직 여부 판단 <span class="badge ${badge}">${esc(label)}</span></h3>
+    <div class="row"><span class="lbl">판정 결과</span><span class="val">${esc(label)}</span></div>
+    ${et.contract_period?`<div class="row"><span class="lbl">계약기간</span><span class="val">${esc(et.contract_period)}</span></div>`:''}
+    <div class="row"><span class="lbl">근거 문구</span><span class="val">${esc(et.evidence||'-')}</span></div>
+    ${et.result!=='정규직'?'<div style="margin-top:8px;padding:10px;background:#fef2f2;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600">⚠️ 청년일자리도약장려금은 정규직 채용이 필수 요건입니다. 기간제 계약인 경우 지원 부적격입니다.</div>':''}
   </div>`;
 }
 
-function renderMinimumWage(mw){
-  if(!mw) return '';
+function renderMinWage(mw){
   const badge=mw.result==='준수'?'badge-ok':mw.result==='위반'?'badge-fail':'badge-na';
-
-  return `<div class="analysis-section">
+  return `<div class="section">
     <h3>💰 최저임금 준수 여부 <span class="badge ${badge}">${esc(mw.result)}</span></h3>
-    ${mw.monthly_salary?`<div class="detail-row"><span class="label">월급여 (계약서)</span><span class="value">${num(mw.monthly_salary)}원</span></div>`:''}
-    ${mw.hourly_wage?`<div class="detail-row"><span class="label">시급 (계약서)</span><span class="value">${num(mw.hourly_wage)}원</span></div>`:''}
-    <div class="detail-row"><span class="label">주 소정근로시간</span><span class="value">${mw.weekly_hours||'-'}시간</span></div>
-    <div class="detail-row"><span class="label">월 환산시간</span><span class="value">${mw.monthly_hours||'-'}시간</span></div>
-    <div class="detail-row"><span class="label">환산 시급</span><span class="value">${mw.calculated_hourly?num(Math.round(mw.calculated_hourly))+'원':'-'}</span></div>
-    <div class="detail-row"><span class="label">2025 최저시급</span><span class="value">10,030원 (월 2,096,270원 / 209h)</span></div>
-    <div class="detail-row"><span class="label">계산 근거</span><span class="value">${esc(mw.evidence||'-')}</span></div>
+    ${mw.monthly_salary?`<div class="row"><span class="lbl">월급여 (계약서)</span><span class="val">${num(mw.monthly_salary)}원</span></div>`:''}
+    ${mw.hourly_wage?`<div class="row"><span class="lbl">시급 (계약서)</span><span class="val">${num(mw.hourly_wage)}원</span></div>`:''}
+    <div class="row"><span class="lbl">주 소정근로시간</span><span class="val">${mw.weekly_hours||'-'}시간</span></div>
+    <div class="row"><span class="lbl">월 환산시간</span><span class="val">${mw.monthly_hours||'-'}시간</span></div>
+    <div class="row"><span class="lbl">환산 시급</span><span class="val">${mw.calculated_hourly?num(Math.round(mw.calculated_hourly))+'원':'-'}</span></div>
+    <div class="row"><span class="lbl">2025 최저시급</span><span class="val">10,030원 (월 2,096,270원/209h)</span></div>
+    <div class="row"><span class="lbl">계산 근거</span><span class="val">${esc(mw.evidence||'-')}</span></div>
   </div>`;
 }
 
-function renderRequiredItems(ri){
-  if(!ri) return '';
+function renderReqItems(ri){
   const items=[
-    {key:'wage_components',label:'임금 구성항목·계산방법·지급방법'},
-    {key:'working_hours',label:'소정근로시간'},
-    {key:'holidays',label:'휴일'},
-    {key:'annual_leave',label:'연차 유급휴가'},
-    {key:'workplace_duties',label:'취업 장소 및 종사 업무'}
+    ['wage_components','임금 구성항목·계산방법·지급방법'],
+    ['working_hours','소정근로시간'],
+    ['holidays','휴일'],
+    ['annual_leave','연차 유급휴가'],
+    ['workplace_duties','취업 장소·종사 업무']
   ];
-
-  if(ri.is_part_time){
-    items.push({key:'daily_schedule',label:'근로일 및 근로일별 근로시간 (단시간 근로자)'});
-  }
-
-  const total=items.length;
-  const found=items.filter(i=>ri[i.key]?.found).length;
+  if(ri.is_part_time)items.push(['daily_schedule','근로일·근로일별 근로시간 (단시간)']);
+  const total=items.length,found=items.filter(([k])=>ri[k]?.found).length;
   const badge=found===total?'badge-ok':found>=total-1?'badge-warn':'badge-fail';
-
-  let html=`<div class="analysis-section">
-    <h3>📑 필수 기재사항 체크 (근로기준법 §17) <span class="badge ${badge}">${found}/${total} 기재</span></h3>`;
-
-  if(ri.is_part_time){
-    html+=`<div style="margin-bottom:10px;font-size:12px;color:var(--warn);font-weight:600">⚠️ 단시간 근로자로 판단됨 — 추가 필수항목 포함</div>`;
-  }
-
-  html+=`<ul class="checklist">`;
-  items.forEach(item=>{
-    const d=ri[item.key];
-    const ok=d?.found;
-    html+=`<li>
-      <span class="check-icon">${ok?'✅':'❌'}</span>
-      <span><strong>${item.label}</strong><br><span style="font-size:11px;color:var(--gray)">${esc(d?.detail||'-')}</span></span>
-    </li>`;
+  let h=`<div class="section"><h3>📑 필수 기재사항 (근로기준법 §17) <span class="badge ${badge}">${found}/${total}</span></h3>`;
+  if(ri.is_part_time)h+=`<div style="margin-bottom:10px;font-size:12px;color:var(--warn);font-weight:600">⚠️ 단시간 근로자 — 추가 필수항목 포함</div>`;
+  h+=`<ul class="checklist">`;
+  items.forEach(([k,label])=>{
+    const d=ri[k],ok=d?.found;
+    h+=`<li><span class="ci">${ok?'✅':'❌'}</span><span><strong>${label}</strong><br><span style="font-size:11px;color:var(--gray)">${esc(d?.detail||'-')}</span></span></li>`;
   });
-  html+=`</ul></div>`;
-  return html;
+  return h+`</ul></div>`;
 }
 
-function renderBusinessRegistrationCheck(brc){
-  if(!brc) return '';
-  const badge=brc.company_name_match?'badge-ok':'badge-fail';
-  const label=brc.company_name_match?'일치':'불일치';
-
-  return `<div class="analysis-section">
-    <h3>🏢 사업자등록증명 검증 <span class="badge ${badge}">${label}</span></h3>
-    <div class="detail-row"><span class="label">사업자등록증명 상호</span><span class="value">${esc(brc.company_name_on_doc||'-')}</span></div>
-    <div class="detail-row"><span class="label">근로계약서 회사명</span><span class="value">${esc(brc.company_name_on_contract||'-')}</span></div>
-    <div class="detail-row"><span class="label">일치 여부</span><span class="value">${brc.company_name_match?'✅ 일치':'❌ 불일치'}</span></div>
-    <div class="detail-row"><span class="label">판단 근거</span><span class="value">${esc(brc.company_name_match_detail||'-')}</span></div>
+function renderBizCheck(b){
+  const badge=b.match?'badge-ok':'badge-fail';
+  return `<div class="section">
+    <h3>🏢 사업자등록증명 검증 <span class="badge ${badge}">${b.match?'일치':'불일치'}</span></h3>
+    <div class="row"><span class="lbl">사업자등록증명 상호</span><span class="val">${esc(b.doc_company||'-')}</span></div>
+    <div class="row"><span class="lbl">근로계약서 회사명</span><span class="val">${esc(b.contract_company||'-')}</span></div>
+    <div class="row"><span class="lbl">일치 여부</span><span class="val">${b.match?'✅ 일치':'❌ 불일치'}</span></div>
+    <div class="row"><span class="lbl">판단 근거</span><span class="val">${esc(b.detail||'-')}</span></div>
   </div>`;
 }
 
-function renderEducationConfirmationCheck(ecc){
-  if(!ecc) return '';
-  const badge=ecc.overall_result==='정상'?'badge-ok':'badge-warn';
-
-  let html=`<div class="analysis-section">
-    <h3>📋 학력확인서 검증 <span class="badge ${badge}">${esc(ecc.overall_result)}</span></h3>`;
-
-  // Education table
-  if(ecc.education_table){
-    const et=ecc.education_table;
-    html+=`<div style="margin-bottom:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid var(--border)">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">학력 체크표 분석</div>
-      <div class="detail-row"><span class="label">고등학교</span><span class="value">${esc(et.highschool_status||'-')}</span></div>
-      <div class="detail-row"><span class="label">대학(원)교</span><span class="value">${esc(et.university_status||'-')}</span></div>
-      <div class="detail-row"><span class="label">휴학/재학중 체크</span><span class="value">${et.has_suspension_or_enrolled?'⚠️ 있음 — 확인 필요':'✅ 없음'}</span></div>
-      <div class="detail-row"><span class="label">판단 근거</span><span class="value">${esc(et.detail||'-')}</span></div>
-    </div>`;
-  }
-
-  // Yes/No checkbox
-  if(ecc.yes_no_checkbox){
-    const yn=ecc.yes_no_checkbox;
-    const ynIcon=yn.needs_review?'⚠️':'✅';
-    html+=`<div style="margin-bottom:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid var(--border)">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">재학/일학습병행 여부 (예/아니오)</div>
-      <div class="detail-row"><span class="label">체크 항목</span><span class="value">${ynIcon} ${esc(yn.checked||'-')}</span></div>
-      <div class="detail-row"><span class="label">확인 필요</span><span class="value">${yn.needs_review?'⚠️ 예':'정상'}</span></div>
-      <div class="detail-row"><span class="label">판단 근거</span><span class="value">${esc(yn.detail||'-')}</span></div>
-    </div>`;
-  }
-
-  html+=`<div class="detail-row"><span class="label">종합 판단</span><span class="value" style="font-weight:700">${ecc.overall_result==='정상'?'✅':'⚠️'} ${esc(ecc.overall_detail||'-')}</span></div>`;
-  html+=`</div>`;
-  return html;
+function renderEduCheck(e){
+  const badge=e.result==='정상'?'badge-ok':'badge-warn';
+  return `<div class="section">
+    <h3>📋 학력확인서 검증 <span class="badge ${badge}">${esc(e.result)}</span></h3>
+    <div style="padding:12px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);margin-bottom:10px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:8px">학력 체크표</div>
+      <div class="row"><span class="lbl">고등학교</span><span class="val">${esc(e.highschool_checked||'-')}</span></div>
+      <div class="row"><span class="lbl">대학(원)교</span><span class="val">${esc(e.university_checked||'-')}</span></div>
+      <div class="row"><span class="lbl">휴학/재학중 해당</span><span class="val">${e.has_problem?'⚠️ 해당 — 확인 필요':'✅ 해당 없음'}</span></div>
+    </div>
+    <div style="padding:12px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);margin-bottom:10px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:8px">5번 질문 (재학중 여부)</div>
+      <div class="row"><span class="lbl">체크 항목</span><span class="val">${e.yes_no_problem?'⚠️':'✅'} ${esc(e.yes_no_checked||'-')}</span></div>
+      <div class="row"><span class="lbl">확인 필요</span><span class="val">${e.yes_no_problem?'⚠️ 예 (재학중으로 확인)':'정상'}</span></div>
+    </div>
+    <div class="row"><span class="lbl">종합 판단</span><span class="val" style="font-weight:700">${e.result==='정상'?'✅':'⚠️'} ${esc(e.detail||'-')}</span></div>
+  </div>`;
 }
 
-function renderParticipationConsentCheck(pcc){
-  if(!pcc) return '';
-  const badge=pcc.overall_result==='정상'?'badge-ok':'badge-warn';
-
-  let html=`<div class="analysis-section">
-    <h3>✍️ 사업참여 동의서 검증 <span class="badge ${badge}">${esc(pcc.overall_result)}</span></h3>
-    <ul class="checklist">`;
-
-  // Checkboxes
-  if(pcc.consent_checkboxes){
-    const cc=pcc.consent_checkboxes;
-    html+=`<li>
-      <span class="check-icon">${cc.all_checked?'✅':'❌'}</span>
-      <span><strong>동의 체크박스</strong><br><span style="font-size:11px;color:var(--gray)">${esc(cc.detail||'-')}</span></span>
-    </li>`;
-  }
-
-  // Date
-  if(pcc.date_filled){
-    const df=pcc.date_filled;
-    html+=`<li>
-      <span class="check-icon">${df.filled?'✅':'❌'}</span>
-      <span><strong>날짜 기입</strong><br><span style="font-size:11px;color:var(--gray)">${esc(df.detail||'-')}</span></span>
-    </li>`;
-  }
-
-  // Signature
-  if(pcc.signature_present){
-    const sp=pcc.signature_present;
-    html+=`<li>
-      <span class="check-icon">${sp.present?'✅':'❌'}</span>
-      <span><strong>서명/날인</strong><br><span style="font-size:11px;color:var(--gray)">${esc(sp.detail||'-')}</span></span>
-    </li>`;
-  }
-
-  html+=`</ul>`;
-  html+=`<div class="detail-row" style="margin-top:12px"><span class="label">종합 판단</span><span class="value" style="font-weight:700">${pcc.overall_result==='정상'?'✅':'⚠️'} ${esc(pcc.overall_detail||'-')}</span></div>`;
-  html+=`</div>`;
-  return html;
+function renderConsentCheck(c){
+  const badge=c.result==='정상'?'badge-ok':'badge-warn';
+  return `<div class="section">
+    <h3>✍️ 사업참여 동의서 검증 <span class="badge ${badge}">${esc(c.result)}</span></h3>
+    <ul class="checklist">
+      <li><span class="ci">${c.checkboxes_ok?'✅':'❌'}</span><span><strong>동의 체크박스</strong><br><span style="font-size:11px;color:var(--gray)">${esc(c.checkboxes_detail||'-')}</span></span></li>
+      <li><span class="ci">${c.date_filled?'✅':'❌'}</span><span><strong>날짜 기입</strong><br><span style="font-size:11px;color:var(--gray)">${esc(c.date_detail||'-')}</span></span></li>
+      <li><span class="ci">${c.signature_ok?'✅':'❌'}</span><span><strong>서명/날인</strong><br><span style="font-size:11px;color:var(--gray)">${esc(c.signature_detail||'-')}</span></span></li>
+    </ul>
+    <div class="row" style="margin-top:12px"><span class="lbl">종합 판단</span><span class="val" style="font-weight:700">${c.result==='정상'?'✅':'⚠️'} ${esc(c.detail||'-')}</span></div>
+  </div>`;
 }
 
-function renderSummary(r){
+function renderSummary(r,nameOk){
   const banner=$('summaryBanner');
   let issues=0;
-  const docs=r.documents;
+  const docs=r.documents||{};
 
-  // Check missing docs
-  if(!docs.fact_certificate?.found) issues++;
-  if(!docs.graduation_certificate?.found) issues++;
-  if(!docs.employment_contract?.found) issues++;
-  if(!docs.business_registration?.found) issues++;
-  if(!docs.education_confirmation?.found) issues++;
-  if(!docs.participation_consent?.found) issues++;
+  // Missing docs
+  ['fact_certificate','graduation_certificate','employment_contract','business_registration','education_confirmation','participation_consent'].forEach(k=>{
+    if(!docs[k]?.found)issues++;
+  });
 
-  // Check contract issues
+  // Name mismatch
+  if(r.worker_name&&!nameOk)issues++;
+
+  // Contract issues
   const ca=r.contract_analysis;
   if(ca){
-    if(ca.employment_type?.result==='기간제'||ca.employment_type?.result==='기간제_가능성'||ca.employment_type?.result==='판단불가') issues++;
-    if(ca.minimum_wage?.result==='위반') issues++;
-    if(ca.minimum_wage?.result==='확인불가') issues++;
+    const et=ca.employment_type;
+    if(et&&et.result!=='정규직')issues++;
+    if(ca.minimum_wage?.result==='위반')issues++;
+    if(ca.minimum_wage?.result==='확인불가')issues++;
     if(ca.required_items){
       const keys=['wage_components','working_hours','holidays','annual_leave','workplace_duties'];
-      if(ca.required_items.is_part_time) keys.push('daily_schedule');
-      keys.forEach(k=>{if(!ca.required_items[k]?.found) issues++});
+      if(ca.required_items.is_part_time)keys.push('daily_schedule');
+      keys.forEach(k=>{if(!ca.required_items[k]?.found)issues++});
     }
   }
 
-  // Check business registration match
-  if(r.business_registration_check && !r.business_registration_check.company_name_match) issues++;
+  // Biz reg
+  if(r.business_reg_check&&!r.business_reg_check.match)issues++;
 
-  // Check education confirmation
-  if(r.education_confirmation_check && r.education_confirmation_check.overall_result!=='정상') issues++;
+  // Edu
+  if(r.edu_check&&r.edu_check.result!=='정상')issues++;
 
-  // Check participation consent
-  if(r.participation_consent_check && r.participation_consent_check.overall_result!=='정상') issues++;
-
-  // Check name match
-  const nameMatch = r.worker_name && $('targetName').value.trim() && r.worker_name.replace(/\s/g,'') === $('targetName').value.trim().replace(/\s/g,'');
-  if(r.worker_name && !nameMatch) issues++;
+  // Consent
+  if(r.consent_check&&r.consent_check.result!=='정상')issues++;
 
   banner.style.display='block';
   if(issues===0){
     banner.className='summary-banner ok';
-    banner.textContent='✅ 전체 검토 결과: 이상없음';
+    banner.textContent='✅ 전체 검토 결과: 이상없음 — 청년일자리도약장려금 적격';
   }else{
     banner.className='summary-banner warn';
     banner.textContent=`⚠️ 전체 검토 결과: 검토필요 항목 ${issues}개`;
   }
 }
 
-// ========== Helpers ==========
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function num(n){return n!=null?Number(n).toLocaleString('ko-KR'):'-'}
 </script>
