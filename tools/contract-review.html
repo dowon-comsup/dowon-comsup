@@ -320,9 +320,10 @@ function buildPrompt(targetName){
 각각 found(true/false), detail
 
 ### D. 사업자등록증명 검증 (business_reg_check) — 없으면 null
-- doc_company: 사업자등록증명의 상호(법인명)
-- contract_company: 근로계약서의 회사명
-- match: 동일 여부 (true/false)
+요청 대상자 이름("${targetName}")과 사업자등록증명에 기재된 대표자 성명을 비교합니다.
+- target_name: 요청 대상자 이름
+- doc_representative: 사업자등록증명에 기재된 대표자 성명
+- match: 두 이름이 동일한지 (true/false). 동일하면 대표자 본인이므로 확인 필요
 - detail: 판단 근거
 
 ### E. 학력확인서 검증 (edu_check) — 없으면 null
@@ -378,8 +379,8 @@ function buildPrompt(targetName){
     }
   },
   "business_reg_check": {
-    "doc_company": "",
-    "contract_company": "",
+    "target_name": "",
+    "doc_representative": "",
     "match": false,
     "detail": ""
   },
@@ -524,12 +525,14 @@ function renderReqItems(ri){
 }
 
 function renderBizCheck(b){
-  const badge=b.match?'badge-ok':'badge-fail';
+  // match=true면 대표자와 대상자가 동일인 → 확인 필요
+  const badge=b.match?'badge-warn':'badge-ok';
+  const statusText=b.match?'동일인 — 확인 필요':'다른 사람 — 정상';
   return `<div class="section">
-    <h3>🏢 사업자등록증명 검증 <span class="badge ${badge}">${b.match?'일치':'불일치'}</span></h3>
-    <div class="row"><span class="lbl">사업자등록증명 상호</span><span class="val">${esc(b.doc_company||'-')}</span></div>
-    <div class="row"><span class="lbl">근로계약서 회사명</span><span class="val">${esc(b.contract_company||'-')}</span></div>
-    <div class="row"><span class="lbl">일치 여부</span><span class="val">${b.match?'✅ 일치':'❌ 불일치'}</span></div>
+    <h3>🏢 사업자등록증명 검증 <span class="badge ${badge}">${statusText}</span></h3>
+    <div class="row"><span class="lbl">요청 대상자</span><span class="val">${esc(b.target_name||'-')}</span></div>
+    <div class="row"><span class="lbl">대표자 성명 (서류)</span><span class="val">${esc(b.doc_representative||'-')}</span></div>
+    <div class="row"><span class="lbl">동일인 여부</span><span class="val">${b.match?'⚠️ 동일인 (대표자 본인 채용 — 확인 필요)':'✅ 다른 사람'}</span></div>
     <div class="row"><span class="lbl">판단 근거</span><span class="val">${esc(b.detail||'-')}</span></div>
   </div>`;
 }
@@ -593,8 +596,8 @@ function renderSummary(r,nameOk){
     }
   }
 
-  // Biz reg
-  if(r.business_reg_check&&!r.business_reg_check.match)issues++;
+  // Biz reg: match=true면 대표자=대상자 동일인 → 확인 필요
+  if(r.business_reg_check&&r.business_reg_check.match)issues++;
 
   // Edu
   if(r.edu_check&&r.edu_check.result!=='정상')issues++;
