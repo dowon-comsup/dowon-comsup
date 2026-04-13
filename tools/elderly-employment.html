@@ -423,12 +423,12 @@ async function parseRules(){
     for(let i=0;i<maxPages;i++){
       contentParts.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:images[i]}});
     }
-    contentParts.push({type:'text',text:`위 취업규칙 PDF의 내용입니다. 추출된 텍스트도 참고하세요:\n\n${text.substring(0,8000)}\n\n다음을 JSON으로 답변해주세요:\n1. retirement_age: 정년이 몇 세로 설정되어 있는지 (숫자, 없으면 null)\n2. retirement_type: 정년 기준 유형 - "birthday"(만 n세가 되는 날), "month_end"(만 n세가 되는 달의 말일), "year_end"(만 n세가 되는 해의 말일), "half_year_end"(상/하반기 말일), "unknown"(불명확)\n3. has_continued_employment: 계속고용제도(재고용/정년연장/정년폐지) 조항이 있는지 (boolean)\n4. continued_employment_type: 있다면 유형 - "rehire"(재고용), "extend"(정년연장), "abolish"(정년폐지), null\n5. needs_regulation_fix: 정년이 없거나 만60세 미만이면 true (규정정비 대상)\n6. relevant_clauses: 정년 관련 조항 원문 (배열)\n7. notes: 특이사항\n\nJSON만 출력하세요.`});
+    contentParts.push({type:'text',text:`위는 취업규칙 PDF 이미지입니다. 아래는 PDF에서 추출한 텍스트입니다:\n\n${text.substring(0,12000)}\n\n[작업]\n이 취업규칙에서 "정년"이라는 단어가 포함된 조항(조, 항, 호)을 모두 찾아 원문 그대로 추출해주세요.\n이미지와 텍스트를 모두 참고하되, 이미지를 우선시하세요. 텍스트 추출이 깨져있을 수 있습니다.\n\n다음 JSON 형식으로 답변해주세요:\n{\n  "retirement_age": 정년이 몇 세인지 (숫자). 정년 규정이 없으면 null. "만 60세" 등에서 숫자만 추출,\n  "retirement_type": 정년 도달 기준. 아래 중 택1:\n    - "birthday": 만 n세가 되는 날 (또는 "만 n세에 달한 날")\n    - "month_end": 만 n세가 되는 날이 속하는 달의 말일\n    - "year_end": 만 n세가 되는 해의 12월 31일\n    - "half_year_end": 상반기(6월말)/하반기(12월말)\n    - "unknown": 기준이 명시되어 있지 않음,\n  "has_continued_employment": 계속고용(재고용/정년연장/정년폐지) 관련 조항 존재 여부 (boolean),\n  "continued_employment_type": "rehire"(재고용) | "extend"(정년연장) | "abolish"(정년폐지) | null,\n  "needs_regulation_fix": 정년 규정이 아예 없거나, 만 60세 미만으로 설정된 경우 true,\n  "retirement_clauses": [\n    {\n      "article": "제OO조 (조항 제목)",\n      "full_text": "해당 조항의 전체 원문을 그대로 옮겨적기. 항/호가 있으면 모두 포함"\n    }\n  ],\n  "notes": "특이사항 (정년 관련 부속 규정, 경과조치, 촉탁직 재고용 등 참고사항)"\n}\n\nJSON만 출력하세요. 마크다운 코드블록 없이 순수 JSON만.`});
 
     const resp = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:contentParts}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4096,messages:[{role:'user',content:contentParts}]})
     });
 
     if(!resp.ok){
@@ -457,6 +457,7 @@ function displayRetirementResult(result){
   retirementType = result.retirement_type || 'month_end';
 
   let html='';
+  // 판정 배너
   if(result.needs_regulation_fix){
     html+=`<div class="retirement-result">
       <div><div class="age">${retirementAge||'미설정'}</div><div class="age-label">정년 (만 세)</div></div>
@@ -472,17 +473,82 @@ function displayRetirementResult(result){
       </div></div>`;
   }
 
-  if(result.relevant_clauses && result.relevant_clauses.length){
-    html+=`<details style="margin-top:8px"><summary>관련 조항 원문</summary><div style="padding:8px;font-size:12px;background:var(--bg-sub);border-radius:6px;margin-top:4px">`;
-    result.relevant_clauses.forEach(c=>html+=`<p style="margin:4px 0">${c}</p>`);
+  // AI가 추출한 정년 관련 조항 (retirement_clauses - 새 형식)
+  const clauses = result.retirement_clauses || [];
+  // 하위호환: 구 형식 relevant_clauses도 처리
+  const legacyClauses = result.relevant_clauses || [];
+
+  if(clauses.length > 0){
+    html+=`<div style="margin-top:14px"><div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">정년 관련 조항 원문</div>`;
+    clauses.forEach(c=>{
+      html+=`<div style="padding:12px 14px;margin-bottom:8px;background:var(--bg-sub);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;line-height:1.8">`;
+      if(c.article) html+=`<div style="font-weight:700;color:var(--text);margin-bottom:4px">${escHtml(c.article)}</div>`;
+      if(c.full_text) html+=`<div style="white-space:pre-wrap;color:var(--text)">${escHtml(c.full_text)}</div>`;
+      html+=`</div>`;
+    });
+    html+=`</div>`;
+  } else if(legacyClauses.length > 0){
+    html+=`<div style="margin-top:14px"><div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">정년 관련 조항 원문</div>`;
+    html+=`<div style="padding:12px 14px;background:var(--bg-sub);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;line-height:1.8;white-space:pre-wrap">`;
+    legacyClauses.forEach(c=>html+=escHtml(c)+'\n');
+    html+=`</div></div>`;
+  }
+
+  // PDF 텍스트에서 "정년" 키워드 포함 줄 직접 추출 (AI 결과와 별도로)
+  const rawText = document.getElementById('dbgRulesText').textContent||'';
+  const retirementLines = extractRetirementLines(rawText);
+  if(retirementLines.length > 0){
+    html+=`<details style="margin-top:12px" open><summary style="font-size:13px;font-weight:700;color:var(--text)">PDF 텍스트에서 "정년" 포함 구간 (${retirementLines.length}건)</summary>`;
+    html+=`<div style="margin-top:6px;padding:12px 14px;background:#fffef5;border:1px solid #e5e2c8;border-radius:var(--radius);font-size:12px;line-height:1.8;white-space:pre-wrap;max-height:400px;overflow-y:auto">`;
+    retirementLines.forEach(block=>html+=escHtml(block)+'\n\n');
     html+=`</div></details>`;
   }
-  if(result.notes) html+=`<div class="alert alert-info" style="margin-top:8px">${result.notes}</div>`;
+
+  if(result.notes) html+=`<div class="alert alert-info" style="margin-top:10px">${escHtml(result.notes)}</div>`;
 
   document.getElementById('retirementDisplay').innerHTML=html;
   document.getElementById('rulesResult').innerHTML=`<div class="alert alert-success">정년 분석 완료</div>`;
   document.getElementById('stepRules').querySelector('.step-num').classList.add('done');
+  document.getElementById('btnParseRules').disabled=false;
   checkAnalyzeReady();
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// PDF 원문에서 "정년" 키워드가 포함된 줄 + 전후 맥락 추출
+function extractRetirementLines(text){
+  if(!text) return [];
+  const lines = text.split('\n');
+  const blocks = [];
+  const contextRange = 3; // 전후 3줄씩
+
+  for(let i=0; i<lines.length; i++){
+    if(!/정년/.test(lines[i])) continue;
+    const start = Math.max(0, i-contextRange);
+    const end = Math.min(lines.length-1, i+contextRange);
+    // 이전 블록과 겹치면 병합
+    if(blocks.length > 0){
+      const prev = blocks[blocks.length-1];
+      if(start <= prev.end+2){
+        prev.end = end;
+        continue;
+      }
+    }
+    blocks.push({start, end, anchor:i});
+  }
+
+  return blocks.map(b=>{
+    const chunk = [];
+    for(let j=b.start; j<=b.end; j++){
+      const line = lines[j].trim();
+      if(!line) continue;
+      // "정년"이 포함된 줄은 강조 표시용으로 ► 붙임
+      chunk.push(/정년/.test(lines[j]) ? '► '+line : '  '+line);
+    }
+    return chunk.join('\n');
+  }).filter(b=>b.trim());
 }
 
 function manualRetirement(){
