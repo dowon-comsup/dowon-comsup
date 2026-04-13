@@ -117,6 +117,26 @@ pre.log{background:var(--ink-50);padding:10px;font-size:11px;overflow:auto;max-h
 .adj-row input,.adj-row select{padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px}
 .hidden{display:none!important}
 .divider{border:none;border-top:2px solid var(--border);margin:24px 0}
+/* Multi-applicant */
+.applicant-input-area{margin-bottom:16px}
+.applicant-input-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.applicant-input-row input{flex:1;padding:8px 12px;border:2px solid var(--border);border-radius:8px;font-size:13px}
+.applicant-input-row input:focus{border-color:var(--primary);outline:none}
+.applicant-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.applicant-tag{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--ink-50);border:1px solid var(--ink-200);border-radius:20px;font-size:13px;font-weight:600}
+.applicant-tag .remove-tag{background:none;border:none;color:var(--danger);cursor:pointer;font-size:15px;padding:0 2px;line-height:1}
+.applicant-tag .remove-tag:hover{color:#991b1b}
+.result-person-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+.result-person-tab{padding:8px 20px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--gray);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .2s}
+.result-person-tab.active{color:var(--primary-dark);border-bottom-color:var(--primary)}
+.result-person-tab:hover{color:var(--primary)}
+.result-person-tab .tab-status{font-size:11px;margin-left:4px}
+.result-person-panel{display:none}
+.result-person-panel.active{display:block}
+.multi-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:20px}
+.multi-summary-card{padding:14px;border-radius:10px;border:1px solid var(--border);background:var(--surface,#fff);box-shadow:var(--card-shadow)}
+.multi-summary-card h4{font-size:13px;margin-bottom:4px}
+.multi-summary-card .count{font-size:20px;font-weight:800}
 </style>
 </head>
 <body>
@@ -142,9 +162,14 @@ pre.log{background:var(--ink-50);padding:10px;font-size:11px;overflow:auto;max-h
   <input type="password" id="apiKey" placeholder="sk-ant-...">
   <span class="status" id="apiKeyStatus"></span>
 </div>
-<div class="input-section">
-  <label>요청 대상자 이름:</label>
-  <input type="text" id="targetName" placeholder="예: 황인경">
+<div class="applicant-input-area">
+  <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">요청 대상자:</label>
+  <div class="applicant-input-row">
+    <input type="text" id="applicantInput" placeholder="이름 입력 후 Enter 또는 추가 버튼 (예: 황인경)">
+    <button class="btn-sm btn-blue" id="btnAddApplicant" type="button">추가</button>
+  </div>
+  <div class="applicant-tags" id="applicantTags"></div>
+  <div style="font-size:11px;color:var(--gray);margin-top:4px">여러 명의 대상자를 추가할 수 있습니다. 쉼표(,)로 구분하여 한번에 입력도 가능합니다.</div>
 </div>
 
 <div class="upload-zone" id="uploadZone">
@@ -159,11 +184,7 @@ pre.log{background:var(--ink-50);padding:10px;font-size:11px;overflow:auto;max-h
 <div id="statusText"></div>
 
 <div id="results" style="display:none">
-  <div class="summary-banner" id="summaryBanner"></div>
-  <div class="info-bar" id="infoBar"></div>
-  <h2 style="font-size:16px;margin:20px 0 12px">서류 존재 여부</h2>
-  <div class="doc-cards" id="docCards"></div>
-  <div id="analysisArea"></div>
+  <div id="multiResultArea"></div>
 </div>
 
 <details style="margin-top:24px"><summary>API 응답 원문 (디버그)</summary><pre class="log" id="debugLog">분석 실행 후 표시됩니다.</pre></details>
@@ -327,6 +348,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
    TAB 1: 서류 판독 (기존 기능 보존)
    ========================================================= */
 let uploadedFiles=[];
+let applicants=[];
 
 // API Key persistence
 (function(){
@@ -348,7 +370,39 @@ zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag
 zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
 zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');addFiles(e.dataTransfer.files)});
 fi.addEventListener('change',()=>addFiles(fi.files));
-$('targetName').addEventListener('input',updateBtn);
+
+// Multi-applicant management
+function addApplicant(name){
+  name=(name||'').trim();
+  if(!name)return;
+  if(applicants.includes(name)){return}
+  applicants.push(name);
+  renderApplicantTags();
+  updateBtn();
+}
+function removeApplicant(name){
+  applicants=applicants.filter(n=>n!==name);
+  renderApplicantTags();
+  updateBtn();
+}
+function renderApplicantTags(){
+  const el=$('applicantTags');
+  el.innerHTML=applicants.map(n=>`<span class="applicant-tag">${esc(n)}<button class="remove-tag" onclick="removeApplicant('${n.replace(/'/g,"\\'")}')">&times;</button></span>`).join('');
+}
+$('btnAddApplicant').addEventListener('click',()=>{
+  const inp=$('applicantInput');
+  const val=inp.value.trim();
+  if(val){
+    val.split(/[,，]/).forEach(n=>addApplicant(n.trim()));
+    inp.value='';
+  }
+});
+$('applicantInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    $('btnAddApplicant').click();
+  }
+});
 
 function addFiles(files){
   for(const f of files){
@@ -370,7 +424,7 @@ function renderFileList(){
   }));
 }
 function updateBtn(){
-  $('btnAnalyze').disabled=!(uploadedFiles.length>0&&$('apiKey').value.trim()&&$('targetName').value.trim());
+  $('btnAnalyze').disabled=!(uploadedFiles.length>0&&$('apiKey').value.trim()&&applicants.length>0);
 }
 updateBtn();
 
@@ -395,9 +449,8 @@ $('btnAnalyze').addEventListener('click',runAnalysis);
 
 async function runAnalysis(){
   const apiKey=$('apiKey').value.trim();
-  const targetName=$('targetName').value.trim();
   if(!apiKey){alert('API Key를 입력하세요.');return}
-  if(!targetName){alert('요청 대상자 이름을 입력하세요.');return}
+  if(!applicants.length){alert('대상자를 추가하세요.');return}
   if(!uploadedFiles.length){alert('PDF를 업로드하세요.');return}
 
   $('btnAnalyze').disabled=true;
@@ -405,36 +458,52 @@ async function runAnalysis(){
   $('results').style.display='none';
   setProgress(5,'PDF 변환 중...');
 
+  const allResults=[];
+  const debugLogs=[];
+
   try{
     const pdfContents=[];
     for(let i=0;i<uploadedFiles.length;i++){
-      setProgress(5+Math.round(20*i/uploadedFiles.length),`PDF 변환 중 (${i+1}/${uploadedFiles.length})...`);
+      setProgress(5+Math.round(15*i/uploadedFiles.length),`PDF 변환 중 (${i+1}/${uploadedFiles.length})...`);
       pdfContents.push({name:uploadedFiles[i].name,base64:await pdfToBase64(uploadedFiles[i].file)});
     }
 
-    setProgress(30,'Claude AI 분석 중... (1~2분 소요)');
-
-    const content=[];
+    const pdfContentBlocks=[];
     pdfContents.forEach(p=>{
-      content.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:p.base64}});
-      content.push({type:'text',text:`[위 PDF 파일명: ${p.name}]`});
+      pdfContentBlocks.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:p.base64}});
+      pdfContentBlocks.push({type:'text',text:`[위 PDF 파일명: ${p.name}]`});
     });
-    content.push({type:'text',text:buildPrompt(targetName)});
 
-    const raw=await callClaude(apiKey,content);
-    $('debugLog').textContent=raw;
-    setProgress(90,'결과 파싱 중...');
+    const total=applicants.length;
+    for(let i=0;i<total;i++){
+      const name=applicants[i];
+      const pct=20+Math.round(70*(i/total));
+      setProgress(pct,`Claude AI 분석 중... (${i+1}/${total}: ${name})`);
 
-    let result;
-    try{
-      const m=raw.match(/```json\s*([\s\S]*?)\s*```/)||raw.match(/(\{[\s\S]*\})/);
-      result=JSON.parse(m[1]);
-    }catch(e){throw new Error('AI 응답 파싱 실패: '+e.message+'\n\n원문:\n'+raw.slice(0,500))}
+      try{
+        const content=[...pdfContentBlocks,{type:'text',text:buildPrompt(name)}];
+        const raw=await callClaude(apiKey,content);
+        debugLogs.push(`=== ${name} ===\n${raw}`);
 
-    postProcessResult(result);
+        let result;
+        try{
+          const m=raw.match(/```json\s*([\s\S]*?)\s*```/)||raw.match(/(\{[\s\S]*\})/);
+          result=JSON.parse(m[1]);
+        }catch(e){
+          allResults.push({targetName:name,error:'AI 응답 파싱 실패: '+e.message,raw:raw.slice(0,500)});
+          continue;
+        }
+        postProcessResult(result);
+        allResults.push({targetName:name,result:result});
+      }catch(e){
+        allResults.push({targetName:name,error:e.message});
+        debugLogs.push(`=== ${name} ===\nERROR: ${e.message}`);
+      }
+    }
 
+    $('debugLog').textContent=debugLogs.join('\n\n');
     setProgress(100,'분석 완료');
-    renderResults(result,targetName);
+    renderMultiResults(allResults);
   }catch(e){
     alert('분석 오류: '+e.message);
     console.error(e);
@@ -611,14 +680,105 @@ function buildPrompt(targetName){
 }
 
 // ========== Tab1 Render ==========
-function renderResults(r, targetName){
+
+function renderMultiResults(allResults){
+  $('results').style.display='block';
+  const area=$('multiResultArea');
+
+  if(allResults.length===1){
+    // Single person: show inline like before (but in-page, not modal)
+    const item=allResults[0];
+    if(item.error){
+      area.innerHTML=`<div class="summary-banner error" style="display:block">오류: ${esc(item.targetName)} — ${esc(item.error)}</div>`;
+      return;
+    }
+    area.innerHTML=renderSinglePersonHtml(item.result,item.targetName);
+    $('statusText').textContent='분석 완료';
+    return;
+  }
+
+  // Multiple people: overview + tabs
   let html='';
 
-  // Summary banner
-  const nameOk=r.worker_name&&targetName&&r.worker_name.replace(/\s/g,'')===targetName.replace(/\s/g,'');
-  html+=buildSummaryHtml(r,nameOk);
+  // Overview summary cards
+  let okCount=0,warnCount=0,errCount=0;
+  allResults.forEach(item=>{
+    if(item.error){errCount++;return}
+    const issues=countIssues(item.result,item.targetName);
+    if(issues===0)okCount++;else warnCount++;
+  });
+  html+=`<div class="multi-summary">
+    <div class="multi-summary-card"><div style="color:var(--gray);font-size:12px">전체 대상자</div><div class="count">${allResults.length}명</div></div>
+    <div class="multi-summary-card" style="border-color:var(--ok,#16a34a)"><div style="color:var(--gray);font-size:12px">이상없음</div><div class="count" style="color:var(--ok-text,#166534)">${okCount}명</div></div>
+    <div class="multi-summary-card" style="border-color:var(--warn,#ca8a04)"><div style="color:var(--gray);font-size:12px">검토필요</div><div class="count" style="color:var(--warn-text,#854d0e)">${warnCount}명</div></div>
+    ${errCount?`<div class="multi-summary-card" style="border-color:var(--err,#dc2626)"><div style="color:var(--gray);font-size:12px">오류</div><div class="count" style="color:var(--err-text,#991b1b)">${errCount}명</div></div>`:''}
+  </div>`;
 
-  // Info bar
+  // Person tabs
+  html+='<div class="result-person-tabs" id="personTabs">';
+  allResults.forEach((item,i)=>{
+    const issues=item.error?-1:countIssues(item.result,item.targetName);
+    const statusIcon=item.error?'<span class="tab-status" style="color:var(--err,#dc2626)">ERR</span>'
+      :issues===0?'<span class="tab-status" style="color:var(--ok,#16a34a)">OK</span>'
+      :`<span class="tab-status" style="color:var(--warn,#d97706)">${issues}</span>`;
+    html+=`<button class="result-person-tab${i===0?' active':''}" data-pidx="${i}" onclick="switchPersonTab(${i})">${esc(item.targetName)} ${statusIcon}</button>`;
+  });
+  html+='</div>';
+
+  // Person panels
+  allResults.forEach((item,i)=>{
+    html+=`<div class="result-person-panel${i===0?' active':''}" id="personPanel${i}">`;
+    if(item.error){
+      html+=`<div class="summary-banner error" style="display:block">오류: ${esc(item.error)}</div>`;
+    }else{
+      html+=renderSinglePersonHtml(item.result,item.targetName);
+    }
+    html+='</div>';
+  });
+
+  area.innerHTML=html;
+  $('statusText').textContent='분석 완료';
+}
+
+function switchPersonTab(idx){
+  document.querySelectorAll('.result-person-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.result-person-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.result-person-tab[data-pidx="${idx}"]`)?.classList.add('active');
+  const panel=$('personPanel'+idx);
+  if(panel)panel.classList.add('active');
+}
+
+function countIssues(r,targetName){
+  let issues=0;
+  const docs=r.documents||{};
+  ['fact_certificate','graduation_certificate','employment_contract','business_registration','education_confirmation','participation_consent'].forEach(k=>{
+    if(!docs[k]?.found)issues++;
+  });
+  const nameOk=r.worker_name&&targetName&&r.worker_name.replace(/\s/g,'')===targetName.replace(/\s/g,'');
+  if(r.worker_name&&!nameOk)issues++;
+  const ca=r.contract_analysis;
+  if(ca){
+    const et=ca.employment_type;
+    if(et&&et.result!=='정규직')issues++;
+    if(ca.minimum_wage?.result==='위반')issues++;
+    if(ca.minimum_wage?.result==='확인불가')issues++;
+    if(ca.required_items){
+      const keys=['wage_components','working_hours','holidays','annual_leave','workplace_duties'];
+      if(ca.required_items.is_part_time)keys.push('daily_schedule');
+      keys.forEach(k=>{if(!ca.required_items[k]?.found)issues++});
+    }
+  }
+  if(r.business_reg_check&&r.business_reg_check.match)issues++;
+  if(r.edu_check&&r.edu_check.result!=='정상')issues++;
+  if(r.consent_check&&r.consent_check.result!=='정상')issues++;
+  return issues;
+}
+
+function renderSinglePersonHtml(r,targetName){
+  let html='';
+  const nameOk=r.worker_name&&targetName&&r.worker_name.replace(/\s/g,'')===targetName.replace(/\s/g,'');
+  html+=buildSummaryHtml(r,targetName);
+
   html+='<div class="info-bar" style="display:flex">';
   html+=buildInfoHtml('요청 대상자',targetName);
   if(r.worker_name) html+=buildInfoHtml('근로자(서류)',r.worker_name);
@@ -628,11 +788,9 @@ function renderResults(r, targetName){
   if(r.worker_name&&!nameOk) html+=buildInfoHtml('이름 일치','불일치!','var(--danger)');
   html+='</div>';
 
-  // Doc cards
   html+='<h2 style="font-size:16px;margin:20px 0 12px">서류 존재 여부</h2>';
   html+=buildDocCardsHtml(r.documents);
 
-  // Analysis sections
   if(r.contract_analysis){
     const ca=r.contract_analysis;
     if(ca.employment_type) html+=renderEmploymentType(ca.employment_type);
@@ -643,8 +801,7 @@ function renderResults(r, targetName){
   if(r.edu_check) html+=renderEduCheck(r.edu_check);
   if(r.consent_check) html+=renderConsentCheck(r.consent_check);
 
-  DwModal.show('청년일자리도약장려금 서류 판독 결과', html);
-  $('statusText').textContent='분석 완료';
+  return html;
 }
 
 function buildInfoHtml(label,value,color){
@@ -762,33 +919,12 @@ function renderConsentCheck(c){
   </div>`;
 }
 
-function buildSummaryHtml(r,nameOk){
-  let issues=0;
-  const docs=r.documents||{};
-  ['fact_certificate','graduation_certificate','employment_contract','business_registration','education_confirmation','participation_consent'].forEach(k=>{
-    if(!docs[k]?.found)issues++;
-  });
-  if(r.worker_name&&!nameOk)issues++;
-  const ca=r.contract_analysis;
-  if(ca){
-    const et=ca.employment_type;
-    if(et&&et.result!=='정규직')issues++;
-    if(ca.minimum_wage?.result==='위반')issues++;
-    if(ca.minimum_wage?.result==='확인불가')issues++;
-    if(ca.required_items){
-      const keys=['wage_components','working_hours','holidays','annual_leave','workplace_duties'];
-      if(ca.required_items.is_part_time)keys.push('daily_schedule');
-      keys.forEach(k=>{if(!ca.required_items[k]?.found)issues++});
-    }
-  }
-  if(r.business_reg_check&&r.business_reg_check.match)issues++;
-  if(r.edu_check&&r.edu_check.result!=='정상')issues++;
-  if(r.consent_check&&r.consent_check.result!=='정상')issues++;
-
+function buildSummaryHtml(r,targetName){
+  const issues=countIssues(r,targetName);
   if(issues===0){
-    return '<div class="summary-banner ok" style="display:block">✅ 전체 검토 결과: 이상없음 — 청년일자리도약장려금 적격</div>';
+    return '<div class="summary-banner ok" style="display:block">전체 검토 결과: 이상없음 — 청년일자리도약장려금 적격</div>';
   }else{
-    return `<div class="summary-banner warn" style="display:block">⚠️ 전체 검토 결과: 검토필요 항목 ${issues}개</div>`;
+    return `<div class="summary-banner warn" style="display:block">전체 검토 결과: 검토필요 항목 ${issues}개</div>`;
   }
 }
 

@@ -134,7 +134,7 @@ pre.debug{background:var(--bg-sub);padding:10px;font-size:11px;overflow:auto;max
 </div>
 
 <h1>고령자 계속고용 지원금 대상자 판독</h1>
-<p class="subtitle">취업규칙에서 정년을 파악하고, 고용현황에서 정년 도달 근로자를 전수 추출합니다. 모든 처리는 브라우저 내에서만 수행됩니다.</p>
+<p class="subtitle">취업규칙에서 정년을 파악하고, 검토기준일로부터 향후 3년간 정년 도달(예정) 근로자를 전수 추출합니다. 모든 처리는 브라우저 내에서만 수행됩니다.</p>
 
 <!-- API Key -->
 <div class="step" id="stepApiKey">
@@ -243,22 +243,9 @@ pre.debug{background:var(--bg-sub);padding:10px;font-size:11px;overflow:auto;max
 
     <div class="form-row" style="margin-top:12px">
       <div class="form-group">
-        <label>기준일 (검토 기준)</label>
+        <label>검토 기준일</label>
         <input type="date" id="reviewDate" value="">
-        <span class="hint">미입력시 오늘 날짜 기준</span>
-      </div>
-      <div class="form-group">
-        <label>신청 분기</label>
-        <select id="applyQuarter">
-          <option value="2025-Q1">2025년 1분기 (1~3월)</option>
-          <option value="2025-Q2">2025년 2분기 (4~6월)</option>
-          <option value="2025-Q3">2025년 3분기 (7~9월)</option>
-          <option value="2025-Q4">2025년 4분기 (10~12월)</option>
-          <option value="2026-Q1" selected>2026년 1분기 (1~3월)</option>
-          <option value="2026-Q2">2026년 2분기 (4~6월)</option>
-          <option value="2026-Q3">2026년 3분기 (7~9월)</option>
-          <option value="2026-Q4">2026년 4분기 (10~12월)</option>
-        </select>
+        <span class="hint">미입력시 오늘 날짜 기준. 기준일로부터 향후 3년간 정년 도달 예정자를 전수 추출합니다.</span>
       </div>
     </div>
 
@@ -866,8 +853,9 @@ function analyzeEligibility(workers){
   const reviewDate=parseDate(document.getElementById('reviewDate').value)||new Date();
   const region=document.getElementById('companyRegion').value;
   const hasHistory=document.getElementById('hasHistory').value==='yes';
-  const quarter=document.getElementById('applyQuarter').value;
-  const [qYear,qNum]=quarter.split('-Q').map(Number);
+
+  // 향후 3년 판단 범위
+  const scanEnd = addYears(reviewDate, 3);
 
   // Effective start date = earlier of systemStart and reportDate
   const effectiveStart = systemStart && reportDate ? new Date(Math.min(systemStart,reportDate)) : systemStart||reportDate;
@@ -909,12 +897,16 @@ function analyzeEligibility(workers){
       info.isRetired = info.retirementReachDate <= reviewDate;
     }
 
+    // 3년 판단 범위 내 정년 도달 여부 (이미 도달했거나 향후 3년 내 도달 예정)
+    let inScanWindow = false;
+    if(info.retirementReachDate){
+      inScanWindow = info.retirementReachDate <= scanEnd;
+    }
+
     // Check if within 5-year window from system start
-    let inWindow = true;
+    let inSystemWindow = true;
     if(fiveYearEnd && info.retirementReachDate){
-      inWindow = info.retirementReachDate <= fiveYearEnd;
-      // Also include those who already reached retirement before system start
-      // if they were re-employed within 6 months
+      inSystemWindow = info.retirementReachDate <= fiveYearEnd;
     }
 
     // ---- Exclusion checks ----
@@ -929,16 +921,15 @@ function analyzeEligibility(workers){
       }
     }
 
-    // 2. Wage check for 2025
-    if(w.salary && w.salary < 1210000 && qYear===2025){
-      info.exclusionReason = (info.exclusionReason?info.exclusionReason+' / ':'')+'2025년 월평균보수 121만원 미만';
+    // 2. Wage check (2025년 기준 적용)
+    if(w.salary && w.salary < 1210000){
+      info.exclusionReason = (info.exclusionReason?info.exclusionReason+' / ':'')+'월평균보수 121만원 미만 (최저임금 미달)';
       isExcluded = true;
     }
 
     // 3. Hire date check (pre 2025-01-01 workers: must have been hired before system start)
-    // This is for workers whose continued employment starts before 2025-01-01
     if(systemStart && w.hireDate && info.retirementReachDate){
-      const continuedEmpDate = info.retirementReachDate; // approximate
+      const continuedEmpDate = info.retirementReachDate;
       if(continuedEmpDate < new Date(2025,0,1)){
         if(w.hireDate > systemStart){
           info.exclusionReason = (info.exclusionReason?info.exclusionReason+' / ':'')+'입사일이 제도 시행일 이후 (2025.1.1 이전 계속고용자)';
@@ -947,8 +938,8 @@ function analyzeEligibility(workers){
       }
     }
 
-    // 4. Not within 5-year window
-    if(!inWindow && info.retirementReachDate){
+    // 4. Not within 5-year window from system start
+    if(!inSystemWindow && info.retirementReachDate){
       info.exclusionReason = (info.exclusionReason?info.exclusionReason+' / ':'')+'제도 시행일로부터 5년 이내 정년 미도달';
       isExcluded = true;
     }
@@ -957,41 +948,55 @@ function analyzeEligibility(workers){
     if(!w.birthDate){
       info.eligibilityStatus = 'no_birth';
       info.notes.push('생년월일 미확인');
-    } else if(info.age < retirementAge - 5){
+    } else if(!inScanWindow){
       info.eligibilityStatus = 'too_young';
-      info.notes.push('정년 도달까지 5년 초과');
+      info.notes.push(`향후 3년 내 정년 미도달 (정년도달 예정: ${info.retirementReachDate?formatDate(info.retirementReachDate):'불명'})`);
     } else if(isExcluded){
       info.eligibilityStatus = 'excluded';
-    } else if(info.retirementReachDate && (info.isRetired || (fiveYearEnd && info.retirementReachDate <= fiveYearEnd))){
-      // Potential candidate
-      if(info.isCurrentlyEmployed){
-        info.eligibilityStatus = 'eligible_active';
-        info.notes.push('재직중 - 추가검토 대상');
-      } else if(w.lossReason && /계약만료|기간만료/.test(w.lossReason)){
-        info.eligibilityStatus = 'eligible_contract_end';
-        info.notes.push('퇴사(계약만료) - 1년 단위 계약 달성 여부 확인 필요');
-      } else if(w.lossDate){
-        info.eligibilityStatus = 'eligible_resigned';
-        info.notes.push('퇴사 - 재고용일~퇴사일 기간 산출 필요');
+    } else if(info.retirementReachDate && inScanWindow){
+      // 3년 범위 내 정년 도달(예정)자 — 대상 후보
+      if(info.isRetired){
+        // 이미 정년 도달
+        if(info.isCurrentlyEmployed){
+          info.eligibilityStatus = 'eligible_active';
+          info.notes.push('정년 도달 후 재직중 (계속고용 중)');
+        } else if(w.lossReason && /계약만료|기간만료/.test(w.lossReason)){
+          info.eligibilityStatus = 'eligible_contract_end';
+          info.notes.push('퇴사(계약만료) - 1년 단위 계약 달성 여부 확인 필요');
+        } else if(w.lossDate){
+          info.eligibilityStatus = 'eligible_resigned';
+          info.notes.push('퇴사 - 재고용일~퇴사일 기간 산출 필요');
+        } else {
+          info.eligibilityStatus = 'eligible_review';
+          info.notes.push('추가검토 필요');
+        }
       } else {
-        info.eligibilityStatus = 'eligible_review';
-        info.notes.push('추가검토 필요');
+        // 향후 정년 도달 예정
+        if(info.isCurrentlyEmployed){
+          info.eligibilityStatus = 'eligible_upcoming';
+          info.notes.push(`정년 도달 예정 (${formatDate(info.retirementReachDate)}) — 사전 준비 대상`);
+        } else {
+          info.eligibilityStatus = 'not_eligible';
+          info.notes.push('정년 미도달 상태에서 퇴사');
+        }
       }
 
       // Calculate support period & amount
-      if(!hasHistory){
-        info.notes.push('기존 신청이력 없음 - 검토금액 없음 산정');
-        info.totalEstimate = 0;
-      } else {
-        const supportCalc = calcSupport(info, region, qYear, qNum, systemStart);
-        info.supportYears = supportCalc.years;
-        info.quarterlyAmount = supportCalc.quarterly;
-        info.totalEstimate = supportCalc.total;
-        info.supportDetail = supportCalc.detail;
+      if(info.eligibilityStatus.startsWith('eligible')){
+        if(!hasHistory){
+          info.notes.push('기존 신청이력 없음 - 검토금액 없음 산정');
+          info.totalEstimate = 0;
+        } else {
+          const supportCalc = calcSupport(info, region, reviewDate, systemStart);
+          info.supportYears = supportCalc.years;
+          info.quarterlyAmount = supportCalc.quarterly;
+          info.totalEstimate = supportCalc.total;
+          info.supportDetail = supportCalc.detail;
+        }
       }
     } else {
       info.eligibilityStatus = 'not_eligible';
-      info.notes.push('정년 미도달 또는 대상 외');
+      info.notes.push('대상 외');
     }
 
     all.push(info);
@@ -1005,7 +1010,7 @@ function analyzeEligibility(workers){
   // Overlap check (고령자고용지원금)
   const overlapCheck = checkOverlap(systemStart, eligible, isPost20240109, fiveYearEnd);
 
-  return {all, eligible, excluded, overlapCheck, systemStart, effectiveStart, fiveYearEnd, isPost20240109, region, hasHistory, quarter};
+  return {all, eligible, excluded, overlapCheck, systemStart, effectiveStart, fiveYearEnd, isPost20240109, region, hasHistory, reviewDate, scanEnd};
 }
 
 function calcAge(birth, asOf){
@@ -1029,10 +1034,11 @@ function calcRetirementDate(birth, age, type){
 
 function addYears(d,n){return new Date(d.getFullYear()+n,d.getMonth(),d.getDate());}
 
-function calcSupport(info, region, qYear, qNum, systemStart){
-  // Quarterly amount
+function calcSupport(info, region, reviewDate, systemStart){
+  // 2026년 이후 기준 단가 적용 (검토기준일 기준)
+  const revYear = reviewDate.getFullYear();
   let quarterly;
-  if(qYear>=2026){
+  if(revYear >= 2026){
     quarterly = region==='metro' ? 900000 : 1200000;
   } else {
     quarterly = 900000;
@@ -1042,22 +1048,23 @@ function calcSupport(info, region, qYear, qNum, systemStart){
   const maxQuarters = 12;
   let remainingQuarters = maxQuarters;
 
-  // Calculate how many quarters may have already been used
-  if(info.retirementReachDate && systemStart){
-    const reEmployDate = info.retirementReachDate; // approximate start of support
+  // 정년 도달일 기준 지원기간 산출
+  if(info.retirementReachDate){
+    const reEmployDate = info.retirementReachDate;
     const supportEnd = addYears(reEmployDate, 3);
-    const quarterStart = new Date(qYear, (qNum-1)*3, 1);
 
-    if(quarterStart > supportEnd){
+    if(reviewDate > supportEnd){
       remainingQuarters = 0;
-    } else {
-      const monthsLeft = (supportEnd.getFullYear()-quarterStart.getFullYear())*12+(supportEnd.getMonth()-quarterStart.getMonth());
+    } else if(reviewDate > reEmployDate){
+      // 이미 정년 도달 → 남은 지원기간 산출
+      const monthsLeft = (supportEnd.getFullYear()-reviewDate.getFullYear())*12+(supportEnd.getMonth()-reviewDate.getMonth());
       remainingQuarters = Math.min(maxQuarters, Math.ceil(monthsLeft/3));
     }
+    // 아직 정년 미도달 → 최대 12분기
   }
 
-  // If resigned, adjust
-  if(info.lossDate && info.retirementReachDate){
+  // 퇴사자는 실 근무기간으로 조정
+  if(info.lossDate && info.retirementReachDate && info.lossDate > info.retirementReachDate){
     const workedMonths = (info.lossDate.getFullYear()-info.retirementReachDate.getFullYear())*12+(info.lossDate.getMonth()-info.retirementReachDate.getMonth());
     remainingQuarters = Math.min(remainingQuarters, Math.ceil(workedMonths/3));
   }
@@ -1132,9 +1139,14 @@ function displayResults(r){
 
   // Summary banner
   if(r.eligible.length>0){
-    html+=`<div class="summary-banner info" style="display:block">총 ${r.all.length}명 중 ${r.eligible.length}명 대상자 추정 (제외: ${r.excluded.length}명) — 추가검토 필요</div>`;
+    const alreadyReached = r.eligible.filter(w=>w.isRetired).length;
+    const upcoming = r.eligible.filter(w=>!w.isRetired).length;
+    let detail = '';
+    if(alreadyReached>0) detail += `정년도달 ${alreadyReached}명`;
+    if(upcoming>0) detail += `${detail?' / ':''}도달예정 ${upcoming}명`;
+    html+=`<div class="summary-banner info" style="display:block">총 ${r.all.length}명 중 <b>${r.eligible.length}명</b> 대상(후보) (${detail}, 제외: ${r.excluded.length}명) — ${formatDate(r.reviewDate)}~${formatDate(r.scanEnd)} 기준</div>`;
   }else{
-    html+=`<div class="summary-banner warn" style="display:block">총 ${r.all.length}명 분석 완료. 대상자 추정 0명.${!r.hasHistory?' (기존 신청이력 없음)':''}</div>`;
+    html+=`<div class="summary-banner warn" style="display:block">총 ${r.all.length}명 분석 완료. 향후 3년 내 대상자 추정 0명.${!r.hasHistory?' (기존 신청이력 없음)':''}</div>`;
   }
 
   // Stats
@@ -1155,7 +1167,7 @@ function displayResults(r){
         <div><span style="color:var(--text-sub)">제도 시행일:</span> <b>${r.systemStart?formatDate(r.systemStart):'미입력'}</b></div>
         <div><span style="color:var(--text-sub)">5년 만료:</span> <b>${r.fiveYearEnd?formatDate(r.fiveYearEnd):'—'}</b></div>
         <div><span style="color:var(--text-sub)">소재지:</span> <b>${r.region==='metro'?'수도권':'비수도권'}</b></div>
-        <div><span style="color:var(--text-sub)">신청분기:</span> <b>${r.quarter}</b></div>
+        <div><span style="color:var(--text-sub)">판단 범위:</span> <b>${formatDate(r.reviewDate)} ~ ${formatDate(r.scanEnd)} (3년)</b></div>
         <div><span style="color:var(--text-sub)">기존이력:</span> <b>${r.hasHistory?'있음':'없음'}</b></div>
       </div>
       ${!r.hasHistory?'<div class="alert alert-warn" style="margin-top:12px">기존 신청이력 없음: 정년연장 등 사업장에 추가확인 필요한 바 검토금액 없음으로 산정</div>':''}
@@ -1165,7 +1177,7 @@ function displayResults(r){
   // Tabs
   html+=`<div class="tab-nav">
     <button class="tab-btn active" onclick="switchModalTab(this,'modalTabAll')">전체 근로자</button>
-    <button class="tab-btn" onclick="switchModalTab(this,'modalTabEligible')">대상자 (추정)</button>
+    <button class="tab-btn" onclick="switchModalTab(this,'modalTabEligible')">대상(후보)자</button>
     <button class="tab-btn" onclick="switchModalTab(this,'modalTabExcluded')">제외 대상자</button>
     <button class="tab-btn" onclick="switchModalTab(this,'modalTabOverlap')">중복검토 (고령자고용)</button>
   </div>`;
@@ -1289,6 +1301,7 @@ function renderTable(containerId, workers, mode){
 function getStatusBadge(status){
   const map={
     'eligible_active':'<span class="badge badge-ok">대상추정(재직)</span>',
+    'eligible_upcoming':'<span class="badge badge-info">정년도달예정</span>',
     'eligible_contract_end':'<span class="badge badge-warn">대상추정(계약만료)</span>',
     'eligible_resigned':'<span class="badge badge-warn">대상추정(퇴사)</span>',
     'eligible_review':'<span class="badge badge-info">추가검토</span>',
@@ -1322,6 +1335,8 @@ function exportExcel(){
   if(!analysisResult) return;
   const wb=XLSX.utils.book_new();
 
+  const statusLabel = s => ({'eligible_active':'대상추정(재직)','eligible_upcoming':'정년도달예정','eligible_contract_end':'대상추정(계약만료)','eligible_resigned':'대상추정(퇴사)','eligible_review':'추가검토','excluded':'제외','not_eligible':'비대상','too_young':'3년내 미도달','no_birth':'생년월일미확인'}[s]||s);
+
   // All workers
   const allData=analysisResult.all.map((w,i)=>({
     'No.':i+1,
@@ -1332,7 +1347,8 @@ function exportExcel(){
     '상실일':w.lossDate?formatDate(w.lossDate):'',
     '재직여부':w.isCurrentlyEmployed?'재직':'퇴사',
     '정년도달일':w.retirementReachDate?formatDate(w.retirementReachDate):'',
-    '판정':w.eligibilityStatus,
+    '정년도달여부':w.isRetired?'도달':'미도달',
+    '판정':statusLabel(w.eligibilityStatus),
     '추정금액(원)':w.totalEstimate||'',
     '비고':w.notes.join('; ')+(w.exclusionReason?' [제외: '+w.exclusionReason+']':'')
   }));
@@ -1349,6 +1365,8 @@ function exportExcel(){
     '상실일':w.lossDate?formatDate(w.lossDate):'',
     '재직여부':w.isCurrentlyEmployed?'재직':'퇴사',
     '정년도달일':w.retirementReachDate?formatDate(w.retirementReachDate):'',
+    '정년도달여부':w.isRetired?'도달':'미도달(예정)',
+    '판정':statusLabel(w.eligibilityStatus),
     '추정금액(원)':w.totalEstimate||'',
     '지원상세':w.supportDetail||'',
     '비고':w.notes.join('; ')
