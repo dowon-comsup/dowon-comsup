@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>급여서류 검증도구 v8.7 (Gemini+Claude ì´ì¤í) | 노무법인 도원</title>
+<script src="../js/dowon-api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -325,6 +326,25 @@ tr:hover{background:var(--light)}
       </div>
     </div>
   </div>
+
+  <!-- 사업장 선택 -->
+  <div class="step-card" style="margin-bottom:0;border-bottom:2px solid var(--primary-light,#a0c8ff)">
+    <h3 style="margin-bottom:10px">사업장 선택 <span style="font-size:12px;color:var(--gray,#888);font-weight:400">(노션 연동)</span></h3>
+    <div id="bizSelector"></div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      BusinessSelector.init('bizSelector', (biz) => {
+        if (!biz) return;
+        // 요청서 텍스트에 사업장 정보 자동 입력
+        const ta = document.getElementById('requestText');
+        if (ta && !ta.value.trim()) {
+          ta.value = `사업장: ${biz.name}\n사업자번호: ${biz.biz_reg_no || '-'}\n담당자: ${biz.contact_person || '-'}\n이메일: ${biz.contact_email || '-'}\n\n`;
+          ta.focus();
+        }
+      }, { placeholder: '사업장을 선택하면 정보가 자동입력됩니다' });
+    });
+  </script>
 
   <div class="steps">
     <!-- STEP 1: 요청서 -->
