@@ -2,18 +2,26 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>청년일자리도약장려금 서류 판독 | 노무법인 도원</title>
+<title>청년일자리도약장려금 서류 판독 & 지원금 검토 | 노무법인 도원</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
-:root{--primary:#059669;--primary-light:#d1fae5;--primary-dark:#047857;--danger:#dc2626;--warn:#d97706;--gray:#6b7280;--border:#e5e7eb;--bg:#f9fafb;--card-shadow:0 1px 3px rgba(0,0,0,.08)}
+:root{--primary:#059669;--primary-light:#d1fae5;--primary-dark:#047857;--danger:#dc2626;--warn:#d97706;--gray:#6b7280;--border:#e5e7eb;--bg:#f9fafb;--card-shadow:0 1px 3px rgba(0,0,0,.08);--blue:#2563eb;--blue-light:#dbeafe}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;max-width:1200px;margin:0 auto;padding:0 16px 60px;color:#222;background:#fff}
 a{color:var(--primary);text-decoration:none}
 .topbar{padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:20px}
 .topbar a{font-size:13px;font-weight:600;color:#2563eb}
 h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:4px}
-.subtitle{font-size:12px;color:var(--gray);margin-bottom:20px}
+.subtitle{font-size:12px;color:var(--gray);margin-bottom:16px}
+/* Tabs */
+.tab-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px}
+.tab-btn{padding:10px 24px;font-size:14px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--gray);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab-btn.active{color:var(--primary-dark);border-bottom-color:var(--primary)}
+.tab-btn:hover{color:var(--primary)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+/* Common */
 .input-section{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
 .input-section label{font-size:13px;font-weight:600;white-space:nowrap;min-width:130px}
 .input-section input{flex:1;min-width:280px;padding:8px 12px;border:2px solid var(--border);border-radius:8px;font-size:13px}
@@ -35,6 +43,10 @@ button{font-size:13px;padding:10px 20px;border:none;border-radius:8px;cursor:poi
 button:disabled{opacity:.5;cursor:not-allowed}
 .btn-primary{background:var(--primary);color:#fff;font-size:15px;padding:12px 32px}
 .btn-primary:hover:not(:disabled){background:var(--primary-dark)}
+.btn-sm{padding:6px 14px;font-size:12px;border-radius:6px}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-blue:hover:not(:disabled){background:#1d4ed8}
 .progress-bar{height:6px;background:#e2e8f0;border-radius:3px;margin:12px 0;overflow:hidden;display:none}
 .progress-bar .fill{height:100%;background:var(--primary);transition:width .3s;width:0}
 #statusText{font-size:12px;color:var(--gray);text-align:center;min-height:18px}
@@ -60,6 +72,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .badge-warn{background:#fef3c7;color:#92400e}
 .badge-fail{background:#fee2e2;color:#991b1b}
 .badge-na{background:#e5e7eb;color:#374151}
+.badge-blue{background:var(--blue-light);color:#1e40af}
 .row{display:flex;gap:8px;margin:6px 0;font-size:13px;align-items:baseline}
 .row .lbl{color:var(--gray);min-width:140px;flex-shrink:0;font-weight:600}
 .row .val{color:#111}
@@ -70,16 +83,57 @@ button:disabled{opacity:.5;cursor:not-allowed}
 details{margin:8px 0}
 summary{font-size:13px;cursor:pointer;color:var(--gray)}
 pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:300px;border-radius:6px;white-space:pre-wrap;word-break:break-all}
+/* Tab2 specific */
+.form-panel{border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;background:#fff;box-shadow:var(--card-shadow)}
+.form-panel h3{font-size:14px;color:#1e293b;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:12px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12px;font-weight:600;color:#475569}
+.form-group input,.form-group select{padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit}
+.form-group input:focus,.form-group select:focus{border-color:var(--primary);outline:none}
+.form-group .hint{font-size:11px;color:var(--gray)}
+.cb-group{display:flex;align-items:center;gap:8px;padding:4px 0}
+.cb-group input[type=checkbox],.cb-group input[type=radio]{width:16px;height:16px;accent-color:var(--primary)}
+.cb-group label{font-size:13px;font-weight:600;cursor:pointer}
+.insured-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.insured-table th,.insured-table td{padding:6px 8px;border:1px solid var(--border);text-align:center}
+.insured-table th{background:var(--bg);font-weight:600;color:#475569}
+.insured-table input{width:60px;text-align:center;padding:4px;border:1px solid var(--border);border-radius:4px}
+.worker-card{border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;background:#fafbfc;position:relative}
+.worker-card .worker-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.worker-card .worker-header h4{font-size:13px;color:#334155}
+.worker-card .remove-worker{position:absolute;top:10px;right:10px}
+.result-card{border-radius:10px;padding:16px;margin-bottom:12px}
+.result-card.eligible{background:#f0fdf4;border:1px solid #86efac}
+.result-card.ineligible{background:#fef2f2;border:1px solid #fca5a5}
+.result-card.check{background:#fefce8;border:1px solid #fde047}
+.result-card.info{background:#f0f9ff;border:1px solid #7dd3fc}
+.result-card h4{font-size:14px;margin-bottom:8px}
+.result-card p{font-size:13px;line-height:1.6}
+.money{font-size:18px;font-weight:800;color:var(--primary-dark)}
+.money.warn{color:var(--warn)}
+.adj-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.adj-row input,.adj-row select{padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px}
+.hidden{display:none!important}
+.divider{border:none;border-top:2px solid var(--border);margin:24px 0}
 </style>
 </head>
 <body>
 
 <div class="topbar"><a href="../index.html">&larr; 대시보드로 돌아가기</a></div>
 
-<h1>청년일자리도약장려금 서류 판독 도구 <span style="font-size:13px;color:#888">V1</span></h1>
-<p class="subtitle">요청 대상자 이름과 PDF 서류를 업로드하면, 6종 서류 존재 여부 · 정규직 판단 · 최저임금 준수 · 학력확인 · 동의서 완비 등을 자동 판독합니다.</p>
+<h1>청년일자리도약장려금 서류 판독 & 지원금 검토 <span style="font-size:13px;color:#888">V2</span></h1>
+<p class="subtitle">서류 AI 판독 + 지원금 수급 요건 자동 검토 (기업규모, 협약, 대상자, 제척기간, 23년도 누락분)</p>
 
-<!-- Inputs -->
+<!-- Tab Navigation -->
+<div class="tab-nav">
+  <button class="tab-btn active" data-tab="doc">서류 판독 (AI)</button>
+  <button class="tab-btn" data-tab="subsidy">지원금 검토 (로직)</button>
+</div>
+
+<!-- ==================== TAB 1: 서류 판독 ==================== -->
+<div id="tab-doc" class="tab-content active">
+
 <div class="input-section">
   <label>Anthropic API Key:</label>
   <input type="password" id="apiKey" placeholder="sk-ant-...">
@@ -90,7 +144,6 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
   <input type="text" id="targetName" placeholder="예: 황인경">
 </div>
 
-<!-- Upload -->
 <div class="upload-zone" id="uploadZone">
   <h3>PDF 파일을 드래그하거나 클릭하여 업로드</h3>
   <p>졸업증명서 · 근로계약서 · 사업자등록증명 · 학력확인서 · 동의서 등 (복수 파일 가능, 한 PDF에 여러 서류 포함 가능)</p>
@@ -102,7 +155,6 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
 <div class="progress-bar" id="progressBar"><div class="fill" id="progressFill"></div></div>
 <div id="statusText"></div>
 
-<!-- Results -->
 <div id="results" style="display:none">
   <div class="summary-banner" id="summaryBanner"></div>
   <div class="info-bar" id="infoBar"></div>
@@ -113,9 +165,165 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
 
 <details style="margin-top:24px"><summary>API 응답 원문 (디버그)</summary><pre class="log" id="debugLog">분석 실행 후 표시됩니다.</pre></details>
 
+</div>
+
+<!-- ==================== TAB 2: 지원금 검토 ==================== -->
+<div id="tab-subsidy" class="tab-content">
+
+<!-- 1. 기업 정보 -->
+<div class="form-panel">
+  <h3>1. 기업 정보 (기업규모 확인)</h3>
+  <div class="form-grid">
+    <div class="form-group">
+      <div class="cb-group">
+        <input type="checkbox" id="s_isPriority">
+        <label for="s_isPriority">우선지원대상기업 해당</label>
+      </div>
+      <span class="hint">출산육아기고용안정장려금 기준 참조</span>
+    </div>
+    <div class="form-group">
+      <div class="cb-group">
+        <input type="checkbox" id="s_isMetro">
+        <label for="s_isMetro">수도권 소재 사업장</label>
+      </div>
+      <span class="hint">서울·인천·경기 소재 여부</span>
+    </div>
+  </div>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>고용보험 성립일</label>
+      <input type="date" id="s_establishDate">
+    </div>
+    <div class="form-group">
+      <label>사업개시일</label>
+      <input type="date" id="s_bizStartDate">
+    </div>
+    <div class="form-group">
+      <label>고용보험 업종</label>
+      <select id="s_industry">
+        <option value="general">일반 업종</option>
+        <option value="knowledge">지식서비스산업</option>
+        <option value="culture">문화콘텐츠산업</option>
+        <option value="renewable">신에너지·재생에너지산업</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>대표자 생년월일</label>
+      <input type="date" id="s_ceoBirth">
+      <span class="hint">청년창업기업 판단용 (만15세~39세 & 사업개시 7년이내)</span>
+    </div>
+  </div>
+
+  <h4 style="font-size:13px;margin:16px 0 8px;color:#334155">월별 고용보험 피보험자 수 (매월 말일 기준)</h4>
+  <p style="font-size:11px;color:var(--gray);margin-bottom:8px">검토월 직전 1년간 (최소 성립일이 속한 월 ~ 직전월). 빈 칸은 0으로 처리됩니다.</p>
+  <div style="overflow-x:auto">
+    <table class="insured-table" id="insuredTable">
+      <thead><tr id="insuredHeader"></tr></thead>
+      <tbody><tr id="insuredRow"></tr></tbody>
+    </table>
+  </div>
+  <div style="margin-top:8px;font-size:13px;color:#334155">
+    <span>월평균 피보험자 수: </span><strong id="avgInsuredDisplay">-</strong>
+    <span style="margin-left:16px">기업규모: </span><strong id="companySizeDisplay">-</strong>
+  </div>
+</div>
+
+<!-- 2. 24년도 협약 정보 -->
+<div class="form-panel">
+  <h3>2. 24년도 청일도 사업참여 (협약) 정보</h3>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>협약체결 여부</label>
+      <select id="s_has24Agree">
+        <option value="no">없음</option>
+        <option value="yes">있음</option>
+      </select>
+    </div>
+    <div class="form-group hidden" id="s_24agreeStatusWrap">
+      <label>처리상태</label>
+      <select id="s_24agreeStatus">
+        <option value="approved">승인</option>
+        <option value="other">기타 (미승인 등)</option>
+      </select>
+    </div>
+    <div class="form-group hidden" id="s_24agreeDateWrap">
+      <label>협약 신청일</label>
+      <input type="date" id="s_24agreeDate">
+    </div>
+  </div>
+
+  <div id="s_adjSection" class="hidden" style="margin-top:16px">
+    <h4 style="font-size:13px;margin-bottom:8px;color:#334155">고용조정 이력 (협약 신청일 이후)</h4>
+    <p style="font-size:11px;color:var(--gray);margin-bottom:8px">협약 신청일 이후 발생한 고용조정(해고/퇴직 등)을 입력하세요.</p>
+    <div id="adjList"></div>
+    <button class="btn-sm btn-blue" onclick="addAdjustment()">+ 고용조정 추가</button>
+  </div>
+</div>
+
+<!-- 3. 24년 근로자 목록 -->
+<div class="form-panel">
+  <h3>3. 24년도 대상 근로자 목록</h3>
+  <p style="font-size:12px;color:var(--gray);margin-bottom:12px">24년도 협약 신청일 이후 ~ 24.12.31 사이 입사한 청년 및 기존 채용자명단통보 인력을 입력하세요.</p>
+  <div id="workers24List"></div>
+  <button class="btn-sm btn-blue" onclick="addWorker24()">+ 근로자 추가</button>
+</div>
+
+<!-- 4. 23년도 사업 정보 -->
+<div class="form-panel">
+  <h3>4. 23년도 청일도 사업참여 여부 및 누락분</h3>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>23년 협약체결 여부</label>
+      <select id="s_has23Agree">
+        <option value="no">없음</option>
+        <option value="yes">있음 (협약 + 채용자명단통보)</option>
+        <option value="agreeOnly">있음 (협약만, 통보 대상 없음)</option>
+      </select>
+    </div>
+  </div>
+  <div id="workers23Section" class="hidden" style="margin-top:12px">
+    <p style="font-size:12px;color:var(--gray);margin-bottom:12px">23년 채용자명단통보 근로자를 입력하세요.</p>
+    <div id="workers23List"></div>
+    <button class="btn-sm btn-blue" onclick="addWorker23()">+ 23년 근로자 추가</button>
+  </div>
+</div>
+
+<!-- 검토 실행 -->
+<div class="btn-row">
+  <button class="btn-primary btn-blue" id="btnSubsidy" style="font-size:16px;padding:14px 48px" onclick="runSubsidyCheck()">지원금 검토 실행</button>
+</div>
+
+<!-- 검토 결과 -->
+<div id="subsidyResults" class="hidden"></div>
+
+</div>
+
 <script>
-let uploadedFiles=[];
+/* =========================================================
+   COMMON UTILITIES
+   ========================================================= */
 const $=id=>document.getElementById(id);
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function num(n){return n!=null?Number(n).toLocaleString('ko-KR'):'-'}
+function formatMoney(n){return num(n)+'원'}
+function formatDate(d){if(!d)return '-';const dt=new Date(d);return `${dt.getFullYear()}.${String(dt.getMonth()+1).padStart(2,'0')}.${String(dt.getDate()).padStart(2,'0')}`}
+
+/* =========================================================
+   TAB MANAGEMENT
+   ========================================================= */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    btn.classList.add('active');
+    $('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* =========================================================
+   TAB 1: 서류 판독 (기존 기능 보존)
+   ========================================================= */
+let uploadedFiles=[];
 
 // API Key persistence
 (function(){
@@ -130,7 +338,6 @@ const $=id=>document.getElementById(id);
   if(s)$('apiKeyStatus').textContent='Key 저장됨';
 })();
 
-// File upload
 const zone=$('uploadZone'),fi=$('fileInput');
 zone.addEventListener('click',()=>fi.click());
 zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover')});
@@ -180,7 +387,6 @@ async function callClaude(apiKey,contents){
   return j.content[0].text;
 }
 
-// Main
 $('btnAnalyze').addEventListener('click',runAnalysis);
 
 async function runAnalysis(){
@@ -221,7 +427,6 @@ async function runAnalysis(){
       result=JSON.parse(m[1]);
     }catch(e){throw new Error('AI 응답 파싱 실패: '+e.message+'\n\n원문:\n'+raw.slice(0,500))}
 
-    // 후처리: 정규직 판단 모순 보정
     postProcessResult(result);
 
     setProgress(100,'완료');
@@ -239,19 +444,13 @@ async function runAnalysis(){
 
 function setProgress(p,m){$('progressFill').style.width=p+'%';$('statusText').textContent=m||''}
 
-// 후처리: AI가 evidence와 result를 모순되게 반환하는 경우 보정
 function postProcessResult(r){
   if(!r.contract_analysis?.employment_type) return;
   const et=r.contract_analysis.employment_type;
   const ev=(et.evidence||'').toLowerCase();
   const cp=(et.contract_period||'');
-
-  // 1. 계약기간에 종료일 패턴이 있으면 무조건 기간제
   const hasEndDate=/\d{4}.*년.*\d{1,2}.*월.*\d{1,2}.*일.*까지/.test(cp)||/까지/.test(cp);
-
-  // 2. evidence에서 "기간제"라고 판단했는데 result가 정규직인 경우
   const evidenceSaysFixed=/기간제/.test(ev);
-
   if(et.result==='정규직'||et.result==='정규직_추정'){
     if(hasEndDate||evidenceSaysFixed){
       et.result='기간제';
@@ -260,7 +459,6 @@ function postProcessResult(r){
   }
 }
 
-// ========== Prompt ==========
 function buildPrompt(targetName){
   return `당신은 한국 노동법 전문가이며, 청년일자리도약장려금 서류 검토 담당자입니다.
 업로드된 PDF 서류들을 분석하여 아래 JSON 구조를 정확히 채워 반환하세요.
@@ -409,9 +607,8 @@ function buildPrompt(targetName){
 해당 서류가 없으면 contract_analysis, business_reg_check, edu_check, consent_check 각각 null로 설정하세요.`;
 }
 
-// ========== Render ==========
+// ========== Tab1 Render ==========
 function renderResults(r, targetName){
-  // Info bar
   const ib=$('infoBar');
   ib.style.display='flex';
   ib.innerHTML='';
@@ -421,20 +618,16 @@ function renderResults(r, targetName){
   if(r.company_name)addInfo(ib,'사업장',r.company_name);
   if(r.birth_date)addInfo(ib,'생년월일',r.birth_date);
 
-  // Name match
   const nameOk=r.worker_name&&targetName&&r.worker_name.replace(/\s/g,'')===targetName.replace(/\s/g,'');
   if(r.worker_name&&!nameOk){
     addInfo(ib,'이름 일치','불일치!','var(--danger)');
   }
 
-  // Doc cards
   renderDocCards(r.documents);
 
-  // Analysis area
   const area=$('analysisArea');
   area.innerHTML='';
 
-  // Contract analysis
   if(r.contract_analysis){
     const ca=r.contract_analysis;
     if(ca.employment_type) area.innerHTML+=renderEmploymentType(ca.employment_type);
@@ -442,16 +635,10 @@ function renderResults(r, targetName){
     if(ca.required_items) area.innerHTML+=renderReqItems(ca.required_items);
   }
 
-  // Business reg check
   if(r.business_reg_check) area.innerHTML+=renderBizCheck(r.business_reg_check);
-
-  // Education check
   if(r.edu_check) area.innerHTML+=renderEduCheck(r.edu_check);
-
-  // Consent check
   if(r.consent_check) area.innerHTML+=renderConsentCheck(r.consent_check);
 
-  // Summary
   renderSummary(r,nameOk);
 }
 
@@ -525,7 +712,6 @@ function renderReqItems(ri){
 }
 
 function renderBizCheck(b){
-  // match=true면 대표자와 대상자가 동일인 → 확인 필요
   const badge=b.match?'badge-warn':'badge-ok';
   const statusText=b.match?'동일인 — 확인 필요':'다른 사람 — 정상';
   return `<div class="section">
@@ -573,16 +759,10 @@ function renderSummary(r,nameOk){
   const banner=$('summaryBanner');
   let issues=0;
   const docs=r.documents||{};
-
-  // Missing docs
   ['fact_certificate','graduation_certificate','employment_contract','business_registration','education_confirmation','participation_consent'].forEach(k=>{
     if(!docs[k]?.found)issues++;
   });
-
-  // Name mismatch
   if(r.worker_name&&!nameOk)issues++;
-
-  // Contract issues
   const ca=r.contract_analysis;
   if(ca){
     const et=ca.employment_type;
@@ -595,14 +775,8 @@ function renderSummary(r,nameOk){
       keys.forEach(k=>{if(!ca.required_items[k]?.found)issues++});
     }
   }
-
-  // Biz reg: match=true면 대표자=대상자 동일인 → 확인 필요
   if(r.business_reg_check&&r.business_reg_check.match)issues++;
-
-  // Edu
   if(r.edu_check&&r.edu_check.result!=='정상')issues++;
-
-  // Consent
   if(r.consent_check&&r.consent_check.result!=='정상')issues++;
 
   banner.style.display='block';
@@ -615,8 +789,911 @@ function renderSummary(r,nameOk){
   }
 }
 
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function num(n){return n!=null?Number(n).toLocaleString('ko-KR'):'-'}
+
+/* =========================================================
+   TAB 2: 지원금 검토 로직
+   ========================================================= */
+
+// ========== 날짜/나이 유틸리티 ==========
+
+/** 만 나이 계산 (기준일 기준) */
+function calcAge(birthStr, baseStr){
+  const b=new Date(birthStr), d=new Date(baseStr);
+  let age=d.getFullYear()-b.getFullYear();
+  const mDiff=d.getMonth()-b.getMonth();
+  if(mDiff<0||(mDiff===0&&d.getDate()<b.getDate())) age--;
+  return age;
+}
+
+/** 두 날짜 사이의 월 수 (소수점 포함하지 않음, 완료 월 수) */
+function monthsBetween(startStr, endStr){
+  const s=new Date(startStr), e=new Date(endStr);
+  let months=(e.getFullYear()-s.getFullYear())*12+(e.getMonth()-s.getMonth());
+  if(e.getDate()<s.getDate()) months--;
+  return Math.max(0, months);
+}
+
+/** 날짜에 N개월 더하기 */
+function addMonths(dateStr, n){
+  const d=new Date(dateStr);
+  d.setMonth(d.getMonth()+n);
+  return d;
+}
+
+/** 날짜에 N년 더하기 */
+function addYears(dateStr, n){
+  const d=new Date(dateStr);
+  d.setFullYear(d.getFullYear()+n);
+  return d;
+}
+
+/** 해당 월의 마지막 날 */
+function lastDayOfMonth(year, month){
+  return new Date(year, month+1, 0);
+}
+
+/** 제척기간 계산: 고용일 + N년 되는 날이 속하는 월의 익월 + 1개월 말일 */
+function calcDeadline(hireDateStr, years){
+  const hire=new Date(hireDateStr);
+  // N년 후 날짜
+  const anniversary=new Date(hire);
+  anniversary.setFullYear(anniversary.getFullYear()+years);
+  // N년 되는 날 = anniversary - 1일
+  const nYearDate=new Date(anniversary);
+  nYearDate.setDate(nYearDate.getDate()-1);
+  // 속하는 월 + 2 의 말일 (익월부터 2개월 후)
+  const dlMonth=nYearDate.getMonth()+2;
+  const dlYear=nYearDate.getFullYear();
+  return lastDayOfMonth(dlYear, dlMonth);
+}
+
+/** YYYY-MM-DD 포맷 */
+function toDateStr(d){
+  if(!d) return '';
+  if(typeof d==='string') d=new Date(d);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+/** 올림 (소수점 이하) */
+function ceilNum(n){ return Math.ceil(n); }
+
+// ========== 피보험자 수 테이블 초기화 ==========
+function initInsuredTable(){
+  const today=new Date();
+  const headerRow=$('insuredHeader');
+  const dataRow=$('insuredRow');
+  headerRow.innerHTML='';
+  dataRow.innerHTML='';
+
+  // 직전 12개월 (현재월 제외, 직전월부터)
+  for(let i=12;i>=1;i--){
+    const d=new Date(today.getFullYear(), today.getMonth()-i, 1);
+    const label=`${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}`;
+    const th=document.createElement('th');
+    th.textContent=label;
+    headerRow.appendChild(th);
+
+    const td=document.createElement('td');
+    td.innerHTML=`<input type="number" min="0" class="insured-input" data-month="${label}" value="" placeholder="0">`;
+    dataRow.appendChild(td);
+  }
+
+  // 평균 자동 계산
+  dataRow.querySelectorAll('.insured-input').forEach(inp=>{
+    inp.addEventListener('input', calcAvgInsuredDisplay);
+  });
+}
+
+function getInsuredData(){
+  const inputs=document.querySelectorAll('.insured-input');
+  const data=[];
+  inputs.forEach(inp=>{
+    data.push({month:inp.dataset.month, count:parseInt(inp.value)||0});
+  });
+  return data;
+}
+
+function calcAvgInsured(insuredData, establishDateStr){
+  let relevantData=insuredData.filter(d=>d.count>0||true); // 모든 월 포함
+  if(establishDateStr){
+    const estDate=new Date(establishDateStr);
+    const estMonth=`${estDate.getFullYear()}.${String(estDate.getMonth()+1).padStart(2,'0')}`;
+    // 성립일이 속한 월 이후만 포함
+    relevantData=relevantData.filter(d=>d.month>=estMonth);
+  }
+  if(relevantData.length===0) return 0;
+  const sum=relevantData.reduce((a,b)=>a+b.count,0);
+  return ceilNum(sum/relevantData.length);
+}
+
+function calcAvgInsuredDisplay(){
+  const data=getInsuredData();
+  const estDate=$('s_establishDate').value;
+  const avg=calcAvgInsured(data, estDate);
+  $('avgInsuredDisplay').textContent=avg+'명';
+
+  // 기업규모 판단
+  const isPriority=$('s_isPriority').checked;
+  const industry=$('s_industry').value;
+  const ceoBirth=$('s_ceoBirth').value;
+  const bizStart=$('s_bizStartDate').value;
+
+  let sizeOk=false;
+  let sizeText='';
+
+  if(!isPriority){
+    sizeText='우선지원대상기업 미해당 → 부적격';
+  }else if(avg>=5){
+    sizeOk=true;
+    sizeText=`적격 (우선지원 + ${avg}인 이상)`;
+  }else{
+    // 5인 미만 예외
+    if(industry==='knowledge'||industry==='culture'||industry==='renewable'){
+      sizeOk=true;
+      const indName={knowledge:'지식서비스산업',culture:'문화콘텐츠산업',renewable:'신재생에너지산업'}[industry];
+      sizeText=`${avg}인 미만이나 ${indName} → 적격 (예외)`;
+    }else if(ceoBirth&&bizStart){
+      const ceoAge=calcAge(ceoBirth, toDateStr(new Date()));
+      const bizYears=(new Date()-new Date(bizStart))/(365.25*24*60*60*1000);
+      if(ceoAge>=15&&ceoAge<=39&&bizYears<=7){
+        sizeOk=true;
+        sizeText=`${avg}인 미만이나 청년창업기업(대표 만${ceoAge}세, 업력 ${bizYears.toFixed(1)}년) → 적격 (예외)`;
+      }else{
+        sizeText=`5인 미만 & 예외 미해당 → 부적격`;
+      }
+    }else{
+      sizeText=`5인 미만 & 예외 미해당 → 부적격`;
+    }
+  }
+  $('companySizeDisplay').textContent=sizeText;
+  $('companySizeDisplay').style.color=sizeOk?'var(--primary)':'var(--danger)';
+}
+
+// 기업정보 변경 시 자동 재계산
+['s_isPriority','s_isMetro','s_industry'].forEach(id=>{
+  $(id).addEventListener('change', calcAvgInsuredDisplay);
+});
+['s_establishDate','s_bizStartDate','s_ceoBirth'].forEach(id=>{
+  $(id).addEventListener('change', calcAvgInsuredDisplay);
+});
+
+initInsuredTable();
+
+// ========== 24년 협약 토글 ==========
+$('s_has24Agree').addEventListener('change',function(){
+  const show=this.value==='yes';
+  $('s_24agreeStatusWrap').classList.toggle('hidden',!show);
+  $('s_24agreeDateWrap').classList.toggle('hidden',!show);
+  $('s_adjSection').classList.toggle('hidden',!show);
+});
+
+// ========== 고용조정 동적 추가 ==========
+let adjCount=0;
+function addAdjustment(){
+  adjCount++;
+  const div=document.createElement('div');
+  div.className='adj-row';
+  div.id=`adj_${adjCount}`;
+  div.innerHTML=`
+    <label style="font-size:12px;font-weight:600;min-width:40px">조정${adjCount}</label>
+    <input type="date" class="adj-date" placeholder="고용조정일">
+    <select class="adj-code">
+      <option value="other">일반 해고/권고사직</option>
+      <option value="26-1">26-1 (징계해고)</option>
+      <option value="26-2">26-2 (권고사직-근로자귀책)</option>
+    </select>
+    <button class="btn-sm btn-danger" onclick="this.parentElement.remove()">삭제</button>
+  `;
+  $('adjList').appendChild(div);
+}
+
+function getAdjustments(){
+  const rows=document.querySelectorAll('.adj-row');
+  const adjs=[];
+  rows.forEach(row=>{
+    const date=row.querySelector('.adj-date')?.value;
+    const code=row.querySelector('.adj-code')?.value;
+    if(date) adjs.push({date, code});
+  });
+  return adjs;
+}
+
+// ========== 23년 협약 토글 ==========
+$('s_has23Agree').addEventListener('change',function(){
+  const show=this.value==='yes';
+  $('workers23Section').classList.toggle('hidden',!show);
+});
+
+// ========== 근로자 동적 관리 ==========
+let worker24Count=0;
+let worker23Count=0;
+
+function addWorker24(){
+  worker24Count++;
+  const id=worker24Count;
+  const div=document.createElement('div');
+  div.className='worker-card';
+  div.id=`w24_${id}`;
+  div.innerHTML=`
+    <div class="worker-header">
+      <h4>근로자 #${id}</h4>
+      <button class="btn-sm btn-danger remove-worker" onclick="document.getElementById('w24_${id}').remove()">삭제</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>이름</label><input type="text" class="w24-name"></div>
+      <div class="form-group"><label>생년월일</label><input type="date" class="w24-birth"></div>
+      <div class="form-group">
+        <label>성별</label>
+        <select class="w24-gender"><option value="female">여성</option><option value="male">남성</option></select>
+      </div>
+      <div class="form-group"><label>입사일</label><input type="date" class="w24-hire"></div>
+      <div class="form-group">
+        <label>현재 고용상태</label>
+        <select class="w24-employed"><option value="yes">고용중</option><option value="no">고용종료</option></select>
+      </div>
+      <div class="form-group"><label>고용종료일 (해당시)</label><input type="date" class="w24-termDate"></div>
+      <div class="form-group">
+        <label>계약직 여부</label>
+        <select class="w24-fixedTerm"><option value="no">아니오 (정규직)</option><option value="yes">예 (계약직)</option></select>
+      </div>
+      <div class="form-group"><label>계약종료월 (계약직인 경우, YYYY-MM)</label><input type="month" class="w24-contractEnd"></div>
+      <div class="form-group">
+        <label>1년 이내 재입사 여부</label>
+        <select class="w24-rehire"><option value="no">아니오</option><option value="yes">예 (1년 이내 재입사)</option></select>
+      </div>
+    </div>
+    <hr style="margin:10px 0;border:none;border-top:1px dashed var(--border)">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>채용자명단통보 여부</label>
+        <select class="w24-notified"><option value="no">미통보 (신규인력)</option><option value="yes">통보완료 (기존인력)</option></select>
+      </div>
+      <div class="form-group">
+        <label>적격 여부 (통보된 경우)</label>
+        <select class="w24-eligible"><option value="yes">적격</option><option value="no">부적격/미확인</option></select>
+      </div>
+      <div class="form-group"><label>기존 신청금액 (원)</label><input type="number" class="w24-claimed" value="0" min="0" step="10000"></div>
+    </div>
+  `;
+  $('workers24List').appendChild(div);
+}
+
+function getWorkers24(){
+  const cards=document.querySelectorAll('[id^="w24_"]');
+  const workers=[];
+  cards.forEach(card=>{
+    workers.push({
+      name: card.querySelector('.w24-name')?.value||'',
+      birth: card.querySelector('.w24-birth')?.value||'',
+      gender: card.querySelector('.w24-gender')?.value||'female',
+      hire: card.querySelector('.w24-hire')?.value||'',
+      employed: card.querySelector('.w24-employed')?.value==='yes',
+      termDate: card.querySelector('.w24-termDate')?.value||'',
+      fixedTerm: card.querySelector('.w24-fixedTerm')?.value==='yes',
+      contractEnd: card.querySelector('.w24-contractEnd')?.value||'',
+      rehire: card.querySelector('.w24-rehire')?.value==='yes',
+      notified: card.querySelector('.w24-notified')?.value==='yes',
+      eligible: card.querySelector('.w24-eligible')?.value==='yes',
+      claimed: parseInt(card.querySelector('.w24-claimed')?.value)||0,
+    });
+  });
+  return workers;
+}
+
+function addWorker23(){
+  worker23Count++;
+  const id=worker23Count;
+  const div=document.createElement('div');
+  div.className='worker-card';
+  div.id=`w23_${id}`;
+  div.innerHTML=`
+    <div class="worker-header">
+      <h4>23년 근로자 #${id}</h4>
+      <button class="btn-sm btn-danger remove-worker" onclick="document.getElementById('w23_${id}').remove()">삭제</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>이름</label><input type="text" class="w23-name"></div>
+      <div class="form-group"><label>입사일 (고용일)</label><input type="date" class="w23-hire"></div>
+      <div class="form-group">
+        <label>현재 고용상태</label>
+        <select class="w23-employed"><option value="yes">고용중</option><option value="no">고용종료</option></select>
+      </div>
+      <div class="form-group"><label>고용종료일 (해당시)</label><input type="date" class="w23-termDate"></div>
+      <div class="form-group">
+        <label>고용조정 해당 여부</label>
+        <select class="w23-adjusted"><option value="no">아니오</option><option value="yes">예</option></select>
+      </div>
+      <div class="form-group"><label>기존 신청 총액 (원)</label><input type="number" class="w23-claimed" value="0" min="0" step="10000"></div>
+    </div>
+  `;
+  $('workers23List').appendChild(div);
+}
+
+function getWorkers23(){
+  const cards=document.querySelectorAll('[id^="w23_"]');
+  const workers=[];
+  cards.forEach(card=>{
+    workers.push({
+      name: card.querySelector('.w23-name')?.value||'',
+      hire: card.querySelector('.w23-hire')?.value||'',
+      employed: card.querySelector('.w23-employed')?.value==='yes',
+      termDate: card.querySelector('.w23-termDate')?.value||'',
+      adjusted: card.querySelector('.w23-adjusted')?.value==='yes',
+      claimed: parseInt(card.querySelector('.w23-claimed')?.value)||0,
+    });
+  });
+  return workers;
+}
+
+
+// ========== 핵심 검토 엔진 ==========
+
+function runSubsidyCheck(){
+  const today=new Date();
+  const todayStr=toDateStr(today);
+  const results=[];
+  let totalAmount=0;
+
+  // ── 1단계: 기업규모 확인 ──
+  const isPriority=$('s_isPriority').checked;
+  const isMetro=$('s_isMetro').checked;
+  const estDate=$('s_establishDate').value;
+  const bizStart=$('s_bizStartDate').value;
+  const industry=$('s_industry').value;
+  const ceoBirth=$('s_ceoBirth').value;
+  const insuredData=getInsuredData();
+  const avgInsured=calcAvgInsured(insuredData, estDate);
+
+  let companySizeOk=false;
+  let companySizeReason='';
+  let companySizeExceptionNote='';
+
+  if(!isPriority){
+    companySizeReason='우선지원대상기업에 해당하지 않음';
+  }else if(avgInsured>=5){
+    companySizeOk=true;
+    companySizeReason=`우선지원대상기업 해당 + 월평균 피보험자 ${avgInsured}명 (5인 이상)`;
+  }else{
+    // 5인 미만 예외 확인
+    if(industry==='knowledge'){
+      companySizeOk=true;
+      companySizeReason=`월평균 ${avgInsured}명 (5인 미만)이나, 지식서비스산업 업종으로 예외 적용`;
+      companySizeExceptionNote='지식서비스산업';
+    }else if(industry==='culture'){
+      companySizeOk=true;
+      companySizeReason=`월평균 ${avgInsured}명 (5인 미만)이나, 문화콘텐츠산업 업종으로 예외 적용`;
+      companySizeExceptionNote='문화콘텐츠산업';
+    }else if(industry==='renewable'){
+      companySizeOk=true;
+      companySizeReason=`월평균 ${avgInsured}명 (5인 미만)이나, 신에너지·재생에너지산업 업종으로 예외 적용`;
+      companySizeExceptionNote='신재생에너지산업';
+    }else if(ceoBirth&&bizStart){
+      const ceoAge=calcAge(ceoBirth, todayStr);
+      const bizYears=(today-new Date(bizStart))/(365.25*24*60*60*1000);
+      if(ceoAge>=15&&ceoAge<=39&&bizYears<=7){
+        companySizeOk=true;
+        companySizeReason=`월평균 ${avgInsured}명 (5인 미만)이나, 청년창업기업 해당 (대표 만${ceoAge}세, 업력 ${bizYears.toFixed(1)}년)`;
+        companySizeExceptionNote='청년창업기업';
+      }else{
+        companySizeReason=`월평균 ${avgInsured}명 (5인 미만) & 예외사유 미해당 (대표 만${ceoAge}세, 업력 ${bizYears.toFixed(1)}년)`;
+      }
+    }else{
+      companySizeReason=`월평균 ${avgInsured}명 (5인 미만) & 예외사유 미해당`;
+    }
+  }
+
+  results.push({
+    type: companySizeOk?'eligible':'ineligible',
+    title: '1단계: 기업규모 확인',
+    icon: companySizeOk?'✅':'❌',
+    lines: [
+      `우선지원대상기업: ${isPriority?'해당':'미해당'}`,
+      `월평균 피보험자 수: ${avgInsured}명 (소수점 올림 적용)`,
+      companySizeExceptionNote?`예외사유: ${companySizeExceptionNote}`:'',
+      `결과: ${companySizeReason}`,
+    ].filter(Boolean),
+  });
+
+  if(!companySizeOk){
+    results.push({type:'ineligible',title:'검토 중단',icon:'🚫',lines:['기업규모 요건 미충족으로 청년일자리도약장려금 신청 불가']});
+    renderSubsidyResults(results, 0);
+    return;
+  }
+
+  // ── 2단계: 24년도 협약 확인 ──
+  const has24Agree=$('s_has24Agree').value==='yes';
+  const agree24Status=$('s_24agreeStatus').value;
+  const agree24Date=$('s_24agreeDate').value;
+  const adjustments=getAdjustments();
+  const workers24=getWorkers24();
+
+  // 고용조정 중 진짜 고용조정(26-1, 26-2 제외) 필터
+  const realAdjustments=adjustments.filter(a=>a.code!=='26-1'&&a.code!=='26-2');
+  const excludedAdjustments=adjustments.filter(a=>a.code==='26-1'||a.code==='26-2');
+
+  if(has24Agree&&agree24Status==='approved'){
+    // ── 2-1. 협약 있는 경우 ──
+    results.push({type:'info',title:'2단계: 24년도 협약 확인',icon:'📋',lines:[
+      `협약체결: 있음 (처리상태: 승인)`,
+      `협약 신청일: ${formatDate(agree24Date)}`,
+      `고용조정 이력: ${adjustments.length}건${excludedAdjustments.length>0?` (이 중 ${excludedAdjustments.length}건은 근로자 귀책사유(26-1/26-2)로 고용조정 미해당, 단 추가자료 필요)`:''}`
+    ]});
+
+    // 가장 최근 실질 고용조정일
+    let latestRealAdjDate=null;
+    if(realAdjustments.length>0){
+      latestRealAdjDate=realAdjustments.map(a=>a.date).sort().pop();
+    }
+
+    // ── ㄱ. 신규인력 검토 ──
+    const newWorkers=workers24.filter(w=>!w.notified);
+    const newResults=[];
+
+    newWorkers.forEach(w=>{
+      const issues=[];
+      let eligible=true;
+
+      // 청년 나이 확인
+      if(w.birth&&w.hire){
+        const ageAtHire=calcAge(w.birth, w.hire);
+        const maxAge=w.gender==='male'?35:34;
+        if(ageAtHire<15||ageAtHire>maxAge){
+          eligible=false;
+          issues.push(`나이 부적격: 고용일 기준 만${ageAtHire}세 (${w.gender==='male'?'남성 만15~35세':'여성 만15~34세'} 범위 밖)`);
+        }else{
+          issues.push(`나이 적격: 고용일 기준 만${ageAtHire}세`);
+        }
+      }
+
+      // 입사일 범위: 협약 신청일 이후 ~ 24.12.31
+      if(w.hire){
+        if(agree24Date&&w.hire<agree24Date){
+          eligible=false;
+          issues.push(`입사일(${formatDate(w.hire)})이 협약 신청일(${formatDate(agree24Date)}) 이전 → 부적격`);
+        }
+        if(w.hire>'2024-12-31'){
+          eligible=false;
+          issues.push(`입사일(${formatDate(w.hire)})이 24.12.31 이후 → 24년 사업 부적격`);
+        }
+      }
+
+      // 현재 고용종료 확인
+      if(!w.employed){
+        eligible=false;
+        issues.push(`현재 고용종료 상태 → 신규인력으로 부적격`);
+      }
+
+      // 고용조정 후 3개월 제한
+      if(latestRealAdjDate&&w.hire){
+        const adjPlus3=addMonths(latestRealAdjDate, 3);
+        if(new Date(w.hire)<adjPlus3){
+          eligible=false;
+          issues.push(`고용조정일(${formatDate(latestRealAdjDate)}) 후 3개월(${formatDate(toDateStr(adjPlus3))}) 이전 입사 → 부적격`);
+        }
+      }
+
+      // 계약직 확인
+      if(w.fixedTerm){
+        if(w.contractEnd&&w.hire){
+          const hireDate=new Date(w.hire);
+          const contractEndDate=new Date(w.contractEnd+'-01');
+          const diffMonths=(contractEndDate.getFullYear()-hireDate.getFullYear())*12+(contractEndDate.getMonth()-hireDate.getMonth());
+          if(diffMonths>3){
+            eligible=false;
+            issues.push(`계약직이며 계약종료(${w.contractEnd})까지 ${diffMonths}개월 (3개월 초과) → 부적격`);
+          }else{
+            issues.push(`계약직이나 계약기간 ${diffMonths}개월 (3개월 이내) → 적격`);
+          }
+        }else{
+          issues.push(`계약직 해당 — 계약종료월 확인 필요`);
+        }
+      }
+
+      // 재입사 확인
+      if(w.rehire){
+        eligible=false;
+        issues.push(`1년 이내 재입사자 → 부적격`);
+      }
+
+      // 제척기간 계산
+      let deadlines=[];
+      if(w.hire){
+        const dl1=calcDeadline(w.hire, 1);
+        const dl2=calcDeadline(w.hire, 2);
+        deadlines=[
+          {year:'1년차', deadline:dl1, amount:7200000, monthly:600000},
+          {year:'2년차', deadline:dl2, amount:4800000, monthly:0}
+        ];
+      }
+
+      const workerAmount=eligible?12000000:0;
+      if(eligible) totalAmount+=12000000;
+
+      newResults.push({
+        name: w.name||'(이름없음)',
+        eligible,
+        issues,
+        amount: workerAmount,
+        deadlines,
+        type: 'new',
+      });
+    });
+
+    if(newResults.length>0){
+      results.push({type:'info',title:'ㄱ. 신규인력 검토 결과',icon:'👤',lines:[`대상자 ${newResults.length}명 검토`],workers:newResults});
+    }
+
+    // ── ㄴ. 기존 통보인력 검토 ──
+    const notifiedWorkers=workers24.filter(w=>w.notified);
+    const existingResults=[];
+
+    notifiedWorkers.forEach(w=>{
+      const issues=[];
+      let eligible=true;
+      let remainAmount=0;
+
+      if(!w.eligible){
+        eligible=false;
+        issues.push('채용자명단통보 적격 미확인 → 부적격');
+      }else{
+        issues.push('채용자명단통보: 적격');
+
+        // 1200만원 - 기신청금액
+        const maxAmount=12000000;
+        remainAmount=maxAmount-w.claimed;
+
+        if(remainAmount<=0){
+          eligible=false;
+          issues.push(`기신청금액 ${formatMoney(w.claimed)} → 한도(${formatMoney(maxAmount)}) 소진 완료`);
+        }else{
+          issues.push(`기신청금액: ${formatMoney(w.claimed)} → 잔여: ${formatMoney(remainAmount)}`);
+
+          // 고용종료 시 월할계산 (6개월 이상 근무)
+          if(!w.employed&&w.hire&&w.termDate){
+            const workedMonths=monthsBetween(w.hire, w.termDate);
+            if(workedMonths<6){
+              eligible=false;
+              issues.push(`고용종료 + 근무 ${workedMonths}개월 (6개월 미만) → 부적격`);
+            }else{
+              // 1년차 월할계산: 근무월수 × 60만원 (최대 720만원)
+              const yr1Max=Math.min(workedMonths, 12)*600000;
+              // 2년차: 24개월 만족해야 함
+              const yr2Max=workedMonths>=24?4800000:0;
+              const proRatedMax=yr1Max+yr2Max;
+              const actualRemain=Math.min(remainAmount, proRatedMax-w.claimed);
+              if(actualRemain>0){
+                remainAmount=Math.max(0, actualRemain);
+                issues.push(`고용종료(${formatDate(w.termDate)}) — 근무 ${workedMonths}개월, 월할계산 적용`);
+                issues.push(`1년차 최대: ${formatMoney(yr1Max)}, 2년차: ${formatMoney(yr2Max)}`);
+              }else{
+                remainAmount=0;
+                issues.push(`고용종료 후 월할계산 결과 추가 수급액 없음`);
+              }
+            }
+          }
+        }
+      }
+
+      // 제척기간
+      let deadlines=[];
+      if(w.hire){
+        const dl1=calcDeadline(w.hire, 1);
+        const dl2=calcDeadline(w.hire, 2);
+        deadlines=[
+          {year:'1년차', deadline:dl1, amount:7200000, monthly:600000},
+          {year:'2년차', deadline:dl2, amount:4800000, monthly:0}
+        ];
+      }
+
+      if(eligible&&remainAmount>0) totalAmount+=remainAmount;
+
+      existingResults.push({
+        name: w.name||'(이름없음)',
+        eligible: eligible&&remainAmount>0,
+        issues,
+        amount: eligible?Math.max(0,remainAmount):0,
+        deadlines,
+        type: 'existing',
+      });
+    });
+
+    if(existingResults.length>0){
+      results.push({type:'info',title:'ㄴ. 기존 통보인력 검토 결과',icon:'📑',lines:[`대상자 ${existingResults.length}명 검토`],workers:existingResults});
+    }
+
+    // 26-1/26-2 관련 안내
+    if(excludedAdjustments.length>0){
+      results.push({type:'check',title:'참고: 근로자 귀책사유 고용조정',icon:'📌',lines:[
+        `26-1/26-2 코드 해당 ${excludedAdjustments.length}건 — 고용조정으로 보지 않으나, 신청 시 추가자료 제출 필요`,
+        ...excludedAdjustments.map(a=>`  - ${formatDate(a.date)} / 코드: ${a.code}`)
+      ]});
+    }
+
+  }else if(has24Agree&&agree24Status!=='approved'){
+    results.push({type:'ineligible',title:'2단계: 24년도 협약 확인',icon:'❌',lines:[
+      '협약체결은 있으나 처리상태가 승인이 아님 → 사업참여 부적격'
+    ]});
+  }else{
+    // ── 2-2. 협약 없는 경우 ──
+    results.push({type:'check',title:'2단계: 24년도 협약 미체결',icon:'📋',lines:[
+      '협약 미체결 → 신규 협약 신청 가능 여부 검토'
+    ]});
+
+    // 현재 기준 전 3개월 내 고용조정 확인
+    const threeMonthsAgo=addMonths(todayStr, -3);
+    const recentAdj=realAdjustments.filter(a=>new Date(a.date)>=threeMonthsAgo);
+    if(recentAdj.length>0){
+      results.push({type:'ineligible',title:'고용조정 제한',icon:'🚫',lines:[
+        `최근 3개월 내 고용조정 ${recentAdj.length}건 → 협약 신청 불가`,
+        ...recentAdj.map(a=>`  - ${formatDate(a.date)}`)
+      ]});
+      renderSubsidyResults(results, 0);
+      return;
+    }
+
+    // 한도인원 계산
+    const limitBase=avgInsured;
+    const limitPct=isMetro?0.5:1.0;
+    const limitWorkers=ceilNum(limitBase*limitPct);
+
+    results.push({type:'info',title:'한도인원 산정',icon:'📊',lines:[
+      `월평균 피보험자: ${avgInsured}명`,
+      `한도비율: ${isMetro?'50% (수도권)':'100% (비수도권)'}`,
+      `한도인원: ${limitWorkers}명`
+    ]});
+
+    // 전 2개월 내 입사한 현재 고용중 청년 확인
+    const twoMonthsAgo=addMonths(todayStr, -2);
+    const noAgreeResults=[];
+
+    workers24.forEach(w=>{
+      const issues=[];
+      let eligible=true;
+
+      // 청년 나이 확인
+      if(w.birth&&w.hire){
+        const ageAtHire=calcAge(w.birth, w.hire);
+        const maxAge=w.gender==='male'?35:34;
+        if(ageAtHire<15||ageAtHire>maxAge){
+          eligible=false;
+          issues.push(`나이 부적격: 고용일 기준 만${ageAtHire}세`);
+        }else{
+          issues.push(`나이 적격: 고용일 기준 만${ageAtHire}세`);
+        }
+      }
+
+      // 입사일 범위: 전 2개월 내
+      if(w.hire){
+        if(new Date(w.hire)<twoMonthsAgo){
+          eligible=false;
+          issues.push(`입사일(${formatDate(w.hire)})이 2개월 전(${formatDate(toDateStr(twoMonthsAgo))}) 이전 → 부적격`);
+        }
+      }
+
+      // 현재 고용중
+      if(!w.employed){
+        eligible=false;
+        issues.push('현재 고용종료 → 부적격');
+      }
+
+      // 계약직 확인
+      if(w.fixedTerm){
+        if(w.contractEnd&&w.hire){
+          const hireDate=new Date(w.hire);
+          const contractEndDate=new Date(w.contractEnd+'-01');
+          const diffMonths=(contractEndDate.getFullYear()-hireDate.getFullYear())*12+(contractEndDate.getMonth()-hireDate.getMonth());
+          if(diffMonths>3){
+            eligible=false;
+            issues.push(`계약직 — 계약기간 ${diffMonths}개월 (3개월 초과) → 부적격`);
+          }else{
+            issues.push(`계약직이나 계약기간 ${diffMonths}개월 (3개월 이내) → 적격`);
+          }
+        }else{
+          issues.push('계약직 해당 — 계약종료월 확인 필요');
+        }
+      }
+
+      // 재입사 확인
+      if(w.rehire){
+        eligible=false;
+        issues.push('1년 이내 재입사자 → 부적격');
+      }
+
+      // 제척기간
+      let deadlines=[];
+      if(w.hire){
+        const dl1=calcDeadline(w.hire, 1);
+        const dl2=calcDeadline(w.hire, 2);
+        deadlines=[
+          {year:'1년차', deadline:dl1, amount:7200000, monthly:600000},
+          {year:'2년차', deadline:dl2, amount:4800000, monthly:0}
+        ];
+      }
+
+      noAgreeResults.push({
+        name: w.name||'(이름없음)',
+        eligible,
+        issues,
+        amount: eligible?12000000:0,
+        deadlines,
+        type: 'noAgree',
+      });
+    });
+
+    // 한도인원 적용
+    const eligibleNoAgree=noAgreeResults.filter(w=>w.eligible);
+    if(eligibleNoAgree.length>limitWorkers){
+      for(let i=limitWorkers;i<eligibleNoAgree.length;i++){
+        eligibleNoAgree[i].eligible=false;
+        eligibleNoAgree[i].amount=0;
+        eligibleNoAgree[i].issues.push(`한도인원(${limitWorkers}명) 초과 → 제외`);
+      }
+    }
+
+    const eligibleCount=noAgreeResults.filter(w=>w.eligible).length;
+    noAgreeResults.filter(w=>w.eligible).forEach(w=>{totalAmount+=12000000});
+
+    if(noAgreeResults.length>0){
+      results.push({type:'info',title:'협약 미체결 시 대상자 검토',icon:'👤',
+        lines:[`검토 대상 ${noAgreeResults.length}명 중 적격 ${eligibleCount}명 (한도: ${limitWorkers}명)`],
+        workers:noAgreeResults
+      });
+    }
+  }
+
+  // ── 3단계: 제척기간 표시 (모든 적격 근로자) ──
+  // (제척기간은 각 근로자 결과에 포함됨 — 별도 섹션 불필요)
+
+  // ── 4단계: 23년도 누락분 ──
+  const has23Agree=$('s_has23Agree').value;
+  if(has23Agree==='yes'){
+    const workers23=getWorkers23();
+    const results23=[];
+
+    workers23.forEach(w=>{
+      const issues=[];
+      let remainAmount=0;
+
+      if(w.adjusted){
+        issues.push('고용조정 해당 → 추가 신청 불가');
+      }else if(!w.employed&&w.hire&&w.termDate){
+        // 고용종료 — 근무기간에 따른 계산
+        const workedMonths=monthsBetween(w.hire, w.termDate);
+        if(workedMonths<6){
+          issues.push(`고용종료 + 근무 ${workedMonths}개월 (6개월 미만) → 추가 신청 불가`);
+        }else{
+          const yr1=Math.min(workedMonths, 12)*600000;
+          const yr2=workedMonths>=24?4800000:0;
+          const maxClaim=yr1+yr2;
+          remainAmount=Math.max(0, maxClaim-w.claimed);
+          if(remainAmount>0){
+            issues.push(`근무 ${workedMonths}개월 → 최대 ${formatMoney(maxClaim)}, 기신청 ${formatMoney(w.claimed)} → 잔여 ${formatMoney(remainAmount)}`);
+          }else{
+            issues.push(`기신청금액(${formatMoney(w.claimed)})으로 한도 소진`);
+          }
+        }
+      }else if(w.employed){
+        // 고용중 — 1200만원 기준
+        remainAmount=Math.max(0, 12000000-w.claimed);
+        if(remainAmount>0){
+          issues.push(`고용중 → 최대 12,000,000원, 기신청 ${formatMoney(w.claimed)} → 잔여 ${formatMoney(remainAmount)}`);
+        }else{
+          issues.push(`기신청금액(${formatMoney(w.claimed)})으로 한도 소진`);
+        }
+      }
+
+      // 23년 제척기간
+      let deadlines=[];
+      if(w.hire){
+        const dl1=calcDeadline(w.hire, 1);
+        const dl2=calcDeadline(w.hire, 2);
+        deadlines=[
+          {year:'1년차', deadline:dl1},
+          {year:'2년차', deadline:dl2}
+        ];
+        const today=new Date();
+        deadlines.forEach(d=>{
+          const expired=d.deadline<today;
+          d.expired=expired;
+          issues.push(`${d.year} 제척기간: ${formatDate(toDateStr(d.deadline))}${expired?' (기한 경과)':' (기한 내)'}`);
+        });
+      }
+
+      if(remainAmount>0) totalAmount+=remainAmount;
+
+      results23.push({
+        name: w.name||'(이름없음)',
+        eligible: remainAmount>0,
+        issues,
+        amount: remainAmount,
+        deadlines,
+        type: '23yr',
+      });
+    });
+
+    if(results23.length>0){
+      results.push({type:'info',title:'4단계: 23년도 누락분 검토',icon:'📅',
+        lines:[`23년 채용자명단통보 근로자 ${results23.length}명 검토`],
+        workers:results23
+      });
+    }else{
+      results.push({type:'info',title:'4단계: 23년도 누락분',icon:'📅',lines:['23년 채용자명단통보 근로자 없음']});
+    }
+  }else if(has23Agree==='agreeOnly'){
+    results.push({type:'info',title:'4단계: 23년도',icon:'📅',lines:['23년 협약체결만 되어있고 채용자명단통보 대상자 없음 → 0원']});
+  }else{
+    results.push({type:'info',title:'4단계: 23년도',icon:'📅',lines:['23년 협약 미체결 → 해당 없음']});
+  }
+
+  renderSubsidyResults(results, totalAmount);
+}
+
+
+// ========== 결과 렌더링 ==========
+
+function renderSubsidyResults(results, totalAmount){
+  const container=$('subsidyResults');
+  container.classList.remove('hidden');
+  let html='';
+
+  // 총액 배너
+  html+=`<div class="summary-banner ${totalAmount>0?'warn':'error'}" style="display:block;margin-bottom:20px">
+    ${totalAmount>0
+      ?`💰 추가확인필요 총 금액: <span class="money warn">${formatMoney(totalAmount)}</span>`
+      :'❌ 추가 수급 가능 금액 없음'}
+  </div>`;
+
+  results.forEach(r=>{
+    html+=`<div class="result-card ${r.type}">`;
+    html+=`<h4>${r.icon} ${esc(r.title)}</h4>`;
+    r.lines.forEach(line=>{
+      html+=`<p>${esc(line)}</p>`;
+    });
+
+    // 근로자 상세
+    if(r.workers&&r.workers.length>0){
+      html+=`<hr style="margin:12px 0;border:none;border-top:1px dashed var(--border)">`;
+      r.workers.forEach(w=>{
+        const cls=w.eligible?'eligible':'ineligible';
+        html+=`<div style="padding:10px 14px;margin:8px 0;border-radius:8px;background:${w.eligible?'#f0fdf4':'#fef2f2'};border:1px solid ${w.eligible?'#86efac':'#fca5a5'}">`;
+        html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
+        html+=`<strong style="font-size:14px">${w.eligible?'✅':'❌'} ${esc(w.name)}</strong>`;
+        if(w.amount>0){
+          html+=`<span class="money" style="font-size:15px">${formatMoney(w.amount)}</span>`;
+        }
+        html+=`</div>`;
+
+        w.issues.forEach(issue=>{
+          html+=`<p style="font-size:12px;color:#475569;margin:2px 0;padding-left:8px">${esc(issue)}</p>`;
+        });
+
+        // 제척기간 표시
+        if(w.deadlines&&w.deadlines.length>0){
+          html+=`<div style="margin-top:8px;padding:8px 12px;background:#fff;border-radius:6px;border:1px solid var(--border)">`;
+          html+=`<strong style="font-size:12px;color:#334155">제척기간:</strong>`;
+          w.deadlines.forEach(d=>{
+            const dlStr=formatDate(toDateStr(d.deadline));
+            const expired=d.deadline<new Date();
+            const expiredMark=d.expired!==undefined?d.expired:expired;
+            html+=`<span style="display:inline-block;margin:2px 8px;font-size:12px;padding:2px 8px;border-radius:4px;background:${expiredMark?'#fee2e2':'#dbeafe'};color:${expiredMark?'#991b1b':'#1e40af'}">`;
+            html+=`${d.year}: ${dlStr}${expiredMark?' (경과)':''}`;
+            html+=`</span>`;
+          });
+          html+=`</div>`;
+        }
+
+        html+=`</div>`;
+      });
+    }
+
+    html+=`</div>`;
+  });
+
+  container.innerHTML=html;
+
+  // 스크롤
+  container.scrollIntoView({behavior:'smooth',block:'start'});
+}
 </script>
 </body>
 </html>
