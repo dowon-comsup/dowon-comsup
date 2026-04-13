@@ -3,50 +3,51 @@
 <head>
 <meta charset="UTF-8">
 <title>수기 스캔서류 OCR 추출 (Gemini / Claude)</title>
+<link rel="stylesheet" href="../assets/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
-body{font-family:'Malgun Gothic',sans-serif;max-width:1200px;margin:20px auto;padding:0 16px;color:#222}
-h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:8px}
+body{font-family:'Malgun Gothic',sans-serif;max-width:1200px;margin:20px auto;padding:0 16px;color:var(--ink-800)}
+h1{font-size:20px;border-bottom:2px solid var(--ink-700);padding-bottom:8px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
 label{font-weight:600;font-size:13px}
-input,select,button,textarea{font-size:13px;padding:6px 8px;border:1px solid #bbb;border-radius:4px}
-button{background:#2563eb;color:#fff;border:none;cursor:pointer;font-weight:600}
-button:disabled{background:#999;cursor:not-allowed}
-button.sec{background:#666}
-#log{background:#f4f4f4;padding:8px;font-size:12px;height:120px;overflow:auto;white-space:pre-wrap;border-radius:4px}
+input,select,button,textarea{font-size:13px;padding:6px 8px;border:1px solid var(--ink-200);border-radius:4px}
+button{background:var(--ink-800);color:#fff;border:none;cursor:pointer;font-weight:600}
+button:disabled{background:var(--ink-300);cursor:not-allowed}
+button.sec{background:var(--ink-500)}
+#log{background:var(--ink-50);padding:8px;font-size:12px;height:120px;overflow:auto;white-space:pre-wrap;border-radius:4px}
 .pages{display:flex;gap:8px;overflow-x:auto;margin:8px 0}
-.pages canvas{height:160px;border:1px solid #ccc}
+.pages canvas{height:160px;border:1px solid var(--border-dark)}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:12px;margin-top:14px}
-.card{border:1px solid #d0d7e2;border-radius:8px;padding:12px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-.card h3{margin:0 0 8px;font-size:14px;color:#1e3a8a;border-bottom:1px solid #e5e7eb;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center}
-.card h3 .badge{font-size:10px;background:#dbeafe;color:#1e40af;padding:2px 6px;border-radius:10px;font-weight:600}
+.card{border:1px solid var(--border);border-radius:8px;padding:12px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.card h3{margin:0 0 8px;font-size:14px;color:var(--ink-800);border-bottom:1px solid var(--border);padding-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.card h3 .badge{font-size:10px;background:var(--ink-50);color:var(--ink-700);padding:2px 6px;border-radius:10px;font-weight:600}
 table.kv{width:100%;border-collapse:collapse;font-size:12px}
-table.kv td{padding:4px 6px;vertical-align:top;border-bottom:1px dashed #eee}
-table.kv td.k{width:42%;color:#555;font-weight:600;background:#fafbfc}
+table.kv td{padding:4px 6px;vertical-align:top;border-bottom:1px dashed var(--ink-100)}
+table.kv td.k{width:42%;color:var(--ink-500);font-weight:600;background:#fafbfc}
 table.kv td.v{color:#111;word-break:break-all}
-.empty{color:#bbb}
-.bool-y{color:#059669;font-weight:700}
-.bool-n{color:#9ca3af}
-.q{margin:6px 0;padding:6px 8px;background:#f9fafb;border-radius:4px;font-size:12px}
-.q b{color:#1f2937}
+.empty{color:var(--ink-200)}
+.bool-y{color:var(--ok);font-weight:700}
+.bool-n{color:var(--ink-300)}
+.q{margin:6px 0;padding:6px 8px;background:var(--bg);border-radius:4px;font-size:12px}
+.q b{color:var(--ink-800)}
 .warn{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:8px;border-radius:6px;font-size:12px;margin-top:8px}
 .summary{background:#f0f9ff;border:1px solid #bae6fd;padding:10px;border-radius:6px;font-size:12px;line-height:1.6}
-.tabs{display:flex;gap:4px;margin-top:14px;border-bottom:2px solid #2563eb}
-.tab{padding:6px 14px;background:#e5e7eb;border-radius:6px 6px 0 0;cursor:pointer;font-size:12px;font-weight:600}
-.tab.active{background:#2563eb;color:#fff}
+.tabs{display:flex;gap:4px;margin-top:14px;border-bottom:2px solid var(--ink-800)}
+.tab{padding:6px 14px;background:var(--border);border-radius:6px 6px 0 0;cursor:pointer;font-size:12px;font-weight:600}
+.tab.active{background:var(--ink-800);color:#fff}
 .tabpane{display:none}
 .tabpane.active{display:block}
-pre#json{background:#fafafa;padding:8px;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:600px;overflow:auto;margin:0;border:1px solid #ddd;border-radius:4px}
+pre.json-pre{background:var(--bg);padding:8px;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:600px;overflow:auto;margin:0;border:1px solid var(--border);border-radius:4px}
 .list-item{padding:4px 6px;background:#f3f4f6;border-radius:3px;margin:2px 0;font-size:12px}
 </style>
 </head>
 <body>
-<div style="padding:10px 20px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
-  <a href="../index.html" style="font-size:13px;color:#2563eb;text-decoration:none;font-weight:600;">← 대시보드로 돌아가기</a>
+<div class="tool-topbar">
+  <a href="../index.html">&larr; 대시보드로 돌아가기</a>
 </div>
-<h1>📝 수기 스캔서류 OCR 추출 툴</h1>
-<p style="font-size:13px;color:#555">스캔된 수기 PDF를 업로드하면 비전 LLM이 페이지를 <b>병렬로 분할 호출</b>하여 인식 → 결과를 머지하고 항목별 카드 UI로 표시합니다.</p>
+<h1>수기 스캔서류 OCR 추출 툴</h1>
+<p style="font-size:13px;color:var(--ink-500)">스캔된 수기 PDF를 업로드하면 비전 LLM이 페이지를 <b>병렬로 분할 호출</b>하여 인식 → 결과를 머지하고 항목별 카드 UI로 표시합니다.</p>
 
 <div class="row">
   <label>API:</label>
@@ -70,35 +71,23 @@ pre#json{background:#fafafa;padding:8px;font-size:12px;white-space:pre-wrap;word
   <select id="chunk"><option value="1">1 (최대 병렬)</option><option value="2" selected>2</option><option value="3">3</option><option value="999">전체 1회</option></select>
   <label>동시요청:</label>
   <select id="concurrency"><option>2</option><option selected>4</option><option>6</option><option>8</option></select>
-  <button id="run" onclick="run()">🔍 인식 및 추출</button>
+  <button id="run" onclick="run()">인식 및 추출</button>
 </div>
 
 <div class="pages" id="pages"></div>
 <div id="log"></div>
-
-<div class="tabs">
-  <div class="tab active" onclick="tab('view')">📋 항목별 보기</div>
-  <div class="tab" onclick="tab('json')">{ } 원본 JSON</div>
-</div>
-<div id="pane-view" class="tabpane active">
-  <div id="cards" class="cards"></div>
-</div>
-<div id="pane-json" class="tabpane">
-  <pre id="json">대기중...</pre>
-  <div class="row"><button class="sec" onclick="copy('json')">JSON 복사</button></div>
-</div>
 
 <script>
 const MODELS={gemini:['gemini-2.5-pro','gemini-2.5-flash'],claude:['claude-sonnet-4-5','claude-opus-4-5']};
 const provEl=document.getElementById('provider'),modEl=document.getElementById('model');
 function refreshModels(){modEl.innerHTML='';MODELS[provEl.value].forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;modEl.appendChild(o)})}
 provEl.onchange=refreshModels;refreshModels();
-document.getElementById('apikey').value=localStorage.getItem('ocr_key_'+provEl.value)||'';
-provEl.addEventListener('change',()=>{document.getElementById('apikey').value=localStorage.getItem('ocr_key_'+provEl.value)||''});
-function saveKey(){localStorage.setItem('ocr_key_'+provEl.value,document.getElementById('apikey').value);log('키 저장됨')}
+function _getKeyName(prov){return prov==='claude'?'ANTHROPIC_API_KEY':'ocr_key_gemini';}
+document.getElementById('apikey').value=localStorage.getItem(_getKeyName(provEl.value))||'';
+provEl.addEventListener('change',()=>{document.getElementById('apikey').value=localStorage.getItem(_getKeyName(provEl.value))||''});
+function saveKey(){var _k=document.getElementById('apikey').value;localStorage.setItem(_getKeyName(provEl.value),_k);if(provEl.value==='claude'&&_k.startsWith('sk-ant-'))localStorage.setItem('CLAUDE_API_KEY',_k);log('키 저장됨')}
 function log(m){const l=document.getElementById('log');l.textContent+='['+new Date().toLocaleTimeString()+'] '+m+'\n';l.scrollTop=l.scrollHeight}
 function copy(id){navigator.clipboard.writeText(document.getElementById(id).textContent);log(id+' 복사됨')}
-function tab(t){['view','json'].forEach(x=>{document.getElementById('pane-'+x).classList.toggle('active',x===t)});document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',(i===0&&t==='view')||(i===1&&t==='json')))}
 
 const SCHEMA=`{
   "사업장정보": {"상호명":str,"담당자":str,"담당자연락처":str,"주소":str,"이메일":str,"전화번호":str,"업태_종목":str,"상시근로자수":int,"사업자등록번호":str,"대표자":str,"대표자주민번호":str},
@@ -203,10 +192,40 @@ async function run(){
     const merged=mergeResults(results);
     const dt=((performance.now()-t0)/1000).toFixed(1);
     log(`전체 완료 (${dt}s)`);
-    document.getElementById('json').textContent=JSON.stringify(merged,null,2);
-    renderCards(merged);
+
+    // 모달로 결과 표시
+    const cardHtml=buildCardsHtml(merged);
+    const jsonStr=JSON.stringify(merged,null,2);
+    const modalHtml=`
+      <div class="tabs" style="margin-top:0">
+        <div class="tab active" onclick="modalTab('view')">항목별 보기</div>
+        <div class="tab" onclick="modalTab('json')">{ } 원본 JSON</div>
+      </div>
+      <div id="modal-pane-view" class="tabpane active">
+        <div class="cards">${cardHtml}</div>
+      </div>
+      <div id="modal-pane-json" class="tabpane">
+        <pre class="json-pre">${escapeHtml(jsonStr)}</pre>
+        <div class="row"><button class="sec" onclick="copyText(this)">JSON 복사</button></div>
+      </div>`;
+    DwModal.show('OCR 추출 결과',modalHtml);
   }catch(e){log('오류: '+e.message);alert(e.message)}
-  finally{btn.disabled=false;btn.textContent='🔍 인식 및 추출'}
+  finally{btn.disabled=false;btn.textContent='인식 및 추출'}
+}
+
+function modalTab(t){
+  ['view','json'].forEach(x=>{
+    const el=document.getElementById('modal-pane-'+x);
+    if(el)el.classList.toggle('active',x===t);
+  });
+  const tabs=document.querySelectorAll('#dwModalBody .tab');
+  tabs.forEach((el,i)=>el.classList.toggle('active',(i===0&&t==='view')||(i===1&&t==='json')));
+}
+
+function copyText(btn){
+  const pre=btn.parentElement.previousElementSibling;
+  navigator.clipboard.writeText(pre.textContent);
+  log('JSON 복사됨');
 }
 
 // 깊이 머지 — null/빈값 무시, 배열은 concat-uniq, bool은 true 우선
@@ -275,13 +294,15 @@ function kvTable(obj,labels){
   for(const k of Object.keys(labels)){h+=`<tr><td class="k">${labels[k]}</td><td class="v">${v(obj?.[k])}</td></tr>`}
   return h+'</table>';
 }
-function renderCards(p){
-  const root=document.getElementById('cards');root.innerHTML='';
-  if(!p){root.innerHTML='<div class="card">결과 없음</div>';return}
+function buildCardsHtml(p){
+  let html='';
+  if(!p){return '<div class="card">결과 없음</div>';}
+
+  function addCard(title,content){html+=`<div class="card"><h3>${title}</h3>${content}</div>`;}
 
   // 사업장정보
   const s=p.사업장정보||{};
-  add('🏢 사업장 정보',kvTable(s,{
+  addCard('사업장 정보',kvTable(s,{
     상호명:'상호명',대표자:'대표자',사업자등록번호:'사업자등록번호',
     대표자주민번호:'대표자 주민번호',업태_종목:'업태/종목',상시근로자수:'상시근로자수',
     주소:'주소',전화번호:'전화번호',이메일:'이메일',
@@ -307,17 +328,17 @@ function renderCards(p){
   ];
   let qh='';
   for(const [k,label,fn] of Q){const o=d[k]||{};qh+=`<div class="q"><b>${label}</b><br>${fn(o)}</div>`}
-  add('📋 진단 기초정보 (13문항)',qh);
+  addCard('진단 기초정보 (13문항)',qh);
 
   // 지원금
   const z=p.지원금_검토전_기초정보||{};
   const renderList=arr=>(arr&&arr.length)?arr.map(it=>`<div class="list-item"><b>${v(it.지원금명)}</b><br>대상자: ${v((it.대상자||[]).join(', '))}</div>`).join(''):'<span class="empty">-</span>';
-  add('💰 지원금 검토 정보',
+  addCard('지원금 검토 정보',
     `<div style="font-size:12px"><b>기신청 지원금</b>${renderList(z.기신청_지원금)}<br><b>신청예정 지원금</b>${renderList(z.신청예정_지원금)}</div>`);
 
   // 위임장
   const w=p.위임장||{};
-  add('📝 위임장',kvTable(w,{
+  addCard('위임장',kvTable(w,{
     수임인_사무소명:'수임인 사무소명',수임인_성명:'수임인 성명',수임인_사업자등록번호:'수임인 사업자번호',
     위임인_상호:'위임인 상호',위임인_사업자등록번호:'위임인 사업자번호',
     위임인_연락처:'위임인 연락처',위임인_주소:'위임인 주소'
@@ -325,22 +346,19 @@ function renderCards(p){
 
   // 대리인선임
   const a=p.대리인선임신고서||{};
-  add('🪪 대리인 선임 신고서',
+  addCard('대리인 선임 신고서',
     kvTable(a,{사업장관리번호:'사업장 관리번호',선임일:'선임일',신고일:'신고일'})+
     `<div style="margin-top:6px;font-size:12px">고용보험 ${b(a.보험종류?.고용보험)} · 산재보험 ${b(a.보험종류?.산재보험)}</div>`);
 
   // 요약/경고
   let extra='';
   if(p.원문_요약)extra+=`<div class="summary">${escapeHtml(p.원문_요약)}</div>`;
-  if(p.신뢰도_낮은_필드&&p.신뢰도_낮은_필드.length)extra+=`<div class="warn">⚠ 확인 필요: ${p.신뢰도_낮은_필드.map(escapeHtml).join(', ')}</div>`;
-  if(extra)add('📌 요약 / 확인 필요',extra);
+  if(p.신뢰도_낮은_필드&&p.신뢰도_낮은_필드.length)extra+=`<div class="warn">확인 필요: ${p.신뢰도_낮은_필드.map(escapeHtml).join(', ')}</div>`;
+  if(extra)addCard('요약 / 확인 필요',extra);
 
-  function add(title,html){
-    const c=document.createElement('div');c.className='card';
-    c.innerHTML=`<h3>${title}</h3>${html}`;
-    root.appendChild(c);
-  }
+  return html;
 }
 </script>
+<script src="../assets/modal.js"></script>
 </body>
 </html>

@@ -3,16 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <title>청년일자리도약장려금 서류 판독 & 지원금 검토 | 노무법인 도원</title>
+<link rel="stylesheet" href="../assets/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
-:root{--primary:#059669;--primary-light:#d1fae5;--primary-dark:#047857;--danger:#dc2626;--warn:#d97706;--gray:#6b7280;--border:#e5e7eb;--bg:#f9fafb;--card-shadow:0 1px 3px rgba(0,0,0,.08);--blue:#2563eb;--blue-light:#dbeafe}
+:root{--primary:var(--ink-800,#171717);--primary-light:var(--ink-50,#f5f5f5);--primary-dark:var(--ink-700,#262626);--danger:#dc2626;--warn:#d97706;--gray:var(--ink-400,#737373);--card-shadow:0 1px 3px rgba(0,0,0,.08);--blue:var(--ink-700,#262626);--blue-light:var(--ink-50,#f5f5f5)}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;max-width:1200px;margin:0 auto;padding:0 16px 60px;color:#222;background:#fff}
+body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;max-width:1200px;margin:0 auto;padding:0 16px 60px;color:var(--ink-900);background:var(--surface,#fff)}
 a{color:var(--primary);text-decoration:none}
 .topbar{padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:20px}
-.topbar a{font-size:13px;font-weight:600;color:#2563eb}
-h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:4px}
+.topbar a{font-size:13px;font-weight:600;color:var(--ink-700)}
+h1{font-size:20px;border-bottom:2px solid var(--ink-800);padding-bottom:8px;margin-bottom:4px}
 .subtitle{font-size:12px;color:var(--gray);margin-bottom:16px}
 /* Tabs */
 .tab-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px}
@@ -28,13 +29,13 @@ h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:
 .input-section input[type=password]{font-family:monospace}
 .input-section input:focus{border-color:var(--primary);outline:none}
 .input-section .status{font-size:11px;color:var(--gray)}
-.upload-zone{border:2px dashed #94a3b8;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);margin-bottom:16px}
+.upload-zone{border:2px dashed var(--ink-300);border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);margin-bottom:16px}
 .upload-zone:hover,.upload-zone.dragover{border-color:var(--primary);background:var(--primary-light)}
-.upload-zone h3{font-size:15px;color:#334155;margin-bottom:6px}
+.upload-zone h3{font-size:15px;color:var(--ink-700);margin-bottom:6px}
 .upload-zone p{font-size:12px;color:var(--gray)}
 .upload-zone input{display:none}
 .file-list{list-style:none;margin-bottom:16px}
-.file-list li{display:flex;align-items:center;gap:8px;padding:8px 12px;margin:4px 0;background:#fff;border:1px solid var(--border);border-radius:8px;font-size:13px}
+.file-list li{display:flex;align-items:center;gap:8px;padding:8px 12px;margin:4px 0;background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;font-size:13px}
 .file-list li .fname{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .file-list li .fsize{color:var(--gray);font-size:11px}
 .file-list li .remove{background:var(--danger);color:#fff;border:none;padding:3px 10px;border-radius:4px;font-size:11px;cursor:pointer}
@@ -46,49 +47,49 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .btn-sm{padding:6px 14px;font-size:12px;border-radius:6px}
 .btn-danger{background:var(--danger);color:#fff}
 .btn-blue{background:var(--blue);color:#fff}
-.btn-blue:hover:not(:disabled){background:#1d4ed8}
-.progress-bar{height:6px;background:#e2e8f0;border-radius:3px;margin:12px 0;overflow:hidden;display:none}
+.btn-blue:hover:not(:disabled){background:var(--ink-900)}
+.progress-bar{height:6px;background:var(--ink-100);border-radius:3px;margin:12px 0;overflow:hidden;display:none}
 .progress-bar .fill{height:100%;background:var(--primary);transition:width .3s;width:0}
 #statusText{font-size:12px;color:var(--gray);text-align:center;min-height:18px}
 .summary-banner{padding:16px 20px;border-radius:10px;margin:20px 0;font-size:15px;font-weight:700;display:none}
-.summary-banner.ok{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7}
-.summary-banner.warn{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
-.summary-banner.error{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
-.info-bar{display:flex;gap:16px;flex-wrap:wrap;padding:14px 18px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;margin-bottom:20px;display:none}
+.summary-banner.ok{background:var(--ok-bg,#f0fdf4);color:var(--ok-text,#166534);border:1px solid var(--ok,#16a34a)}
+.summary-banner.warn{background:var(--warn-bg,#fefce8);color:var(--warn-text,#854d0e);border:1px solid var(--warn,#ca8a04)}
+.summary-banner.error{background:var(--err-bg,#fef2f2);color:var(--err-text,#991b1b);border:1px solid var(--err,#dc2626)}
+.info-bar{display:flex;gap:16px;flex-wrap:wrap;padding:14px 18px;background:var(--ink-50);border:1px solid var(--ink-200);border-radius:10px;margin-bottom:20px;display:none}
 .info-bar .info-item{font-size:13px}
 .info-bar .info-item .label{color:var(--gray);font-size:11px}
-.info-bar .info-item .value{font-weight:700;color:#0c4a6e}
+.info-bar .info-item .value{font-weight:700;color:var(--ink-800)}
 .doc-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:24px}
-.doc-card{border:1px solid var(--border);border-radius:10px;padding:16px;background:#fff;box-shadow:var(--card-shadow);display:flex;align-items:flex-start;gap:12px}
+.doc-card{border:1px solid var(--border);border-radius:10px;padding:16px;background:var(--surface,#fff);box-shadow:var(--card-shadow);display:flex;align-items:flex-start;gap:12px}
 .doc-card .icon{font-size:28px;flex-shrink:0;line-height:1}
 .doc-card .content h4{font-size:13px;margin-bottom:4px}
 .doc-card .content p{font-size:11px;color:var(--gray);line-height:1.4}
-.doc-card.found{border-color:#6ee7b7;background:#f0fdf4}
-.doc-card.missing{border-color:#fca5a5;background:#fef2f2}
-.section{border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;background:#fff;box-shadow:var(--card-shadow)}
+.doc-card.found{border-color:var(--ok,#16a34a);background:var(--ok-bg,#f0fdf4)}
+.doc-card.missing{border-color:var(--err,#dc2626);background:var(--err-bg,#fef2f2)}
+.section{border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;background:var(--surface,#fff);box-shadow:var(--card-shadow)}
 .section h3{font-size:15px;color:var(--primary-dark);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
 .section h3 .badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
-.badge-ok{background:#d1fae5;color:#065f46}
-.badge-warn{background:#fef3c7;color:#92400e}
-.badge-fail{background:#fee2e2;color:#991b1b}
-.badge-na{background:#e5e7eb;color:#374151}
-.badge-blue{background:var(--blue-light);color:#1e40af}
+.badge-ok{background:var(--ok-bg,#f0fdf4);color:var(--ok-text,#166534)}
+.badge-warn{background:var(--warn-bg,#fefce8);color:var(--warn-text,#854d0e)}
+.badge-fail{background:var(--err-bg,#fef2f2);color:var(--err-text,#991b1b)}
+.badge-na{background:var(--ink-100);color:var(--ink-600)}
+.badge-blue{background:var(--blue-light);color:var(--ink-700)}
 .row{display:flex;gap:8px;margin:6px 0;font-size:13px;align-items:baseline}
 .row .lbl{color:var(--gray);min-width:140px;flex-shrink:0;font-weight:600}
-.row .val{color:#111}
+.row .val{color:var(--ink-900)}
 .checklist{list-style:none}
 .checklist li{padding:6px 0;font-size:13px;border-bottom:1px dashed var(--border);display:flex;align-items:center;gap:8px}
 .checklist li:last-child{border-bottom:none}
 .checklist .ci{font-size:16px;flex-shrink:0}
 details{margin:8px 0}
 summary{font-size:13px;cursor:pointer;color:var(--gray)}
-pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:300px;border-radius:6px;white-space:pre-wrap;word-break:break-all}
+pre.log{background:var(--ink-50);padding:10px;font-size:11px;overflow:auto;max-height:300px;border-radius:6px;white-space:pre-wrap;word-break:break-all}
 /* Tab2 specific */
-.form-panel{border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;background:#fff;box-shadow:var(--card-shadow)}
-.form-panel h3{font-size:14px;color:#1e293b;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.form-panel{border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;background:var(--surface,#fff);box-shadow:var(--card-shadow)}
+.form-panel h3{font-size:14px;color:var(--ink-800);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:12px}
 .form-group{display:flex;flex-direction:column;gap:4px}
-.form-group label{font-size:12px;font-weight:600;color:#475569}
+.form-group label{font-size:12px;font-weight:600;color:var(--ink-500)}
 .form-group input,.form-group select{padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit}
 .form-group input:focus,.form-group select:focus{border-color:var(--primary);outline:none}
 .form-group .hint{font-size:11px;color:var(--gray)}
@@ -97,17 +98,17 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
 .cb-group label{font-size:13px;font-weight:600;cursor:pointer}
 .insured-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
 .insured-table th,.insured-table td{padding:6px 8px;border:1px solid var(--border);text-align:center}
-.insured-table th{background:var(--bg);font-weight:600;color:#475569}
+.insured-table th{background:var(--bg);font-weight:600;color:var(--ink-500)}
 .insured-table input{width:60px;text-align:center;padding:4px;border:1px solid var(--border);border-radius:4px}
-.worker-card{border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;background:#fafbfc;position:relative}
+.worker-card{border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;background:var(--ink-50);position:relative}
 .worker-card .worker-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.worker-card .worker-header h4{font-size:13px;color:#334155}
+.worker-card .worker-header h4{font-size:13px;color:var(--ink-700)}
 .worker-card .remove-worker{position:absolute;top:10px;right:10px}
 .result-card{border-radius:10px;padding:16px;margin-bottom:12px}
-.result-card.eligible{background:#f0fdf4;border:1px solid #86efac}
-.result-card.ineligible{background:#fef2f2;border:1px solid #fca5a5}
-.result-card.check{background:#fefce8;border:1px solid #fde047}
-.result-card.info{background:#f0f9ff;border:1px solid #7dd3fc}
+.result-card.eligible{background:var(--ok-bg,#f0fdf4);border:1px solid var(--ok,#16a34a)}
+.result-card.ineligible{background:var(--err-bg,#fef2f2);border:1px solid var(--err,#dc2626)}
+.result-card.check{background:var(--warn-bg,#fefce8);border:1px solid var(--warn,#ca8a04)}
+.result-card.info{background:var(--info-bg,#f5f5f5);border:1px solid var(--ink-200,#d4d4d4)}
 .result-card h4{font-size:14px;margin-bottom:8px}
 .result-card p{font-size:13px;line-height:1.6}
 .money{font-size:18px;font-weight:800;color:var(--primary-dark)}
@@ -120,9 +121,11 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
 </head>
 <body>
 
-<div class="topbar"><a href="../index.html">&larr; 대시보드로 돌아가기</a></div>
+<div class="tool-topbar">
+  <a href="../index.html">&larr; 대시보드로 돌아가기</a>
+</div>
 
-<h1>청년일자리도약장려금 서류 판독 & 지원금 검토 <span style="font-size:13px;color:#888">V2</span></h1>
+<h1>청년일자리도약장려금 서류 판독 & 지원금 검토 <span style="font-size:13px;color:var(--ink-400)">V2</span></h1>
 <p class="subtitle">서류 AI 판독 + 지원금 수급 요건 자동 검토 (기업규모, 협약, 대상자, 제척기간, 23년도 누락분)</p>
 
 <!-- Tab Navigation -->
@@ -214,7 +217,7 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
     </div>
   </div>
 
-  <h4 style="font-size:13px;margin:16px 0 8px;color:#334155">월별 고용보험 피보험자 수 (매월 말일 기준)</h4>
+  <h4 style="font-size:13px;margin:16px 0 8px;color:var(--ink-700)">월별 고용보험 피보험자 수 (매월 말일 기준)</h4>
   <p style="font-size:11px;color:var(--gray);margin-bottom:8px">검토월 직전 1년간 (최소 성립일이 속한 월 ~ 직전월). 빈 칸은 0으로 처리됩니다.</p>
   <div style="overflow-x:auto">
     <table class="insured-table" id="insuredTable">
@@ -222,7 +225,7 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
       <tbody><tr id="insuredRow"></tr></tbody>
     </table>
   </div>
-  <div style="margin-top:8px;font-size:13px;color:#334155">
+  <div style="margin-top:8px;font-size:13px;color:var(--ink-700)">
     <span>월평균 피보험자 수: </span><strong id="avgInsuredDisplay">-</strong>
     <span style="margin-left:16px">기업규모: </span><strong id="companySizeDisplay">-</strong>
   </div>
@@ -253,7 +256,7 @@ pre.log{background:#f4f4f4;padding:10px;font-size:11px;overflow:auto;max-height:
   </div>
 
   <div id="s_adjSection" class="hidden" style="margin-top:16px">
-    <h4 style="font-size:13px;margin-bottom:8px;color:#334155">고용조정 이력 (협약 신청일 이후)</h4>
+    <h4 style="font-size:13px;margin-bottom:8px;color:var(--ink-700)">고용조정 이력 (협약 신청일 이후)</h4>
     <p style="font-size:11px;color:var(--gray);margin-bottom:8px">협약 신청일 이후 발생한 고용조정(해고/퇴직 등)을 입력하세요.</p>
     <div id="adjList"></div>
     <button class="btn-sm btn-blue" onclick="addAdjustment()">+ 고용조정 추가</button>
@@ -332,6 +335,7 @@ let uploadedFiles=[];
   $('apiKey').addEventListener('input',()=>{
     const k=$('apiKey').value.trim();
     localStorage.setItem('ANTHROPIC_API_KEY',k);
+    if(k.startsWith('sk-ant-'))localStorage.setItem('CLAUDE_API_KEY',k);
     $('apiKeyStatus').textContent=k?'Key 저장됨':'';
     updateBtn();
   });
@@ -429,9 +433,8 @@ async function runAnalysis(){
 
     postProcessResult(result);
 
-    setProgress(100,'완료');
+    setProgress(100,'분석 완료');
     renderResults(result,targetName);
-    $('results').style.display='block';
   }catch(e){
     alert('분석 오류: '+e.message);
     console.error(e);
@@ -609,45 +612,46 @@ function buildPrompt(targetName){
 
 // ========== Tab1 Render ==========
 function renderResults(r, targetName){
-  const ib=$('infoBar');
-  ib.style.display='flex';
-  ib.innerHTML='';
-  addInfo(ib,'요청 대상자',targetName);
-  if(r.worker_name)addInfo(ib,'근로자(서류)',r.worker_name);
-  if(r.start_date)addInfo(ib,'입사일',r.start_date);
-  if(r.company_name)addInfo(ib,'사업장',r.company_name);
-  if(r.birth_date)addInfo(ib,'생년월일',r.birth_date);
+  let html='';
 
+  // Summary banner
   const nameOk=r.worker_name&&targetName&&r.worker_name.replace(/\s/g,'')===targetName.replace(/\s/g,'');
-  if(r.worker_name&&!nameOk){
-    addInfo(ib,'이름 일치','불일치!','var(--danger)');
-  }
+  html+=buildSummaryHtml(r,nameOk);
 
-  renderDocCards(r.documents);
+  // Info bar
+  html+='<div class="info-bar" style="display:flex">';
+  html+=buildInfoHtml('요청 대상자',targetName);
+  if(r.worker_name) html+=buildInfoHtml('근로자(서류)',r.worker_name);
+  if(r.start_date) html+=buildInfoHtml('입사일',r.start_date);
+  if(r.company_name) html+=buildInfoHtml('사업장',r.company_name);
+  if(r.birth_date) html+=buildInfoHtml('생년월일',r.birth_date);
+  if(r.worker_name&&!nameOk) html+=buildInfoHtml('이름 일치','불일치!','var(--danger)');
+  html+='</div>';
 
-  const area=$('analysisArea');
-  area.innerHTML='';
+  // Doc cards
+  html+='<h2 style="font-size:16px;margin:20px 0 12px">서류 존재 여부</h2>';
+  html+=buildDocCardsHtml(r.documents);
 
+  // Analysis sections
   if(r.contract_analysis){
     const ca=r.contract_analysis;
-    if(ca.employment_type) area.innerHTML+=renderEmploymentType(ca.employment_type);
-    if(ca.minimum_wage) area.innerHTML+=renderMinWage(ca.minimum_wage);
-    if(ca.required_items) area.innerHTML+=renderReqItems(ca.required_items);
+    if(ca.employment_type) html+=renderEmploymentType(ca.employment_type);
+    if(ca.minimum_wage) html+=renderMinWage(ca.minimum_wage);
+    if(ca.required_items) html+=renderReqItems(ca.required_items);
   }
+  if(r.business_reg_check) html+=renderBizCheck(r.business_reg_check);
+  if(r.edu_check) html+=renderEduCheck(r.edu_check);
+  if(r.consent_check) html+=renderConsentCheck(r.consent_check);
 
-  if(r.business_reg_check) area.innerHTML+=renderBizCheck(r.business_reg_check);
-  if(r.edu_check) area.innerHTML+=renderEduCheck(r.edu_check);
-  if(r.consent_check) area.innerHTML+=renderConsentCheck(r.consent_check);
-
-  renderSummary(r,nameOk);
+  DwModal.show('청년일자리도약장려금 서류 판독 결과', html);
+  $('statusText').textContent='분석 완료';
 }
 
-function addInfo(container,label,value,color){
-  container.innerHTML+=`<div class="info-item"><div class="label">${label}</div><div class="value" ${color?`style="color:${color}"`:''}>${esc(value)}</div></div>`;
+function buildInfoHtml(label,value,color){
+  return `<div class="info-item"><div class="label">${label}</div><div class="value" ${color?`style="color:${color}"`:''}>${esc(value)}</div></div>`;
 }
 
-function renderDocCards(docs){
-  const c=$('docCards');c.innerHTML='';
+function buildDocCardsHtml(docs){
   const items=[
     ['fact_certificate','사실증명서','📄'],
     ['graduation_certificate','졸업증명서','🎓'],
@@ -656,12 +660,15 @@ function renderDocCards(docs){
     ['education_confirmation','학력확인서','📋'],
     ['participation_consent','사업참여 동의서','✍️']
   ];
+  let h='<div class="doc-cards">';
   items.forEach(([key,label,icon])=>{
     const d=docs?.[key];if(!d)return;
     const cls=d.found?'found':'missing';
     const si=d.found?'✅':'❌';
-    c.innerHTML+=`<div class="doc-card ${cls}"><div class="icon">${icon}</div><div class="content"><h4>${si} ${label} — ${d.found?'있음':'없음'}</h4><p>${esc(d.detail||'')}</p></div></div>`;
+    h+=`<div class="doc-card ${cls}"><div class="icon">${icon}</div><div class="content"><h4>${si} ${label} — ${d.found?'있음':'없음'}</h4><p>${esc(d.detail||'')}</p></div></div>`;
   });
+  h+='</div>';
+  return h;
 }
 
 function renderEmploymentType(et){
@@ -672,7 +679,7 @@ function renderEmploymentType(et){
     <div class="row"><span class="lbl">판정 결과</span><span class="val">${esc(label)}</span></div>
     ${et.contract_period?`<div class="row"><span class="lbl">계약기간</span><span class="val">${esc(et.contract_period)}</span></div>`:''}
     <div class="row"><span class="lbl">근거 문구</span><span class="val">${esc(et.evidence||'-')}</span></div>
-    ${et.result!=='정규직'?'<div style="margin-top:8px;padding:10px;background:#fef2f2;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600">⚠️ 청년일자리도약장려금은 정규직 채용이 필수 요건입니다. 기간제 계약인 경우 지원 부적격입니다.</div>':''}
+    ${et.result!=='정규직'?'<div style="margin-top:8px;padding:10px;background:var(--err-bg,#fef2f2);border-radius:6px;font-size:12px;color:var(--err-text,#991b1b);font-weight:600">⚠️ 청년일자리도약장려금은 정규직 채용이 필수 요건입니다. 기간제 계약인 경우 지원 부적격입니다.</div>':''}
   </div>`;
 }
 
@@ -727,13 +734,13 @@ function renderEduCheck(e){
   const badge=e.result==='정상'?'badge-ok':'badge-warn';
   return `<div class="section">
     <h3>📋 학력확인서 검증 <span class="badge ${badge}">${esc(e.result)}</span></h3>
-    <div style="padding:12px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);margin-bottom:10px">
+    <div style="padding:12px;background:var(--ink-50);border-radius:8px;border:1px solid var(--border);margin-bottom:10px">
       <div style="font-weight:600;font-size:13px;margin-bottom:8px">학력 체크표</div>
       <div class="row"><span class="lbl">고등학교</span><span class="val">${esc(e.highschool_checked||'-')}</span></div>
       <div class="row"><span class="lbl">대학(원)교</span><span class="val">${esc(e.university_checked||'-')}</span></div>
       <div class="row"><span class="lbl">휴학/재학중 해당</span><span class="val">${e.has_problem?'⚠️ 해당 — 확인 필요':'✅ 해당 없음'}</span></div>
     </div>
-    <div style="padding:12px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);margin-bottom:10px">
+    <div style="padding:12px;background:var(--ink-50);border-radius:8px;border:1px solid var(--border);margin-bottom:10px">
       <div style="font-weight:600;font-size:13px;margin-bottom:8px">5번 질문 (재학중 여부)</div>
       <div class="row"><span class="lbl">체크 항목</span><span class="val">${e.yes_no_problem?'⚠️':'✅'} ${esc(e.yes_no_checked||'-')}</span></div>
       <div class="row"><span class="lbl">확인 필요</span><span class="val">${e.yes_no_problem?'⚠️ 예 (재학중으로 확인)':'정상'}</span></div>
@@ -755,8 +762,7 @@ function renderConsentCheck(c){
   </div>`;
 }
 
-function renderSummary(r,nameOk){
-  const banner=$('summaryBanner');
+function buildSummaryHtml(r,nameOk){
   let issues=0;
   const docs=r.documents||{};
   ['fact_certificate','graduation_certificate','employment_contract','business_registration','education_confirmation','participation_consent'].forEach(k=>{
@@ -779,13 +785,10 @@ function renderSummary(r,nameOk){
   if(r.edu_check&&r.edu_check.result!=='정상')issues++;
   if(r.consent_check&&r.consent_check.result!=='정상')issues++;
 
-  banner.style.display='block';
   if(issues===0){
-    banner.className='summary-banner ok';
-    banner.textContent='✅ 전체 검토 결과: 이상없음 — 청년일자리도약장려금 적격';
+    return '<div class="summary-banner ok" style="display:block">✅ 전체 검토 결과: 이상없음 — 청년일자리도약장려금 적격</div>';
   }else{
-    banner.className='summary-banner warn';
-    banner.textContent=`⚠️ 전체 검토 결과: 검토필요 항목 ${issues}개`;
+    return `<div class="summary-banner warn" style="display:block">⚠️ 전체 검토 결과: 검토필요 항목 ${issues}개</div>`;
   }
 }
 
@@ -1655,7 +1658,7 @@ function renderSubsidyResults(results, totalAmount){
       html+=`<hr style="margin:12px 0;border:none;border-top:1px dashed var(--border)">`;
       r.workers.forEach(w=>{
         const cls=w.eligible?'eligible':'ineligible';
-        html+=`<div style="padding:10px 14px;margin:8px 0;border-radius:8px;background:${w.eligible?'#f0fdf4':'#fef2f2'};border:1px solid ${w.eligible?'#86efac':'#fca5a5'}">`;
+        html+=`<div style="padding:10px 14px;margin:8px 0;border-radius:8px;background:${w.eligible?'var(--ok-bg,#f0fdf4)':'var(--err-bg,#fef2f2)'};border:1px solid ${w.eligible?'var(--ok,#16a34a)':'var(--err,#dc2626)'}">`;
         html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
         html+=`<strong style="font-size:14px">${w.eligible?'✅':'❌'} ${esc(w.name)}</strong>`;
         if(w.amount>0){
@@ -1664,18 +1667,18 @@ function renderSubsidyResults(results, totalAmount){
         html+=`</div>`;
 
         w.issues.forEach(issue=>{
-          html+=`<p style="font-size:12px;color:#475569;margin:2px 0;padding-left:8px">${esc(issue)}</p>`;
+          html+=`<p style="font-size:12px;color:var(--ink-500);margin:2px 0;padding-left:8px">${esc(issue)}</p>`;
         });
 
         // 제척기간 표시
         if(w.deadlines&&w.deadlines.length>0){
-          html+=`<div style="margin-top:8px;padding:8px 12px;background:#fff;border-radius:6px;border:1px solid var(--border)">`;
-          html+=`<strong style="font-size:12px;color:#334155">제척기간:</strong>`;
+          html+=`<div style="margin-top:8px;padding:8px 12px;background:var(--surface,#fff);border-radius:6px;border:1px solid var(--border)">`;
+          html+=`<strong style="font-size:12px;color:var(--ink-700)">제척기간:</strong>`;
           w.deadlines.forEach(d=>{
             const dlStr=formatDate(toDateStr(d.deadline));
             const expired=d.deadline<new Date();
             const expiredMark=d.expired!==undefined?d.expired:expired;
-            html+=`<span style="display:inline-block;margin:2px 8px;font-size:12px;padding:2px 8px;border-radius:4px;background:${expiredMark?'#fee2e2':'#dbeafe'};color:${expiredMark?'#991b1b':'#1e40af'}">`;
+            html+=`<span style="display:inline-block;margin:2px 8px;font-size:12px;padding:2px 8px;border-radius:4px;background:${expiredMark?'var(--err-bg,#fef2f2)':'var(--ink-50,#f5f5f5)'};color:${expiredMark?'var(--err-text,#991b1b)':'var(--ink-700,#262626)'}">`;
             html+=`${d.year}: ${dlStr}${expiredMark?' (경과)':''}`;
             html+=`</span>`;
           });
@@ -1695,5 +1698,6 @@ function renderSubsidyResults(results, totalAmount){
   container.scrollIntoView({behavior:'smooth',block:'start'});
 }
 </script>
+<script src="../assets/modal.js"></script>
 </body>
 </html>

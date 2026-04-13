@@ -9,14 +9,15 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<link rel="stylesheet" href="../assets/style.css">
 <style>
 :root {
-  --primary:#2F5496; --primary-light:#D6E4F0; --success:#198754; --success-bg:#C6EFCE;
-  --danger:#DC3545; --danger-bg:#FFC7CE; --warn:#FFA500; --warn-bg:#FFEB9C;
-  --gray:#6c757d; --light:#f8f9fa; --border:#dee2e6;
+  --primary:var(--ink-800,#171717); --primary-light:var(--ink-50,#f5f5f5); --success:var(--ok,#16a34a); --success-bg:#C6EFCE;
+  --danger:var(--err,#dc2626); --danger-bg:#FFC7CE; --warn:var(--warn,#ca8a04); --warn-bg:#FFEB9C;
+  --gray:var(--ink-400,#a3a3a3); --light:var(--bg,#fafafa); --border:var(--border,#e5e5e5);
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:#f0f2f5;color:#333}
+body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg,#fafafa);color:var(--ink-900,#0a0a0a)}
 .header{background:var(--primary);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:12px}
 .header h1{font-size:18px;font-weight:700}
 .badge{background:rgba(255,255,255,.2);padding:3px 10px;border-radius:12px;font-size:11px}
@@ -235,8 +236,8 @@ tr:hover{background:var(--light)}
 </style>
 </head>
 <body>
-<div style="padding:10px 20px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
-  <a href="../index.html" style="font-size:13px;color:#2563eb;text-decoration:none;font-weight:600;">← 대시보드로 돌아가기</a>
+<div class="tool-topbar">
+  <a href="../index.html">&larr; 대시보드로 돌아가기</a>
 </div>
 
 <!-- API 키 입력 모달 -->
@@ -545,7 +546,7 @@ function initVisionSettings() {
   // standalone: localStorage에서 API 키 복원 (영구 저장)
   const savedModel = localStorage.getItem('vision_model');
   const savedKey = localStorage.getItem('GEMINI_API_KEY');
-  const savedClaudeKey = localStorage.getItem('CLAUDE_API_KEY');
+  const savedClaudeKey = localStorage.getItem('CLAUDE_API_KEY') || localStorage.getItem('ANTHROPIC_API_KEY');
 
   if(savedModel) {
     _visionModel = savedModel;
@@ -648,6 +649,7 @@ function onApiKeyChange() {
 function onClaudeFallbackKeyChange() {
   _claudeFallbackKey = document.getElementById('claudeFallbackKey').value.trim();
   localStorage.setItem('CLAUDE_API_KEY', _claudeFallbackKey);
+  if(_claudeFallbackKey.startsWith('sk-ant-')) localStorage.setItem('ANTHROPIC_API_KEY', _claudeFallbackKey);
   updateClaudeFallbackStatus();
 }
 
@@ -2423,19 +2425,8 @@ async function extractAmountsViaVision(p, canvasDataUrl, isRetry) {
     const mediaType = 'image/jpeg';
     const workerNames = S.workers.map(w=>w.name).join(', ');
 
-    // 전처리 이미지 생성 (isRetry가 아닌 1차 시도에서만)
+    // 전처리는 원본 추출 실패 시에만 지연 생성 (CPU + API 비용 절감)
     let preprocessedDataUrl = null;
-    let preprocessSteps = '';
-    if(!isRetry) {
-      try {
-        const ppResult = await preprocessForVision(canvasDataUrl);
-        preprocessedDataUrl = ppResult.dataUrl;
-        preprocessSteps = ppResult.steps;
-        log('info', `[P${p.pageNum}] 전처리 적용: ${preprocessSteps}`);
-      } catch(ppErr) {
-        log('warn', `[P${p.pageNum}] 전처리 실패(원본 사용): ${ppErr.message}`);
-      }
-    }
 
     const base64 = canvasDataUrl.split(',')[1];
 
@@ -2528,33 +2519,27 @@ ${jsonInstruction}
     const origText = await callVisionApi(base64, mediaType, prompt, p.pageNum);
     let text = origText;
 
-    // 전처리 이미지가 있으면 비교 호출
-    if(preprocessedDataUrl && !isRetry && origText) {
-      const origCount = _countVisionExtractions(origText, p.type);
-      const ppBase64 = preprocessedDataUrl.split(',')[1];
-      // 원본에서 이미 충분한 추출이 되었으면 전처리 스킵 (API 비용 절약)
-      const expectedMin = p.type === 'payroll' ? 1 : 1;
-      if(origCount < expectedMin || origCount === 0) {
-        // 원본 추출 부족 → 전처리로 재시도
-        await new Promise(r => setTimeout(r, 80)); // 약간의 딜레이
-        const ppText = await callVisionApi(ppBase64, mediaType, prompt, p.pageNum);
-        const ppCount = _countVisionExtractions(ppText, p.type);
-        if(ppCount > origCount) {
-          log('success', `[P${p.pageNum}] 원본: ${origCount}명 추출 / 전처리: ${ppCount}명 추출 → 전처리 채택`);
-          text = ppText;
-        } else if(ppCount === origCount && origCount > 0) {
-          log('info', `[P${p.pageNum}] 원본: ${origCount}명 추출 / 전처리: ${ppCount}명 추출 → 원본 유지`);
-        } else {
-          log('info', `[P${p.pageNum}] 원본: ${origCount}명 / 전처리: ${ppCount}명 → 원본 유지`);
+    // 원본 추출 실패/부족 시에만 전처리 생성 + 재시도 (CPU + API 비용 절감)
+    if(!isRetry) {
+      const origCount = origText ? _countVisionExtractions(origText, p.type) : 0;
+      if(origCount === 0) {
+        // 원본 추출 실패 → 전처리 이미지 생성 후 재시도
+        try {
+          const ppResult = await preprocessForVision(canvasDataUrl);
+          preprocessedDataUrl = ppResult.dataUrl;
+          log('info', `[P${p.pageNum}] 원본 추출 실패 → 전처리 적용 (${ppResult.steps})`);
+          const ppBase64 = preprocessedDataUrl.split(',')[1];
+          const ppText = await callVisionApi(ppBase64, mediaType, prompt, p.pageNum);
+          if(ppText) {
+            const ppCount = _countVisionExtractions(ppText, p.type);
+            if(ppCount > 0) {
+              log('success', `[P${p.pageNum}] 전처리로 ${ppCount}명 추출 성공`);
+              text = ppText;
+            }
+          }
+        } catch(ppErr) {
+          log('warn', `[P${p.pageNum}] 전처리 실패: ${ppErr.message}`);
         }
-      }
-    } else if(preprocessedDataUrl && !isRetry && !origText) {
-      // 원본 실패 → 전처리로 시도
-      const ppBase64 = preprocessedDataUrl.split(',')[1];
-      text = await callVisionApi(ppBase64, mediaType, prompt, p.pageNum);
-      if(text) {
-        const ppCount = _countVisionExtractions(text, p.type);
-        log('success', `[P${p.pageNum}] 원본 실패 → 전처리로 ${ppCount}명 추출 성공`);
       }
     }
 
@@ -5152,5 +5137,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
   };
 })();
 </script>
+<script src="../assets/modal.js"></script>
 </body>
 </html>

@@ -6,8 +6,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<link rel="stylesheet" href="../assets/style.css">
 <style>
-:root{--bg:#ffffff;--bg-sub:#f8f9fa;--border:#e5e7eb;--border-dark:#d1d5db;--text:#1a1a1a;--text-sub:#6b7280;--text-muted:#9ca3af;--accent:#111827;--accent-light:#f3f4f6;--blue:#2563eb;--green:#059669;--red:#dc2626;--orange:#d97706;--shadow:0 1px 3px rgba(0,0,0,.06);--shadow-md:0 4px 12px rgba(0,0,0,.08);--radius:8px;--radius-lg:12px}
+:root{--bg: var(--surface, #fff);--bg-sub: var(--ink-50, #f5f5f5);--border: var(--border, #e5e5e5);--border-dark: var(--border-dark, #d4d4d4);--text: var(--ink-800, #171717);--text-sub: var(--ink-400, #737373);--text-muted: var(--ink-300, #a3a3a3);--accent: var(--ink-800, #171717);--accent-light: var(--ink-50, #f5f5f5);--blue: var(--ink-700, #262626);--green: var(--ok, #16a34a);--red: var(--err, #dc2626);--orange: var(--warn, #ca8a04);--shadow:0 1px 3px rgba(0,0,0,.06);--shadow-md:0 4px 12px rgba(0,0,0,.08);--radius:8px;--radius-lg:12px}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,sans-serif;max-width:1100px;margin:0 auto;padding:0 20px 80px;color:var(--text);background:var(--bg);font-size:13px;line-height:1.6}
 .topbar{padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:24px}
@@ -128,7 +129,7 @@ pre.debug{background:var(--bg-sub);padding:10px;font-size:11px;overflow:auto;max
 </head>
 <body>
 
-<div class="topbar">
+<div class="tool-topbar">
   <a href="../index.html">&larr; 대시보드로 돌아가기</a>
 </div>
 
@@ -327,7 +328,7 @@ let empFiles = [];
 
 // ============ INIT ============
 (function init(){
-  const k = localStorage.getItem('elderly_api_key');
+  const k = localStorage.getItem('ANTHROPIC_API_KEY');
   if(k){ document.getElementById('apiKey').value = k; document.getElementById('apiKeySaved').textContent = '저장됨'; }
   document.getElementById('reviewDate').value = new Date().toISOString().slice(0,10);
   setupDragDrop('rulesUpload','rulesFile', f=>{ rulesFiles=[f]; renderFileList('rulesFileList',rulesFiles,i=>{rulesFiles.splice(i,1);renderFileList('rulesFileList',rulesFiles);}); document.getElementById('btnParseRules').disabled=false; });
@@ -345,7 +346,7 @@ let empFiles = [];
 
 function saveApiKey(){
   const k=document.getElementById('apiKey').value.trim();
-  if(k){localStorage.setItem('elderly_api_key',k); document.getElementById('apiKeySaved').textContent='저장됨';}
+  if(k){localStorage.setItem('ANTHROPIC_API_KEY',k);if(k.startsWith('sk-ant-'))localStorage.setItem('CLAUDE_API_KEY',k);document.getElementById('apiKeySaved').textContent='저장됨';}
 }
 
 function toggleStep(id){document.getElementById(id).classList.toggle('collapsed');}
@@ -368,6 +369,19 @@ function checkAnalyzeReady(){
 
 function setStatus(msg){document.getElementById('statusText').textContent=msg;}
 function setProgress(pct){const b=document.getElementById('progressBar');b.style.display='block';document.getElementById('progressFill').style.width=pct+'%';}
+
+// 스캔 PDF 감지 (payroll v8.6 동일 기준: 한글 비율 + 깨진 문자 + 유효문자)
+function detectScannedPage(nativeText){
+  const t=(nativeText||'').replace(/[\s\u00A0\u3000]+/g,'');
+  if(t.length<20)return true;
+  const broken=(t.match(/[\uFFFD\u0000-\u001F]/g)||[]).length;
+  if(broken/t.length>0.1)return true;
+  const meaningful=t.match(/[가-힣A-Za-z0-9]/g)||[];
+  if(meaningful.length<15)return true;
+  const hangul=t.match(/[가-힣]/g)||[];
+  if(hangul.length<5&&t.length<80)return true;
+  return false;
+}
 
 // ============ STEP 2: Parse Rules ============
 // PDF → 페이지별 텍스트 (PDF.js 텍스트 레이어)
@@ -405,7 +419,7 @@ async function pdfPageToImage(file, pageNum, scale=1.5){
 }
 
 async function parseRules(){
-  const apiKey=document.getElementById('apiKey').value.trim()||localStorage.getItem('elderly_api_key');
+  const apiKey=document.getElementById('apiKey').value.trim()||localStorage.getItem('ANTHROPIC_API_KEY');
   if(!apiKey){alert('Anthropic API 키를 입력해주세요.');return;}
   if(!rulesFiles.length){alert('취업규칙 파일을 업로드해주세요.');return;}
 
@@ -416,8 +430,9 @@ async function parseRules(){
   try{
     status('PDF 텍스트 추출 중...');
     const {pages, numPages} = await pdfExtractText(rulesFiles[0]);
-    const totalChars = pages.reduce((s,p)=>s+p.text.trim().length, 0);
-    const hasText = totalChars > numPages * 20;
+    // 페이지별 스캔 감지 (한글 비율/깨진 문자/유효 글자 기준)
+    const scannedCount = pages.filter(p=>detectScannedPage(p.text)).length;
+    const hasText = scannedCount < numPages * 0.5; // 과반수 이상 정상 텍스트여야 hasText
 
     // 텍스트에서 "정년" 포함 페이지 찾기
     let targetPageNums = [];
@@ -437,15 +452,15 @@ async function parseRules(){
     if(targetPageNums.length===0){
       status(`스캔 PDF 감지. Vision으로 정년 페이지 탐색 중... (${numPages}페이지)`);
 
-      // Pass 1: 저화질 썸네일로 정년 페이지 번호 찾기 (10페이지씩 배치)
-      const batchSize = 10;
+      // Pass 1: 중화질 썸네일로 정년 페이지 번호 찾기 (15페이지씩 배치)
+      const batchSize = 15;
       const foundPages = [];
       for(let b=0; b<numPages; b+=batchSize){
         const batchEnd = Math.min(b+batchSize, numPages);
         status(`페이지 탐색 중: ${b+1}~${batchEnd} / ${numPages}`);
         const batchParts = [];
         for(let pn=b+1; pn<=batchEnd; pn++){
-          const img = await pdfPageToImage(rulesFiles[0], pn, 0.8);
+          const img = await pdfPageToImage(rulesFiles[0], pn, 1.2);
           batchParts.push({type:'text',text:`[${pn}페이지]`});
           batchParts.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:img}});
         }
@@ -1113,63 +1128,122 @@ function checkOverlap(systemStart, eligible, isPost20240109, fiveYearEnd){
 
 // ============ DISPLAY ============
 function displayResults(r){
-  document.getElementById('resultsArea').style.display='block';
+  let html = '';
 
-  // Summary
-  const sb=document.getElementById('summaryBanner');
-  sb.style.display='block';
+  // Summary banner
   if(r.eligible.length>0){
-    sb.className='summary-banner info';
-    sb.textContent=`총 ${r.all.length}명 중 ${r.eligible.length}명 대상자 추정 (제외: ${r.excluded.length}명) — 추가검토 필요`;
+    html+=`<div class="summary-banner info" style="display:block">총 ${r.all.length}명 중 ${r.eligible.length}명 대상자 추정 (제외: ${r.excluded.length}명) — 추가검토 필요</div>`;
   }else{
-    sb.className='summary-banner warn';
-    sb.textContent=`총 ${r.all.length}명 분석 완료. 대상자 추정 0명.${!r.hasHistory?' (기존 신청이력 없음)':''}`;
+    html+=`<div class="summary-banner warn" style="display:block">총 ${r.all.length}명 분석 완료. 대상자 추정 0명.${!r.hasHistory?' (기존 신청이력 없음)':''}</div>`;
   }
 
   // Stats
   const totalEstimate = r.eligible.reduce((s,w)=>s+w.totalEstimate,0);
-  document.getElementById('statsRow').innerHTML=`
+  html+=`<div class="stats-row">
     <div class="stat-card"><div class="value">${r.all.length}</div><div class="label">전체 근로자</div></div>
     <div class="stat-card"><div class="value">${r.eligible.length}</div><div class="label">대상자 추정</div></div>
     <div class="stat-card"><div class="value">${r.excluded.length}</div><div class="label">제외 대상자</div></div>
     <div class="stat-card"><div class="value">${r.hasHistory?(totalEstimate/10000).toFixed(0)+'만':'—'}</div><div class="label">추정 지원금액</div></div>
-  `;
+  </div>`;
 
   // Retirement section
-  const retBody=document.getElementById('retirementBody');
-  retBody.innerHTML=`
-    <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">
-      <div><span style="color:var(--text-sub)">정년:</span> <b>만 ${retirementAge}세</b> (${getRetirementTypeLabel(retirementType)})</div>
-      <div><span style="color:var(--text-sub)">제도 시행일:</span> <b>${r.systemStart?formatDate(r.systemStart):'미입력'}</b></div>
-      <div><span style="color:var(--text-sub)">5년 만료:</span> <b>${r.fiveYearEnd?formatDate(r.fiveYearEnd):'—'}</b></div>
-      <div><span style="color:var(--text-sub)">소재지:</span> <b>${r.region==='metro'?'수도권':'비수도권'}</b></div>
-      <div><span style="color:var(--text-sub)">신청분기:</span> <b>${r.quarter}</b></div>
-      <div><span style="color:var(--text-sub)">기존이력:</span> <b>${r.hasHistory?'있음':'없음'}</b></div>
+  html+=`<div class="result-section">
+    <div class="result-header"><h3>정년 판독 결과</h3></div>
+    <div class="result-body">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">
+        <div><span style="color:var(--text-sub)">정년:</span> <b>만 ${retirementAge}세</b> (${getRetirementTypeLabel(retirementType)})</div>
+        <div><span style="color:var(--text-sub)">제도 시행일:</span> <b>${r.systemStart?formatDate(r.systemStart):'미입력'}</b></div>
+        <div><span style="color:var(--text-sub)">5년 만료:</span> <b>${r.fiveYearEnd?formatDate(r.fiveYearEnd):'—'}</b></div>
+        <div><span style="color:var(--text-sub)">소재지:</span> <b>${r.region==='metro'?'수도권':'비수도권'}</b></div>
+        <div><span style="color:var(--text-sub)">신청분기:</span> <b>${r.quarter}</b></div>
+        <div><span style="color:var(--text-sub)">기존이력:</span> <b>${r.hasHistory?'있음':'없음'}</b></div>
+      </div>
+      ${!r.hasHistory?'<div class="alert alert-warn" style="margin-top:12px">기존 신청이력 없음: 정년연장 등 사업장에 추가확인 필요한 바 검토금액 없음으로 산정</div>':''}
     </div>
-    ${!r.hasHistory?'<div class="alert alert-warn" style="margin-top:12px">기존 신청이력 없음: 정년연장 등 사업장에 추가확인 필요한 바 검토금액 없음으로 산정</div>':''}
-  `;
+  </div>`;
 
-  // Tables
-  renderTable('tableAllWrap', r.all, 'all');
-  renderTable('tableEligibleWrap', r.eligible, 'eligible');
-  renderTable('tableExcludedWrap', r.excluded, 'excluded');
+  // Tabs
+  html+=`<div class="tab-nav">
+    <button class="tab-btn active" onclick="switchModalTab(this,'modalTabAll')">전체 근로자</button>
+    <button class="tab-btn" onclick="switchModalTab(this,'modalTabEligible')">대상자 (추정)</button>
+    <button class="tab-btn" onclick="switchModalTab(this,'modalTabExcluded')">제외 대상자</button>
+    <button class="tab-btn" onclick="switchModalTab(this,'modalTabOverlap')">중복검토 (고령자고용)</button>
+  </div>`;
 
-  // Overlap
+  // Tab contents - build tables inline
+  html+=`<div class="tab-content active" id="modalTabAll">${buildTableHtml(r.all, 'all')}</div>`;
+  html+=`<div class="tab-content" id="modalTabEligible">${buildTableHtml(r.eligible, 'eligible')}</div>`;
+  html+=`<div class="tab-content" id="modalTabExcluded">${buildTableHtml(r.excluded, 'excluded')}</div>`;
+
+  // Overlap tab
   const ov=r.overlapCheck;
-  document.getElementById('overlapBody').innerHTML=`
-    <div class="alert ${ov.canCheck?'alert-success':'alert-info'}">
-      <b>고령자고용지원금 중복검토 결과</b><br>
-      ${ov.reason}
+  html+=`<div class="tab-content" id="modalTabOverlap">
+    <div class="result-body">
+      <div class="alert ${ov.canCheck?'alert-success':'alert-info'}">
+        <b>고령자고용지원금 중복검토 결과</b><br>
+        ${ov.reason}
+      </div>
+      <div style="font-size:12px;color:var(--text-sub);margin-top:8px">
+        <p>- 계속고용제도 시행일: ${r.systemStart?formatDate(r.systemStart):'미입력'} (${r.isPost20240109?'2024.1.9 이후':'2024.1.9 이전'})</p>
+        ${ov.latestSupportEnd?`<p>- 대상자 최종 지원기간 종료: ${formatDate(ov.latestSupportEnd)}</p>`:''}
+        ${ov.checkStartDate?`<p>- 고령자고용지원금 검토 가능일: ${formatDate(ov.checkStartDate)}</p>`:''}
+      </div>
     </div>
-    <div style="font-size:12px;color:var(--text-sub);margin-top:8px">
-      <p>- 계속고용제도 시행일: ${r.systemStart?formatDate(r.systemStart):'미입력'} (${r.isPost20240109?'2024.1.9 이후':'2024.1.9 이전'})</p>
-      ${ov.latestSupportEnd?`<p>- 대상자 최종 지원기간 종료: ${formatDate(ov.latestSupportEnd)}</p>`:''}
-      ${ov.checkStartDate?`<p>- 고령자고용지원금 검토 가능일: ${formatDate(ov.checkStartDate)}</p>`:''}
-    </div>
-  `;
+  </div>`;
 
-  // Scroll to results
-  document.getElementById('resultsArea').scrollIntoView({behavior:'smooth'});
+  // Export button
+  html+=`<div class="btn-row" style="margin-top:20px;">
+    <button class="btn-secondary" onclick="exportExcel()">결과 Excel 다운로드</button>
+  </div>`;
+
+  DwModal.show('고령자 계속고용 대상자 분석 결과', html);
+}
+
+function switchModalTab(btn, id){
+  const modal = document.getElementById('dwModalBody') || btn.closest('#dwModalPanel');
+  const container = modal || document;
+  container.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  container.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function buildTableHtml(workers, mode){
+  if(!workers.length){
+    return '<div class="alert alert-info">해당하는 근로자가 없습니다.</div>';
+  }
+
+  const showAmount = analysisResult && analysisResult.hasHistory;
+
+  let html='<table class="data-table"><thead><tr>';
+  html+='<th>No.</th><th>성명</th><th>생년월일</th><th>만 나이</th><th>입사일</th><th>상실일</th><th>재직</th>';
+  html+='<th>정년도달일</th><th>판정</th>';
+  if(showAmount) html+='<th>추정금액</th>';
+  html+='<th>비고</th>';
+  html+='</tr></thead><tbody>';
+
+  workers.forEach((w,i)=>{
+    let rowClass='';
+    if(w.eligibilityStatus.startsWith('eligible')) rowClass='eligible';
+    else if(w.eligibilityStatus==='excluded') rowClass='excluded';
+
+    html+=`<tr class="${rowClass}">`;
+    html+=`<td>${i+1}</td>`;
+    html+=`<td><b>${w.name}</b></td>`;
+    html+=`<td>${w.birthDate?formatDate(w.birthDate):'—'}</td>`;
+    html+=`<td>${w.age!==null?w.age:'—'}</td>`;
+    html+=`<td>${w.hireDate?formatDate(w.hireDate):'—'}</td>`;
+    html+=`<td>${w.lossDate?formatDate(w.lossDate):'—'}</td>`;
+    html+=`<td>${w.isCurrentlyEmployed?'<span class="badge badge-ok">재직</span>':'<span class="badge badge-neutral">퇴사</span>'}</td>`;
+    html+=`<td>${w.retirementReachDate?formatDate(w.retirementReachDate):'—'}</td>`;
+    html+=`<td>${getStatusBadge(w.eligibilityStatus)}</td>`;
+    if(showAmount) html+=`<td>${w.totalEstimate?(w.totalEstimate/10000).toFixed(0)+'만':'—'}</td>`;
+    html+=`<td style="font-size:11px">${w.notes.join('; ')}${w.exclusionReason?' [제외: '+w.exclusionReason+']':''}${w.supportDetail?' | '+w.supportDetail:''}</td>`;
+    html+=`</tr>`;
+  });
+
+  html+='</tbody></table>';
+  return html;
 }
 
 function renderTable(containerId, workers, mode){
@@ -1287,5 +1361,6 @@ function exportExcel(){
 }
 
 </script>
+<script src="../assets/modal.js"></script>
 </body>
 </html>

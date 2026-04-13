@@ -5,61 +5,68 @@
 <title>등기임원 4대보험 환급대상 판정 툴 v1.1</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+<link rel="stylesheet" href="../assets/style.css">
 <style>
- body{font-family:'맑은 고딕',sans-serif;max-width:1400px;margin:20px auto;padding:0 16px;color:#222}
- h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:6px}
- h2{font-size:15px;margin-top:24px;color:#0a4}
- .box{border:1px solid #ccc;padding:14px;border-radius:6px;margin:10px 0;background:#fafafa}
+ body{font-family:'맑은 고딕',sans-serif;max-width:1400px;margin:20px auto;padding:0 16px;color:var(--ink-800)}
+ h1{font-size:20px;border-bottom:2px solid var(--ink-800);padding-bottom:6px}
+ h2{font-size:15px;margin-top:24px;color:var(--ink-800)}
+ .box{border:1px solid var(--border-dark);padding:14px;border-radius:6px;margin:10px 0;background:var(--bg)}
  .row{display:flex;gap:20px;flex-wrap:wrap}
  .row>div{flex:1;min-width:380px}
- input[type=file]{padding:6px;border:1px dashed #888;width:100%;background:#fff}
- button{background:#0a4;color:#fff;border:0;padding:10px 18px;font-size:14px;border-radius:4px;cursor:pointer;margin:6px 4px}
+ input[type=file]{padding:6px;border:1px dashed var(--ink-400);width:100%;background:var(--surface)}
+ button{background:var(--ink-800);color:#fff;border:0;padding:10px 18px;font-size:14px;border-radius:4px;cursor:pointer;margin:6px 4px}
  button:disabled{background:#999}
- button.sec{background:#36c}
+ button.sec{background:var(--ink-600)}
  table{border-collapse:collapse;width:100%;font-size:12px;margin-top:8px;table-layout:fixed}
- th,td{border:1px solid #bbb;padding:5px 7px;text-align:left;vertical-align:top;word-break:keep-all;overflow-wrap:break-word;white-space:normal}
+ th,td{border:1px solid var(--ink-200);padding:5px 7px;text-align:left;vertical-align:top;word-break:keep-all;overflow-wrap:break-word;white-space:normal}
  th{background:#eef;position:sticky;top:0}
  td.reason{font-size:11px;line-height:1.5}
- td.reason div+div{margin-top:3px;padding-top:3px;border-top:1px dashed #ccc}
+ td.reason div+div{margin-top:3px;padding-top:3px;border-top:1px dashed var(--border-dark)}
  tr.j-cancel{background:#fdd}
  tr.j-loss{background:#fec}
  tr.j-fix{background:#fde}
  tr.j-review{background:#ffd}
  tr.j-ok{background:#eaf2fb}
- tr.j-none{background:#eee;color:#666}
- tr.j-expired{background:#ddd;color:#666}
+ tr.j-none{background:#eee;color:var(--ink-500)}
+ tr.j-expired{background:#ddd;color:var(--ink-500)}
  tr.j-confirm{background:#fec8a0}
- .legend span{display:inline-block;padding:3px 8px;margin:2px;border:1px solid #888;font-size:11px}
- .small{font-size:11px;color:#666}
+ .legend span{display:inline-block;padding:3px 8px;margin:2px;border:1px solid var(--ink-400);font-size:11px}
+ .small{font-size:11px;color:var(--ink-500)}
  details{margin:6px 0}
- pre{background:#f4f4f4;padding:8px;font-size:11px;overflow:auto;max-height:200px}
+ pre{background:var(--ink-50);padding:8px;font-size:11px;overflow:auto;max-height:200px}
  .file-list{list-style:none;padding:0;margin:6px 0}
- .file-list li{display:flex;align-items:center;gap:8px;padding:5px 8px;margin:3px 0;background:#fff;border:1px solid #ddd;border-radius:4px;font-size:12px}
+ .file-list li{display:flex;align-items:center;gap:8px;padding:5px 8px;margin:3px 0;background:var(--surface);border:1px solid #ddd;border-radius:4px;font-size:12px}
  .file-list li .fname{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
- .file-list li .fmeta{color:#666;font-size:11px}
+ .file-list li .fmeta{color:var(--ink-500);font-size:11px}
  .file-list li button{padding:2px 8px;font-size:11px;margin:0;background:#d44;min-width:auto}
- .biz-section{border:2px solid #36c;border-radius:8px;padding:14px;margin:16px 0}
- .biz-header{display:flex;align-items:center;gap:12px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ccc}
- .biz-header h3{margin:0;font-size:14px;color:#36c}
- .biz-header .biz-meta{font-size:12px;color:#555}
- .tab-bar{display:flex;gap:0;border-bottom:2px solid #36c;margin-top:16px}
- .tab-bar button{background:#eef;color:#333;border:1px solid #ccc;border-bottom:none;padding:8px 16px;font-size:13px;cursor:pointer;border-radius:6px 6px 0 0;margin:0;position:relative;bottom:-1px}
- .tab-bar button.active{background:#fff;color:#36c;font-weight:700;border-color:#36c;border-bottom:2px solid #fff}
+ .biz-section{border:2px solid var(--ink-600);border-radius:8px;padding:14px;margin:16px 0}
+ .biz-header{display:flex;align-items:center;gap:12px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border-dark)}
+ .biz-header h3{margin:0;font-size:14px;color:var(--ink-600)}
+ .biz-header .biz-meta{font-size:12px;color:var(--ink-500)}
+ .tab-bar{display:flex;gap:0;border-bottom:2px solid var(--ink-600);margin-top:16px}
+ .tab-bar button{background:var(--ink-50);color:var(--ink-800);border:1px solid var(--border-dark);border-bottom:none;padding:8px 16px;font-size:13px;cursor:pointer;border-radius:6px 6px 0 0;margin:0;position:relative;bottom:-1px}
+ .tab-bar button.active{background:var(--surface);color:var(--ink-600);font-weight:700;border-color:var(--ink-600);border-bottom:2px solid var(--surface)}
  tr.j-historical{opacity:0.75}
  tr.j-historical td:first-child{border-left:3px solid #999}
  .period-badge{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;margin-top:2px}
  .period-badge.current{background:#dfd;color:#060;border:1px solid #090}
- .period-badge.past{background:#eee;color:#666;border:1px solid #999}
+ .period-badge.past{background:#eee;color:var(--ink-500);border:1px solid #999}
 </style>
 </head>
 <body>
-<div style="padding:10px 20px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
-  <a href="../index.html" style="font-size:13px;color:#2563eb;text-decoration:none;font-weight:600;">← 대시보드로 돌아가기</a>
+<div class="tool-topbar">
+  <a href="../index.html">&larr; 대시보드로 돌아가기</a>
 </div>
-<h1>등기임원 4대보험(고용/산재) 환급대상 자동 판정 툴 <span style="font-size:13px;color:#888">v1.1</span></h1>
+<h1>등기임원 4대보험(고용/산재) 환급대상 자동 판정 툴 <span style="font-size:13px;color:var(--ink-400)">v1.1</span></h1>
 <p class="small">법인등기부등본 PDF + 근로자고용정보현황 PDF/Excel을 업로드하면 등기임원의 가입여부를 자동 매칭하여 <b>취득취소 / 상실신고 / 정상</b>을 판정합니다.<br>복수 사업장(지사 등)의 고용현황을 각각 업로드하면 사업장 관리번호별로 분리 판정합니다. 모든 처리는 브라우저 내에서만 수행되며 외부로 전송되지 않습니다.</p>
 
+<div class="box" style="margin-bottom:8px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+ <b>Anthropic API Key (Vision OCR용):</b>
+ <input type="password" id="apiKey" style="flex:1;min-width:280px;padding:6px 8px;font-family:monospace;font-size:12px" placeholder="sk-ant-... (스캔 PDF 정확도 향상)">
+ <button class="sec" style="padding:6px 12px;font-size:12px" onclick="var _k=document.getElementById('apiKey').value.trim();localStorage.setItem('ANTHROPIC_API_KEY',_k);if(_k.startsWith('sk-ant-'))localStorage.setItem('CLAUDE_API_KEY',_k);document.getElementById('apiKeySaved').textContent='저장됨'">저장</button>
+ <span id="apiKeySaved" style="font-size:11px;color:var(--ink-800)"></span>
+ <span class="small">미입력시 기본 텍스트 추출만 사용 (스캔 PDF 처리 불가)</span>
+</div>
 <div class="box row">
  <div>
   <b>① 법인등기부등본 PDF</b><br>
@@ -86,7 +93,7 @@
  <span class="j-review" style="background:#ffd">검토필요</span>
  <span class="j-ok" style="background:#eaf2fb">정상</span>
  <span class="j-none" style="background:#eee">대상아님(미가입)</span>
- <span class="j-expired" style="background:#ddd;color:#666">시효경과</span>
+ <span class="j-expired" style="background:#ddd;color:var(--ink-500)">시효경과</span>
  <span class="small" style="margin-left:8px">※ 보험료 소멸시효 3년 (취득취소 제외)</span>
 </div>
 
@@ -109,24 +116,94 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 // === PDF 텍스트 추출 ===
 function setStatus(msg){document.getElementById('result').innerHTML='<p>'+msg+'</p>';}
 
-async function ocrPdf(file){
- setStatus('OCR 엔진 초기화 중... (최초 1회 한글 학습데이터 다운로드, 수십 MB)');
- const worker=await Tesseract.createWorker('kor',1,{
-  logger:m=>{if(m.status==='recognizing text')setStatus(`OCR 진행: ${(m.progress*100).toFixed(0)}% (${file.name})`);}
- });
+// API 키 초기화
+(function(){
+ const k=localStorage.getItem('ANTHROPIC_API_KEY');
+ if(k){document.getElementById('apiKey').value=k;document.getElementById('apiKeySaved').textContent='저장됨';}
+})();
+
+function getApiKey(){return (document.getElementById('apiKey').value||localStorage.getItem('ANTHROPIC_API_KEY')||'').trim();}
+
+// 스캔 PDF 감지 (payroll v8.6 동일 기준: 한글 비율 + 깨진 문자 + 유효문자)
+function detectScannedPage(nativeText){
+ const t=(nativeText||'').replace(/[\s\u00A0\u3000]+/g,'');
+ if(t.length<20)return true;
+ const broken=(t.match(/[\uFFFD\u0000-\u001F]/g)||[]).length;
+ if(broken/t.length>0.1)return true;
+ const meaningful=t.match(/[가-힣A-Za-z0-9]/g)||[];
+ if(meaningful.length<15)return true;
+ const hangul=t.match(/[가-힣]/g)||[];
+ if(hangul.length<5&&t.length<80)return true;
+ return false;
+}
+
+// PDF 페이지 → base64 JPEG
+async function pdfPageToImage(file,pageNum,scale){
  const buf=await file.arrayBuffer();
- const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+ const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+ const page=await pdf.getPage(pageNum);
+ const vp=page.getViewport({scale:scale||2.0});
+ const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+ await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+ return c.toDataURL('image/jpeg',0.85).split(',')[1];
+}
+
+// Claude Vision OCR — 등기부등본 전용 프롬프트
+async function visionOcrPdf(file){
+ const apiKey=getApiKey();
+ if(!apiKey){throw new Error('스캔 PDF 처리에 Anthropic API Key가 필요합니다. 상단에 키를 입력해주세요.');}
+
+ const buf=await file.arrayBuffer();
+ const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
  let out='';
- for(let i=1;i<=pdf.numPages;i++){
-  setStatus(`OCR 페이지 ${i}/${pdf.numPages} 렌더링 중...`);
-  const page=await pdf.getPage(i);
-  const vp=page.getViewport({scale:2.5});
-  const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
-  await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-  const {data}=await worker.recognize(c);
-  out+=data.text+'\n\n';
+ const batchSize=5; // 5페이지씩 배치 호출 (토큰 효율)
+
+ for(let b=0;b<pdf.numPages;b+=batchSize){
+  const batchEnd=Math.min(b+batchSize,pdf.numPages);
+  setStatus(`Vision OCR 진행 중: ${b+1}~${batchEnd} / ${pdf.numPages} 페이지`);
+
+  const content=[];
+  for(let i=b+1;i<=batchEnd;i++){
+   const img=await pdfPageToImage(file,i,2.0);
+   content.push({type:'text',text:`[${i}페이지]`});
+   content.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:img}});
+  }
+  content.push({type:'text',text:`위 이미지는 법인등기부등본 PDF의 스캔본입니다.
+각 페이지의 텍스트를 있는 그대로 정확하게 추출하세요.
+
+[중요 규칙]
+- 임원 이름, 주민등록번호 앞 6자리, 날짜(년 월 일), 직위(대표이사/사내이사/사외이사/감사/이사장/이사)를 특히 정확하게 읽으세요
+- 주민등록번호 뒷자리는 ******* 로 마스킹되어 있으므로 그대로 출력
+- 취임/중임/사임/퇴임/해임/사망/임기만료 등 이벤트 유형을 정확히 구분
+- 말소선(취소선)이 있는 텍스트도 모두 포함하여 추출
+- 줄바꿈을 유지하고, 각 페이지를 [N페이지] 헤더로 구분
+- 텍스트만 출력, 다른 설명 불필요`});
+
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{
+   method:'POST',
+   headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+   body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:8000,messages:[{role:'user',content}]})
+  });
+  if(!resp.ok){
+   const err=await resp.text();
+   if(resp.status===429){
+    setStatus(`API 속도 제한 — 3초 대기 후 재시도...`);
+    await new Promise(r=>setTimeout(r,3000));
+    const resp2=await fetch('https://api.anthropic.com/v1/messages',{
+     method:'POST',
+     headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+     body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:8000,messages:[{role:'user',content}]})
+    });
+    if(!resp2.ok)throw new Error(`Vision API 오류 (${resp2.status})`);
+    const data2=await resp2.json();
+    out+=data2.content[0].text+'\n\n';
+    continue;
+   }
+   throw new Error(`Vision API 오류 (${resp.status}): ${err.substring(0,200)}`);
+  }
+  const data=await resp.json();
+  out+=data.content[0].text+'\n\n';
  }
- await worker.terminate();
  return out;
 }
 
@@ -903,9 +980,12 @@ document.getElementById('btnRun').onclick=async()=>{
   // 1) 등기부 파싱 (공통)
   setStatus('등기부 텍스트 추출 중...');
   let regText=await pdfToText(f1);
-  if(regText.replace(/\s/g,'').length<200){
-   setStatus('텍스트 레이어 없음 → OCR 모드 전환');
-   regText=await ocrPdf(f1);
+  // 페이지별 스캔 감지 (payroll 동일 기준)
+  const regPages=regText.split('\n\n');
+  const scannedRatio=regPages.filter(p=>detectScannedPage(p)).length/Math.max(regPages.length,1);
+  if(scannedRatio>0.5||regText.replace(/\s/g,'').length<200){
+   setStatus('스캔 PDF 감지 → Claude Vision OCR 전환');
+   regText=await visionOcrPdf(f1);
   }
   document.getElementById('dbgRegText').textContent=regText.slice(0,5000);
   const officers=parseRegistry(regText);
@@ -938,7 +1018,12 @@ document.getElementById('btnRun').onclick=async()=>{
    const ext=f2.name.toLowerCase().split('.').pop();
    if(ext==='pdf'){
     empText=await pdfToText(f2);
-    if(empText.replace(/\s/g,'').length<200){empText=await ocrPdf(f2);}
+    const empPages=empText.split('\n\n');
+    const empScanned=empPages.filter(p=>detectScannedPage(p)).length/Math.max(empPages.length,1);
+    if(empScanned>0.5||empText.replace(/\s/g,'').length<200){
+     if(getApiKey()){empText=await visionOcrPdf(f2);}
+     else{setStatus('⚠ 고용현황 스캔 PDF — API 키 없어 텍스트 추출만 사용');}
+    }
     recs=parseEmpText(empText);
     // 사업장 정보 재추출 (파싱 시 더 정확)
     if(!ef.bizNo){const info=extractBizInfo(empText);ef.bizNo=info.bizNo;ef.bizName=info.bizName;}
@@ -991,47 +1076,58 @@ document.getElementById('btnRun').onclick=async()=>{
  }
 };
 
-// === 사업장별 결과 렌더링 ===
+// === 사업장별 결과 렌더링 (모달 팝업) ===
 function renderAllResults(){
  const bizKeys=Object.keys(ALL_BIZ_RESULTS);
  const host=document.getElementById('result');
+ host.innerHTML='<p>분석 완료 — 결과를 팝업으로 표시합니다.</p>';
 
- if(bizKeys.length===1){
-  // 단일 사업장: 기존처럼 플랫 렌더링
-  const biz=ALL_BIZ_RESULTS[bizKeys[0]];
-  const header=biz.bizNo?`<p style="margin:4px 0"><b>사업장:</b> ${biz.bizName||''} <span class="small">${biz.bizNo}</span> — 파일: ${biz.fileName}</p>`:'';
-  host.innerHTML=header+renderSummary(biz.results)+renderResultTable(biz.results);
-  return;
+ // CEO history 섹션을 모달 상단에 포함
+ let modalHtml='';
+ const ceoHistEl=document.getElementById('ceoHist');
+ if(ceoHistEl && ceoHistEl.innerHTML && !ceoHistEl.innerHTML.includes('분석 실행 후')){
+  modalHtml+='<div style="margin-bottom:16px">'+ceoHistEl.innerHTML+'</div><hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">';
  }
 
- // 복수 사업장: 탭 UI
- let tabH='<div class="tab-bar" id="bizTabs">';
- tabH+=`<button class="active" data-biz="__ALL__">전체 통합</button>`;
- bizKeys.forEach((k,i)=>{
-  const b=ALL_BIZ_RESULTS[k];
-  const label=b.bizNo?(b.bizName||b.bizNo):b.fileName;
-  tabH+=`<button data-biz="${k}">${label}</button>`;
- });
- tabH+='</div>';
- tabH+='<div id="bizTabContent"></div>';
- host.innerHTML=tabH;
+ if(bizKeys.length===1){
+  // 단일 사업장: 플랫 렌더링
+  const biz=ALL_BIZ_RESULTS[bizKeys[0]];
+  const header=biz.bizNo?`<p style="margin:4px 0"><b>사업장:</b> ${biz.bizName||''} <span class="small">${biz.bizNo}</span> — 파일: ${biz.fileName}</p>`:'';
+  modalHtml+=header+renderSummary(biz.results)+renderResultTable(biz.results);
+ } else {
+  // 복수 사업장: 탭 UI
+  let tabH='<div class="tab-bar" id="bizTabs">';
+  tabH+=`<button class="active" data-biz="__ALL__">전체 통합</button>`;
+  bizKeys.forEach((k,i)=>{
+   const b=ALL_BIZ_RESULTS[k];
+   const label=b.bizNo?(b.bizName||b.bizNo):b.fileName;
+   tabH+=`<button data-biz="${k}">${label}</button>`;
+  });
+  tabH+='</div>';
+  tabH+='<div id="bizTabContent"></div>';
+  modalHtml+=tabH;
+ }
 
- // 탭 클릭 핸들러
- document.querySelectorAll('#bizTabs button').forEach(btn=>{
-  btn.onclick=()=>{
-   document.querySelectorAll('#bizTabs button').forEach(b=>b.classList.remove('active'));
-   btn.classList.add('active');
-   const key=btn.dataset.biz;
-   const contentEl=document.getElementById('bizTabContent');
-   if(key==='__ALL__'){
-    renderAllTab(contentEl);
-   } else {
-    renderBizTab(contentEl,key);
-   }
-  };
- });
- // 초기: 전체 통합 탭
- renderAllTab(document.getElementById('bizTabContent'));
+ DwModal.show('등기임원 4대보험 판정 결과', modalHtml);
+
+ // 복수 사업장인 경우 탭 핸들러 바인딩 (모달 내부 DOM에서)
+ if(bizKeys.length>1){
+  document.querySelectorAll('#bizTabs button').forEach(btn=>{
+   btn.onclick=()=>{
+    document.querySelectorAll('#bizTabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const key=btn.dataset.biz;
+    const contentEl=document.getElementById('bizTabContent');
+    if(key==='__ALL__'){
+     renderAllTab(contentEl);
+    } else {
+     renderBizTab(contentEl,key);
+    }
+   };
+  });
+  // 초기: 전체 통합 탭
+  renderAllTab(document.getElementById('bizTabContent'));
+ }
 }
 
 function renderAllTab(el){
@@ -1144,5 +1240,6 @@ document.getElementById('btnExport').onclick=()=>{
  XLSX.writeFile(wb,'4대보험_환급대상_판정결과.xlsx');
 };
 </script>
+<script src="../assets/modal.js"></script>
 </body>
 </html>
