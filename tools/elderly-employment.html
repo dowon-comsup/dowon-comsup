@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>고령자 계속고용 지원금 대상자 판독 | 노무법인 도원</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<style>
+:root{--bg:#ffffff;--bg-sub:#f8f9fa;--border:#e5e7eb;--border-dark:#d1d5db;--text:#1a1a1a;--text-sub:#6b7280;--text-muted:#9ca3af;--accent:#111827;--accent-light:#f3f4f6;--blue:#2563eb;--green:#059669;--red:#dc2626;--orange:#d97706;--shadow:0 1px 3px rgba(0,0,0,.06);--shadow-md:0 4px 12px rgba(0,0,0,.08);--radius:8px;--radius-lg:12px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,sans-serif;max-width:1100px;margin:0 auto;padding:0 20px 80px;color:var(--text);background:var(--bg);font-size:13px;line-height:1.6}
+.topbar{padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:24px}
+.topbar a{font-size:13px;font-weight:600;color:var(--text-sub);text-decoration:none}
+.topbar a:hover{color:var(--text)}
+h1{font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px;letter-spacing:-.3px}
+.subtitle{font-size:12px;color:var(--text-sub);margin-bottom:24px;line-height:1.5}
+/* Steps */
+.step{border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px;background:var(--bg)}
+.step.collapsed .step-body{display:none}
+.step-header{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.step-num.done{background:var(--green)}
+.step-title{font-size:14px;font-weight:700;color:var(--text);flex:1}
+.step-toggle{font-size:11px;color:var(--text-muted);padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:none}
+.step-body{margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+/* Form */
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12px;font-weight:600;color:var(--text-sub)}
+.form-group input,.form-group select{padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent);outline:none}
+.form-group .hint{font-size:11px;color:var(--text-muted)}
+/* Upload */
+.upload-zone{border:2px dashed var(--border-dark);border-radius:var(--radius-lg);padding:32px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg-sub);margin-bottom:12px}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:var(--accent-light)}
+.upload-zone h3{font-size:14px;color:var(--text);margin-bottom:4px}
+.upload-zone p{font-size:11px;color:var(--text-muted)}
+.upload-zone input{display:none}
+.file-list{list-style:none;margin-bottom:12px}
+.file-list li{display:flex;align-items:center;gap:8px;padding:8px 12px;margin:4px 0;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px}
+.file-list li .fname{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-list li .fmeta{color:var(--text-muted);font-size:11px}
+.file-list li .remove{background:none;border:1px solid var(--border);color:var(--text-sub);padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer}
+.file-list li .remove:hover{background:var(--red);color:#fff;border-color:var(--red)}
+/* Buttons */
+button{font-size:13px;padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:600;transition:all .15s;font-family:inherit}
+button:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff;padding:10px 28px;font-size:14px}
+.btn-primary:hover:not(:disabled){background:#374151}
+.btn-secondary{background:var(--bg);color:var(--text);border:1.5px solid var(--border-dark);padding:8px 20px}
+.btn-secondary:hover:not(:disabled){background:var(--bg-sub);border-color:var(--accent)}
+.btn-sm{padding:5px 12px;font-size:11px}
+.btn-row{text-align:center;margin:16px 0}
+/* API key */
+.api-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.api-row label{font-size:12px;font-weight:600;color:var(--text-sub);min-width:100px}
+.api-row input{flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace}
+.api-row input:focus{border-color:var(--accent);outline:none}
+.api-row .saved{font-size:11px;color:var(--green)}
+/* Progress */
+.progress-bar{height:4px;background:var(--border);border-radius:2px;margin:12px 0;overflow:hidden;display:none}
+.progress-bar .fill{height:100%;background:var(--accent);transition:width .3s;width:0}
+#statusText{font-size:12px;color:var(--text-muted);text-align:center;min-height:18px;margin:8px 0}
+/* Results */
+.result-section{border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px;background:var(--bg);overflow:hidden}
+.result-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.result-header h3{font-size:14px;font-weight:700;color:var(--text)}
+.result-body{padding:18px}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+.badge-ok{background:#ecfdf5;color:#065f46}
+.badge-warn{background:#fffbeb;color:#92400e}
+.badge-fail{background:#fef2f2;color:#991b1b}
+.badge-info{background:var(--accent-light);color:var(--accent)}
+.badge-neutral{background:var(--bg-sub);color:var(--text-sub)}
+/* Summary */
+.summary-banner{padding:14px 18px;border-radius:var(--radius);margin-bottom:16px;font-size:14px;font-weight:600;display:none}
+.summary-banner.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.summary-banner.warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+.summary-banner.error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.summary-banner.info{background:var(--accent-light);color:var(--accent);border:1px solid var(--border)}
+/* Table */
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th,.data-table td{padding:8px 10px;border:1px solid var(--border);text-align:left;vertical-align:top}
+.data-table th{background:var(--bg-sub);font-weight:600;color:var(--text-sub);position:sticky;top:0;white-space:nowrap}
+.data-table td{color:var(--text)}
+.data-table tr:hover{background:var(--bg-sub)}
+.data-table tr.eligible{background:#f0fdf4}
+.data-table tr.excluded{background:var(--bg-sub);color:var(--text-muted)}
+.data-table tr.review{background:#fffbeb}
+/* Stats */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.stat-card{padding:16px;border:1px solid var(--border);border-radius:var(--radius);text-align:center}
+.stat-card .value{font-size:24px;font-weight:700;color:var(--text)}
+.stat-card .label{font-size:11px;color:var(--text-muted);margin-top:2px}
+/* Misc */
+details{margin:8px 0}
+summary{font-size:12px;cursor:pointer;color:var(--text-sub);font-weight:600}
+pre.debug{background:var(--bg-sub);padding:10px;font-size:11px;overflow:auto;max-height:200px;border-radius:6px;white-space:pre-wrap;word-break:break-all;border:1px solid var(--border)}
+.alert{padding:12px 16px;border-radius:var(--radius);font-size:12px;margin-bottom:12px}
+.alert-info{background:var(--bg-sub);color:var(--text-sub);border:1px solid var(--border)}
+.alert-warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+.alert-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.alert-success{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.divider{height:1px;background:var(--border);margin:16px 0}
+/* Retirement age result */
+.retirement-result{display:flex;align-items:center;gap:16px;padding:16px;border:1px solid var(--border);border-radius:var(--radius);margin:12px 0}
+.retirement-result .age{font-size:32px;font-weight:700;color:var(--text)}
+.retirement-result .age-label{font-size:12px;color:var(--text-sub)}
+.retirement-result .status{flex:1}
+.retirement-result .status .tag{display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600}
+.tag-ok{background:#f0fdf4;color:#065f46;border:1px solid #bbf7d0}
+.tag-fix{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.tag-warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+/* Tab */
+.tab-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px}
+.tab-btn{padding:8px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab-btn.active{color:var(--text);border-bottom-color:var(--accent)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.scroll-wrap{overflow-x:auto;max-height:600px;overflow-y:auto}
+/* Checkbox */
+.cb-row{display:flex;align-items:center;gap:8px;margin:8px 0}
+.cb-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent)}
+.cb-row label{font-size:12px;font-weight:600;cursor:pointer}
+@media(max-width:768px){body{padding:0 12px 40px}.form-row{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="../index.html">&larr; 대시보드로 돌아가기</a>
+</div>
+
+<h1>고령자 계속고용 지원금 대상자 판독</h1>
+<p class="subtitle">취업규칙에서 정년을 파악하고, 고용현황에서 정년 도달 근로자를 전수 추출합니다. 모든 처리는 브라우저 내에서만 수행됩니다.</p>
+
+<!-- API Key -->
+<div class="step" id="stepApiKey">
+  <div class="step-header" onclick="toggleStep('stepApiKey')">
+    <div class="step-num">0</div>
+    <div class="step-title">API 키 설정</div>
+    <span class="step-toggle">접기/펼치기</span>
+  </div>
+  <div class="step-body">
+    <div class="api-row">
+      <label>Anthropic API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-ant-..." value="">
+      <button class="btn-sm btn-secondary" onclick="saveApiKey()">저장</button>
+      <span class="saved" id="apiKeySaved"></span>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);">취업규칙 PDF 분석에 Claude AI를 사용합니다. 키는 브라우저 localStorage에만 저장됩니다.</p>
+  </div>
+</div>
+
+<!-- Step 1: Company Info -->
+<div class="step" id="stepCompany">
+  <div class="step-header" onclick="toggleStep('stepCompany')">
+    <div class="step-num">1</div>
+    <div class="step-title">사업장 기본정보 입력</div>
+    <span class="step-toggle">접기/펼치기</span>
+  </div>
+  <div class="step-body">
+    <div class="form-row">
+      <div class="form-group">
+        <label>사업장명</label>
+        <input type="text" id="companyName" placeholder="예: (주)도원">
+      </div>
+      <div class="form-group">
+        <label>사업장관리번호</label>
+        <input type="text" id="companyId" placeholder="예: 12345678901">
+      </div>
+      <div class="form-group">
+        <label>소재지</label>
+        <select id="companyRegion">
+          <option value="metro">수도권 (서울/경기/인천)</option>
+          <option value="non-metro">비수도권</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>계속고용제도 시행일</label>
+        <input type="date" id="systemStartDate">
+        <span class="hint">취업규칙 또는 단체협약상 계속고용제도 시행일</span>
+      </div>
+      <div class="form-group">
+        <label>제도도입 신고일</label>
+        <input type="date" id="reportDate">
+        <span class="hint">고용센터 신고일 (미입력시 시행일과 동일 처리)</span>
+      </div>
+      <div class="form-group">
+        <label>기존 신청이력 유무</label>
+        <select id="hasHistory">
+          <option value="yes">있음</option>
+          <option value="no">없음 (신규)</option>
+        </select>
+      </div>
+    </div>
+    <div class="alert alert-info">기존 신청이력이 없는 경우: 정년연장 등 사업장에 추가확인 필요한 바 검토금액 없음으로 산정됩니다.</div>
+  </div>
+</div>
+
+<!-- Step 2: Employment Rules -->
+<div class="step" id="stepRules">
+  <div class="step-header" onclick="toggleStep('stepRules')">
+    <div class="step-num">2</div>
+    <div class="step-title">취업규칙 업로드 &mdash; 정년 판독</div>
+    <span class="step-toggle">접기/펼치기</span>
+  </div>
+  <div class="step-body">
+    <div class="upload-zone" id="rulesUpload" onclick="document.getElementById('rulesFile').click()">
+      <h3>취업규칙 PDF 업로드</h3>
+      <p>클릭하거나 파일을 드래그하세요 (PDF)</p>
+      <input type="file" id="rulesFile" accept="application/pdf">
+    </div>
+    <ul class="file-list" id="rulesFileList"></ul>
+    <div class="btn-row">
+      <button class="btn-primary" id="btnParseRules" onclick="parseRules()" disabled>정년 분석 실행</button>
+      <button class="btn-secondary" onclick="manualRetirement()">수동 입력</button>
+    </div>
+    <div id="rulesResult"></div>
+    <div id="retirementDisplay"></div>
+    <details><summary>취업규칙 원문 텍스트 (디버그)</summary><pre class="debug" id="dbgRulesText">분석 실행 후 표시됩니다.</pre></details>
+  </div>
+</div>
+
+<!-- Step 3: Employment Data -->
+<div class="step" id="stepEmployment">
+  <div class="step-header" onclick="toggleStep('stepEmployment')">
+    <div class="step-num">3</div>
+    <div class="step-title">고용현황 업로드 &mdash; 대상자 추출</div>
+    <span class="step-toggle">접기/펼치기</span>
+  </div>
+  <div class="step-body">
+    <div class="upload-zone" id="empUpload" onclick="document.getElementById('empFile').click()">
+      <h3>고용현황 파일 업로드</h3>
+      <p>근로자고용정보현황 PDF 또는 Excel/CSV (복수 파일 가능)</p>
+      <input type="file" id="empFile" accept=".pdf,.xlsx,.xls,.csv" multiple>
+    </div>
+    <ul class="file-list" id="empFileList"></ul>
+
+    <div class="form-row" style="margin-top:12px">
+      <div class="form-group">
+        <label>기준일 (검토 기준)</label>
+        <input type="date" id="reviewDate" value="">
+        <span class="hint">미입력시 오늘 날짜 기준</span>
+      </div>
+      <div class="form-group">
+        <label>신청 분기</label>
+        <select id="applyQuarter">
+          <option value="2025-Q1">2025년 1분기 (1~3월)</option>
+          <option value="2025-Q2">2025년 2분기 (4~6월)</option>
+          <option value="2025-Q3">2025년 3분기 (7~9월)</option>
+          <option value="2025-Q4">2025년 4분기 (10~12월)</option>
+          <option value="2026-Q1" selected>2026년 1분기 (1~3월)</option>
+          <option value="2026-Q2">2026년 2분기 (4~6월)</option>
+          <option value="2026-Q3">2026년 3분기 (7~9월)</option>
+          <option value="2026-Q4">2026년 4분기 (10~12월)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" id="btnAnalyze" onclick="runAnalysis()" disabled>대상자 분석 실행</button>
+    </div>
+
+    <div class="progress-bar" id="progressBar"><div class="fill" id="progressFill"></div></div>
+    <div id="statusText"></div>
+  </div>
+</div>
+
+<!-- Results -->
+<div id="resultsArea" style="display:none;">
+  <!-- Summary -->
+  <div class="summary-banner" id="summaryBanner"></div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="statsRow"></div>
+
+  <!-- Retirement Info -->
+  <div class="result-section" id="retirementSection">
+    <div class="result-header">
+      <h3>정년 판독 결과</h3>
+    </div>
+    <div class="result-body" id="retirementBody"></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-nav" id="resultTabs">
+    <button class="tab-btn active" onclick="switchTab('tabAll')">전체 근로자</button>
+    <button class="tab-btn" onclick="switchTab('tabEligible')">대상자 (추정)</button>
+    <button class="tab-btn" onclick="switchTab('tabExcluded')">제외 대상자</button>
+    <button class="tab-btn" onclick="switchTab('tabOverlap')">중복검토 (고령자고용)</button>
+  </div>
+
+  <div class="tab-content active" id="tabAll">
+    <div class="scroll-wrap" id="tableAllWrap"></div>
+  </div>
+  <div class="tab-content" id="tabEligible">
+    <div class="scroll-wrap" id="tableEligibleWrap"></div>
+  </div>
+  <div class="tab-content" id="tabExcluded">
+    <div class="scroll-wrap" id="tableExcludedWrap"></div>
+  </div>
+  <div class="tab-content" id="tabOverlap">
+    <div class="result-body" id="overlapBody"></div>
+  </div>
+
+  <!-- Export -->
+  <div class="btn-row" style="margin-top:20px;">
+    <button class="btn-secondary" id="btnExport" onclick="exportExcel()">결과 Excel 다운로드</button>
+  </div>
+</div>
+
+<!-- Debug -->
+<details style="margin-top:24px"><summary>고용현황 원문 텍스트 (디버그)</summary><pre class="debug" id="dbgEmpText">분석 실행 후 표시됩니다.</pre></details>
+
+<script>
+// ============ GLOBALS ============
+let retirementAge = null;        // 정년 나이 (만 세)
+let retirementType = null;       // 정년 기준: 'birthday' | 'month_end' | 'year_end' | 'half_year_end'
+let employees = [];              // 파싱된 근로자 목록
+let analysisResult = null;       // 분석 결과
+let rulesFiles = [];
+let empFiles = [];
+
+// ============ INIT ============
+(function init(){
+  const k = localStorage.getItem('elderly_api_key');
+  if(k){ document.getElementById('apiKey').value = k; document.getElementById('apiKeySaved').textContent = '저장됨'; }
+  document.getElementById('reviewDate').value = new Date().toISOString().slice(0,10);
+  setupDragDrop('rulesUpload','rulesFile', f=>{ rulesFiles=[f]; renderFileList('rulesFileList',rulesFiles,i=>{rulesFiles.splice(i,1);renderFileList('rulesFileList',rulesFiles);}); document.getElementById('btnParseRules').disabled=false; });
+  setupDragDrop('empUpload','empFile', f=>{ empFiles.push(f); renderFileList('empFileList',empFiles,i=>{empFiles.splice(i,1);renderFileList('empFileList',empFiles);}); checkAnalyzeReady(); });
+  document.getElementById('rulesFile').addEventListener('change', e=>{
+    if(e.target.files.length){rulesFiles=[e.target.files[0]]; renderFileList('rulesFileList',rulesFiles,i=>{rulesFiles.splice(i,1);renderFileList('rulesFileList',rulesFiles);}); document.getElementById('btnParseRules').disabled=false;}
+  });
+  document.getElementById('empFile').addEventListener('change', e=>{
+    for(const f of e.target.files) empFiles.push(f);
+    renderFileList('empFileList',empFiles,i=>{empFiles.splice(i,1);renderFileList('empFileList',empFiles);});
+    checkAnalyzeReady();
+    e.target.value='';
+  });
+})();
+
+function saveApiKey(){
+  const k=document.getElementById('apiKey').value.trim();
+  if(k){localStorage.setItem('elderly_api_key',k); document.getElementById('apiKeySaved').textContent='저장됨';}
+}
+
+function toggleStep(id){document.getElementById(id).classList.toggle('collapsed');}
+
+function setupDragDrop(zoneId, inputId, onFile){
+  const z=document.getElementById(zoneId);
+  z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('dragover');});
+  z.addEventListener('dragleave',()=>z.classList.remove('dragover'));
+  z.addEventListener('drop',e=>{e.preventDefault();z.classList.remove('dragover');if(e.dataTransfer.files.length)onFile(e.dataTransfer.files[0]);});
+}
+
+function renderFileList(id, files, onRemove){
+  const ul=document.getElementById(id);
+  ul.innerHTML=files.map((f,i)=>`<li><span class="fname">${f.name}</span><span class="fmeta">${(f.size/1024).toFixed(0)} KB</span><button class="remove" onclick="event.stopPropagation();(${onRemove.toString()})(${i})">삭제</button></li>`).join('');
+}
+
+function checkAnalyzeReady(){
+  document.getElementById('btnAnalyze').disabled = !(retirementAge && empFiles.length>0);
+}
+
+function setStatus(msg){document.getElementById('statusText').textContent=msg;}
+function setProgress(pct){const b=document.getElementById('progressBar');b.style.display='block';document.getElementById('progressFill').style.width=pct+'%';}
+
+// ============ STEP 2: Parse Rules ============
+async function pdfToText(file){
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  let out='';
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const tc=await page.getTextContent();
+    const items=tc.items.map(it=>({x:it.transform[4],y:it.transform[5],s:it.str})).sort((a,b)=>b.y-a.y||a.x-b.x);
+    const lines=[];let curY=null,cur=null;
+    items.forEach(it=>{if(curY===null||Math.abs(it.y-curY)>3){cur=[];lines.push(cur);curY=it.y;}cur.push(it);});
+    lines.forEach(L=>{out+=L.map(o=>o.s).join(' ').replace(/\s+/g,' ').trim()+'\n';});
+    out+='\n';
+  }
+  return out;
+}
+
+async function pdfToImages(file, scale=2.0){
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  const images=[];
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const vp=page.getViewport({scale});
+    const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    images.push(c.toDataURL('image/jpeg',0.85).split(',')[1]);
+  }
+  return images;
+}
+
+async function parseRules(){
+  const apiKey=document.getElementById('apiKey').value.trim()||localStorage.getItem('elderly_api_key');
+  if(!apiKey){alert('Anthropic API 키를 입력해주세요.');return;}
+  if(!rulesFiles.length){alert('취업규칙 파일을 업로드해주세요.');return;}
+
+  const btn=document.getElementById('btnParseRules');
+  btn.disabled=true;
+  document.getElementById('rulesResult').innerHTML='<div class="alert alert-info">취업규칙 분석 중...</div>';
+
+  try{
+    // Extract text first
+    let text = await pdfToText(rulesFiles[0]);
+    document.getElementById('dbgRulesText').textContent = text;
+
+    // Also get images for vision if text is sparse
+    const images = await pdfToImages(rulesFiles[0], 1.5);
+
+    const contentParts = [];
+    // Add images (max 10 pages)
+    const maxPages = Math.min(images.length, 10);
+    for(let i=0;i<maxPages;i++){
+      contentParts.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:images[i]}});
+    }
+    contentParts.push({type:'text',text:`위 취업규칙 PDF의 내용입니다. 추출된 텍스트도 참고하세요:\n\n${text.substring(0,8000)}\n\n다음을 JSON으로 답변해주세요:\n1. retirement_age: 정년이 몇 세로 설정되어 있는지 (숫자, 없으면 null)\n2. retirement_type: 정년 기준 유형 - "birthday"(만 n세가 되는 날), "month_end"(만 n세가 되는 달의 말일), "year_end"(만 n세가 되는 해의 말일), "half_year_end"(상/하반기 말일), "unknown"(불명확)\n3. has_continued_employment: 계속고용제도(재고용/정년연장/정년폐지) 조항이 있는지 (boolean)\n4. continued_employment_type: 있다면 유형 - "rehire"(재고용), "extend"(정년연장), "abolish"(정년폐지), null\n5. needs_regulation_fix: 정년이 없거나 만60세 미만이면 true (규정정비 대상)\n6. relevant_clauses: 정년 관련 조항 원문 (배열)\n7. notes: 특이사항\n\nJSON만 출력하세요.`});
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:contentParts}]})
+    });
+
+    if(!resp.ok){
+      const errText = await resp.text();
+      throw new Error(`API 오류 (${resp.status}): ${errText}`);
+    }
+
+    const data = await resp.json();
+    const aiText = data.content[0].text;
+
+    // Parse JSON from response
+    const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('AI 응답에서 JSON을 찾을 수 없습니다.');
+
+    const result = JSON.parse(jsonMatch[0]);
+    displayRetirementResult(result);
+
+  }catch(e){
+    document.getElementById('rulesResult').innerHTML=`<div class="alert alert-error">오류: ${e.message}</div>`;
+    btn.disabled=false;
+  }
+}
+
+function displayRetirementResult(result){
+  retirementAge = result.retirement_age;
+  retirementType = result.retirement_type || 'month_end';
+
+  let html='';
+  if(result.needs_regulation_fix){
+    html+=`<div class="retirement-result">
+      <div><div class="age">${retirementAge||'미설정'}</div><div class="age-label">정년 (만 세)</div></div>
+      <div class="status"><span class="tag tag-fix">규정정비 대상</span>
+        <p style="font-size:12px;margin-top:6px;color:var(--text-sub)">정년이 ${retirementAge?'만 '+retirementAge+'세로 60세 미만':'미설정'}입니다. 규정 정비가 필요합니다.</p>
+      </div></div>`;
+  } else {
+    html+=`<div class="retirement-result">
+      <div><div class="age">만 ${retirementAge}세</div><div class="age-label">정년</div></div>
+      <div class="status"><span class="tag tag-ok">정상</span>
+        <p style="font-size:12px;margin-top:6px;color:var(--text-sub)">정년 기준: ${getRetirementTypeLabel(retirementType)}</p>
+        ${result.has_continued_employment?`<p style="font-size:12px;color:var(--green)">계속고용제도 조항 확인됨 (${getContinuedTypeLabel(result.continued_employment_type)})</p>`:''}
+      </div></div>`;
+  }
+
+  if(result.relevant_clauses && result.relevant_clauses.length){
+    html+=`<details style="margin-top:8px"><summary>관련 조항 원문</summary><div style="padding:8px;font-size:12px;background:var(--bg-sub);border-radius:6px;margin-top:4px">`;
+    result.relevant_clauses.forEach(c=>html+=`<p style="margin:4px 0">${c}</p>`);
+    html+=`</div></details>`;
+  }
+  if(result.notes) html+=`<div class="alert alert-info" style="margin-top:8px">${result.notes}</div>`;
+
+  document.getElementById('retirementDisplay').innerHTML=html;
+  document.getElementById('rulesResult').innerHTML=`<div class="alert alert-success">정년 분석 완료</div>`;
+  document.getElementById('stepRules').querySelector('.step-num').classList.add('done');
+  checkAnalyzeReady();
+}
+
+function manualRetirement(){
+  const age = prompt('정년을 입력하세요 (만 세, 예: 60):');
+  if(!age) return;
+  const ageNum = parseInt(age);
+  if(isNaN(ageNum)||ageNum<50||ageNum>80){alert('50~80 범위의 숫자를 입력하세요.');return;}
+  const type = prompt('정년 기준을 선택하세요:\n1) 만 n세가 되는 날\n2) 만 n세가 되는 달의 말일 (기본)\n3) 만 n세가 되는 해의 말일\n4) 상/하반기 말일','2');
+  const typeMap={'1':'birthday','2':'month_end','3':'year_end','4':'half_year_end'};
+  displayRetirementResult({
+    retirement_age: ageNum,
+    retirement_type: typeMap[type]||'month_end',
+    has_continued_employment: true,
+    continued_employment_type: 'rehire',
+    needs_regulation_fix: ageNum < 60,
+    relevant_clauses: [],
+    notes: '수동 입력'
+  });
+}
+
+function getRetirementTypeLabel(t){
+  return {'birthday':'만 n세가 되는 날','month_end':'만 n세가 되는 달의 말일','year_end':'만 n세가 되는 해의 말일','half_year_end':'상/하반기 말일','unknown':'불명확'}[t]||t;
+}
+function getContinuedTypeLabel(t){
+  return {'rehire':'재고용형','extend':'정년연장형','abolish':'정년폐지형'}[t]||t||'';
+}
+
+// ============ STEP 3: Employment Data Parsing ============
+async function parseExcel(file){
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array',cellDates:true});
+  const workers=[];
+  for(const sheetName of wb.SheetNames){
+    const ws=wb.Sheets[sheetName];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+    if(rows.length<2) continue;
+
+    // Find header row - look for common column names
+    let headerIdx=-1;
+    const headerKeywords=['성명','이름','생년월일','주민등록번호','주민번호','취득일','입사일','상실일','퇴사일','보수','월평균보수','자격취득일'];
+    for(let i=0;i<Math.min(rows.length,10);i++){
+      const row=rows[i].map(c=>String(c).trim());
+      const matchCount=row.filter(c=>headerKeywords.some(k=>c.includes(k))).length;
+      if(matchCount>=2){headerIdx=i;break;}
+    }
+    if(headerIdx<0) continue;
+
+    const headers=rows[headerIdx].map(c=>String(c).trim());
+    // Map columns
+    const colMap={};
+    headers.forEach((h,i)=>{
+      if(/성명|이름/.test(h)&&!colMap.name) colMap.name=i;
+      if(/주민.*번호|주민번호/.test(h)&&!colMap.ssn) colMap.ssn=i;
+      if(/생년월일/.test(h)&&!colMap.birth) colMap.birth=i;
+      if(/(자격)?취득일|입사일/.test(h)&&!colMap.hireDate) colMap.hireDate=i;
+      if(/상실일|퇴사일|이직일/.test(h)&&!colMap.lossDate) colMap.lossDate=i;
+      if(/월평균보수|보수$|보수월액/.test(h)&&!colMap.salary) colMap.salary=i;
+      if(/취득부호|구분/.test(h)&&!colMap.type) colMap.type=i;
+      if(/상실부호|상실사유/.test(h)&&!colMap.lossReason) colMap.lossReason=i;
+      if(/피보험자.*번호|관리번호/.test(h)&&!colMap.insuredNo) colMap.insuredNo=i;
+    });
+
+    if(!colMap.name) continue;
+
+    for(let i=headerIdx+1;i<rows.length;i++){
+      const row=rows[i];
+      if(!row||!row[colMap.name]) continue;
+      const name=String(row[colMap.name]).trim();
+      if(!name||name.length<2) continue;
+
+      const worker={name, source:sheetName};
+      if(colMap.ssn!==undefined){
+        const ssn=String(row[colMap.ssn]).replace(/[^0-9]/g,'');
+        if(ssn.length>=6) worker.birthDate=parseBirthFromSSN(ssn);
+        worker.ssn=ssn;
+      }
+      if(colMap.birth!==undefined && !worker.birthDate){
+        worker.birthDate=parseDate(String(row[colMap.birth]));
+      }
+      if(colMap.hireDate!==undefined) worker.hireDate=parseDate(String(row[colMap.hireDate]));
+      if(colMap.lossDate!==undefined) worker.lossDate=parseDate(String(row[colMap.lossDate]));
+      if(colMap.salary!==undefined) worker.salary=parseNumber(String(row[colMap.salary]));
+      if(colMap.type!==undefined) worker.type=String(row[colMap.type]).trim();
+      if(colMap.lossReason!==undefined) worker.lossReason=String(row[colMap.lossReason]).trim();
+      if(colMap.insuredNo!==undefined) worker.insuredNo=String(row[colMap.insuredNo]).trim();
+
+      workers.push(worker);
+    }
+  }
+  return workers;
+}
+
+async function parseEmpPdf(file){
+  const text=await pdfToText(file);
+  // Try to parse structured data from employment PDF
+  const workers=[];
+  const lines=text.split('\n').map(l=>l.trim()).filter(l=>l);
+
+  // Look for patterns with Korean names + dates + numbers
+  // Common format: name, SSN/birth, hire date, loss date, salary
+  for(const line of lines){
+    // Pattern: Korean name (2-4 chars) followed by numbers/dates
+    const nameMatch=line.match(/([가-힣]{2,4})\s+(\d{6,13})/);
+    if(!nameMatch) continue;
+
+    const name=nameMatch[1];
+    const numStr=nameMatch[2];
+    const worker={name, source:'PDF'};
+
+    if(numStr.length>=13){
+      worker.birthDate=parseBirthFromSSN(numStr);
+      worker.ssn=numStr;
+    }else if(numStr.length>=6){
+      worker.birthDate=parseBirthFromSSN(numStr);
+    }
+
+    // Look for dates in the rest of the line
+    const dates=[...line.matchAll(/(\d{4})[.\-/]?(\d{2})[.\-/]?(\d{2})/g)];
+    if(dates.length>=1) worker.hireDate=new Date(dates[0][1],dates[0][2]-1,dates[0][3]);
+    if(dates.length>=2) worker.lossDate=new Date(dates[1][1],dates[1][2]-1,dates[1][3]);
+
+    // Look for salary
+    const salMatch=line.match(/(\d{1,3}[,.]?\d{3,})\s*$/);
+    if(salMatch) worker.salary=parseNumber(salMatch[1]);
+
+    workers.push(worker);
+  }
+  return {workers, text};
+}
+
+function parseBirthFromSSN(ssn){
+  const clean=ssn.replace(/[^0-9]/g,'');
+  if(clean.length<7) return null;
+  const yy=parseInt(clean.substring(0,2));
+  const mm=parseInt(clean.substring(2,4))-1;
+  const dd=parseInt(clean.substring(4,6));
+  const gen=parseInt(clean.substring(6,7));
+  let yyyy;
+  if(gen===1||gen===2||gen===5||gen===6) yyyy=1900+yy;
+  else if(gen===3||gen===4||gen===7||gen===8) yyyy=2000+yy;
+  else yyyy=yy<30?2000+yy:1900+yy;
+  return new Date(yyyy,mm,dd);
+}
+
+function parseDate(str){
+  if(!str) return null;
+  // Handle Date objects
+  if(str instanceof Date) return str;
+  const s=String(str).trim();
+  // YYYYMMDD or YYYY-MM-DD or YYYY.MM.DD or YYYY/MM/DD
+  let m=s.match(/^(\d{4})[.\-/]?(\d{2})[.\-/]?(\d{2})/);
+  if(m) return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+  // Try JS Date parse
+  const d=new Date(s);
+  return isNaN(d)?null:d;
+}
+
+function parseNumber(str){
+  if(!str) return null;
+  return parseInt(String(str).replace(/[^0-9]/g,''))||null;
+}
+
+// ============ ANALYSIS ENGINE ============
+async function runAnalysis(){
+  if(!retirementAge){alert('먼저 정년을 확인해주세요.');return;}
+  if(!empFiles.length){alert('고용현황 파일을 업로드해주세요.');return;}
+
+  const btn=document.getElementById('btnAnalyze');
+  btn.disabled=true;
+  setStatus('고용현황 파일 파싱 중...');
+  setProgress(10);
+  employees=[];
+  let debugText='';
+
+  try{
+    for(let i=0;i<empFiles.length;i++){
+      const f=empFiles[i];
+      setStatus(`파싱 중: ${f.name} (${i+1}/${empFiles.length})`);
+      if(f.name.match(/\.(xlsx|xls|csv)$/i)){
+        const w=await parseExcel(f);
+        employees.push(...w);
+      }else{
+        const r=await parseEmpPdf(f);
+        employees.push(...r.workers);
+        debugText+=`=== ${f.name} ===\n${r.text}\n\n`;
+      }
+      setProgress(10+60*(i+1)/empFiles.length);
+    }
+    document.getElementById('dbgEmpText').textContent=debugText||'(Excel 파일 - 텍스트 없음)';
+
+    // Deduplicate by name+birth
+    employees = deduplicateWorkers(employees);
+
+    setStatus(`${employees.length}명 근로자 파싱 완료. 분석 중...`);
+    setProgress(80);
+
+    // Run eligibility analysis
+    analysisResult = analyzeEligibility(employees);
+    setProgress(100);
+    setStatus('분석 완료');
+    displayResults(analysisResult);
+    document.getElementById('stepEmployment').querySelector('.step-num').classList.add('done');
+
+  }catch(e){
+    setStatus('오류: '+e.message);
+    console.error(e);
+  }
+  btn.disabled=false;
+}
+
+function deduplicateWorkers(workers){
+  const map=new Map();
+  workers.forEach(w=>{
+    const key=w.name+(w.birthDate?w.birthDate.getTime():'')+(w.ssn||'');
+    if(!map.has(key)){
+      map.set(key,w);
+    }else{
+      // Merge: keep the one with more data, update loss/hire dates
+      const existing=map.get(key);
+      if(!existing.hireDate && w.hireDate) existing.hireDate=w.hireDate;
+      if(!existing.lossDate && w.lossDate) existing.lossDate=w.lossDate;
+      if(!existing.salary && w.salary) existing.salary=w.salary;
+      if(!existing.birthDate && w.birthDate) existing.birthDate=w.birthDate;
+    }
+  });
+  return [...map.values()];
+}
+
+function analyzeEligibility(workers){
+  const systemStart=parseDate(document.getElementById('systemStartDate').value);
+  const reportDate=parseDate(document.getElementById('reportDate').value)||systemStart;
+  const reviewDate=parseDate(document.getElementById('reviewDate').value)||new Date();
+  const region=document.getElementById('companyRegion').value;
+  const hasHistory=document.getElementById('hasHistory').value==='yes';
+  const quarter=document.getElementById('applyQuarter').value;
+  const [qYear,qNum]=quarter.split('-Q').map(Number);
+
+  // Effective start date = earlier of systemStart and reportDate
+  const effectiveStart = systemStart && reportDate ? new Date(Math.min(systemStart,reportDate)) : systemStart||reportDate;
+  // 5-year window from system start
+  const fiveYearEnd = systemStart ? addYears(systemStart, 5) : null;
+  // Is system start before/after 2024-01-09?
+  const isPost20240109 = systemStart ? systemStart >= new Date(2024,0,9) : false;
+
+  const eligible=[];
+  const excluded=[];
+  const all=[];
+
+  workers.forEach(w=>{
+    const info = {
+      ...w,
+      age: null,
+      retirementReachDate: null,
+      isRetired: false,
+      isCurrentlyEmployed: false,
+      eligibilityStatus: 'unknown',
+      exclusionReason: null,
+      supportYears: 0,
+      quarterlyAmount: 0,
+      totalEstimate: 0,
+      notes: []
+    };
+
+    // Calculate age and retirement reach date
+    if(w.birthDate){
+      info.age = calcAge(w.birthDate, reviewDate);
+      info.retirementReachDate = calcRetirementDate(w.birthDate, retirementAge, retirementType);
+    }
+
+    // Currently employed?
+    info.isCurrentlyEmployed = !w.lossDate || w.lossDate > reviewDate;
+
+    // Has reached retirement?
+    if(info.retirementReachDate){
+      info.isRetired = info.retirementReachDate <= reviewDate;
+    }
+
+    // Check if within 5-year window from system start
+    let inWindow = true;
+    if(fiveYearEnd && info.retirementReachDate){
+      inWindow = info.retirementReachDate <= fiveYearEnd;
+      // Also include those who already reached retirement before system start
+      // if they were re-employed within 6 months
+    }
+
+    // ---- Exclusion checks ----
+    let isExcluded = false;
+
+    // 1. Insurance period check (post 2024-01-09 businesses)
+    if(isPost20240109 && w.hireDate && info.retirementReachDate){
+      const insurancePeriod = (info.retirementReachDate - w.hireDate)/(1000*60*60*24*365.25);
+      if(insurancePeriod < 2){
+        info.exclusionReason = '정년 도달일까지 고용보험 취득기간 2년 미만';
+        isExcluded = true;
+      }
+    }
+
+    // 2. Wage check for 2025
+    if(w.salary && w.salary < 1210000 && qYear===2025){
+      info.exclusionReason = (info.exclusionReason?info.exclusionReason+' / ':'')+'2025년 월평균보수 121만원 미만';
+      isExcluded = true;
+    }
+
+    // 3. Hire date check (pre 2025-01-01 workers: must have been hired before system start)
+    // This is for workers whose continued employment starts before 2025-01-01
+    if(systemStart && w.hireDate && info.retirementReachDate){
+      const continuedEmpDate = info.retirementReachDate; // approximate
+      if(continuedEmpDate < new Date(2025,0,1)){
+        if(w.hireDate > systemStart){
+          info.exclusionReason = (info.exclusionReason?info.exclusionReason+' / ':'')+'입사일이 제도 시행일 이후 (2025.1.1 이전 계속고용자)';
+          isExcluded = true;
+        }
+      }
+    }
+
+    // 4. Not within 5-year window
+    if(!inWindow && info.retirementReachDate){
+      info.exclusionReason = (info.exclusionReason?info.exclusionReason+' / ':'')+'제도 시행일로부터 5년 이내 정년 미도달';
+      isExcluded = true;
+    }
+
+    // ---- Eligibility determination ----
+    if(!w.birthDate){
+      info.eligibilityStatus = 'no_birth';
+      info.notes.push('생년월일 미확인');
+    } else if(info.age < retirementAge - 5){
+      info.eligibilityStatus = 'too_young';
+      info.notes.push('정년 도달까지 5년 초과');
+    } else if(isExcluded){
+      info.eligibilityStatus = 'excluded';
+    } else if(info.retirementReachDate && (info.isRetired || (fiveYearEnd && info.retirementReachDate <= fiveYearEnd))){
+      // Potential candidate
+      if(info.isCurrentlyEmployed){
+        info.eligibilityStatus = 'eligible_active';
+        info.notes.push('재직중 - 추가검토 대상');
+      } else if(w.lossReason && /계약만료|기간만료/.test(w.lossReason)){
+        info.eligibilityStatus = 'eligible_contract_end';
+        info.notes.push('퇴사(계약만료) - 1년 단위 계약 달성 여부 확인 필요');
+      } else if(w.lossDate){
+        info.eligibilityStatus = 'eligible_resigned';
+        info.notes.push('퇴사 - 재고용일~퇴사일 기간 산출 필요');
+      } else {
+        info.eligibilityStatus = 'eligible_review';
+        info.notes.push('추가검토 필요');
+      }
+
+      // Calculate support period & amount
+      if(!hasHistory){
+        info.notes.push('기존 신청이력 없음 - 검토금액 없음 산정');
+        info.totalEstimate = 0;
+      } else {
+        const supportCalc = calcSupport(info, region, qYear, qNum, systemStart);
+        info.supportYears = supportCalc.years;
+        info.quarterlyAmount = supportCalc.quarterly;
+        info.totalEstimate = supportCalc.total;
+        info.supportDetail = supportCalc.detail;
+      }
+    } else {
+      info.eligibilityStatus = 'not_eligible';
+      info.notes.push('정년 미도달 또는 대상 외');
+    }
+
+    all.push(info);
+    if(info.eligibilityStatus.startsWith('eligible')) eligible.push(info);
+    if(isExcluded) excluded.push(info);
+  });
+
+  // Sort eligible by retirement reach date
+  eligible.sort((a,b)=>(a.retirementReachDate||0)-(b.retirementReachDate||0));
+
+  // Overlap check (고령자고용지원금)
+  const overlapCheck = checkOverlap(systemStart, eligible, isPost20240109, fiveYearEnd);
+
+  return {all, eligible, excluded, overlapCheck, systemStart, effectiveStart, fiveYearEnd, isPost20240109, region, hasHistory, quarter};
+}
+
+function calcAge(birth, asOf){
+  let age = asOf.getFullYear()-birth.getFullYear();
+  const m=asOf.getMonth()-birth.getMonth();
+  if(m<0||(m===0&&asOf.getDate()<birth.getDate())) age--;
+  return age;
+}
+
+function calcRetirementDate(birth, age, type){
+  const bday = new Date(birth.getFullYear()+age, birth.getMonth(), birth.getDate());
+  switch(type){
+    case 'birthday': return bday;
+    case 'month_end': return new Date(bday.getFullYear(), bday.getMonth()+1, 0);
+    case 'year_end': return new Date(bday.getFullYear(), 11, 31);
+    case 'half_year_end':
+      return bday.getMonth()<6 ? new Date(bday.getFullYear(),5,30) : new Date(bday.getFullYear(),11,31);
+    default: return new Date(bday.getFullYear(), bday.getMonth()+1, 0);
+  }
+}
+
+function addYears(d,n){return new Date(d.getFullYear()+n,d.getMonth(),d.getDate());}
+
+function calcSupport(info, region, qYear, qNum, systemStart){
+  // Quarterly amount
+  let quarterly;
+  if(qYear>=2026){
+    quarterly = region==='metro' ? 900000 : 1200000;
+  } else {
+    quarterly = 900000;
+  }
+
+  // Max 3 years = 12 quarters
+  const maxQuarters = 12;
+  let remainingQuarters = maxQuarters;
+
+  // Calculate how many quarters may have already been used
+  if(info.retirementReachDate && systemStart){
+    const reEmployDate = info.retirementReachDate; // approximate start of support
+    const supportEnd = addYears(reEmployDate, 3);
+    const quarterStart = new Date(qYear, (qNum-1)*3, 1);
+
+    if(quarterStart > supportEnd){
+      remainingQuarters = 0;
+    } else {
+      const monthsLeft = (supportEnd.getFullYear()-quarterStart.getFullYear())*12+(supportEnd.getMonth()-quarterStart.getMonth());
+      remainingQuarters = Math.min(maxQuarters, Math.ceil(monthsLeft/3));
+    }
+  }
+
+  // If resigned, adjust
+  if(info.lossDate && info.retirementReachDate){
+    const workedMonths = (info.lossDate.getFullYear()-info.retirementReachDate.getFullYear())*12+(info.lossDate.getMonth()-info.retirementReachDate.getMonth());
+    remainingQuarters = Math.min(remainingQuarters, Math.ceil(workedMonths/3));
+  }
+
+  remainingQuarters = Math.max(0, remainingQuarters);
+
+  return {
+    years: Math.ceil(remainingQuarters/4),
+    quarterly,
+    total: remainingQuarters * quarterly,
+    detail: `${remainingQuarters}분기 x ${(quarterly/10000).toFixed(0)}만원 = ${((remainingQuarters*quarterly)/10000).toFixed(0)}만원`
+  };
+}
+
+function checkOverlap(systemStart, eligible, isPost20240109, fiveYearEnd){
+  if(!systemStart) return {canCheck:false, reason:'계속고용제도 시행일 미입력'};
+
+  // Find latest support end date among all eligible
+  let latestSupportEnd = null;
+  eligible.forEach(w=>{
+    if(w.retirementReachDate){
+      const end = addYears(w.retirementReachDate, 3);
+      if(!latestSupportEnd || end > latestSupportEnd) latestSupportEnd = end;
+    }
+  });
+
+  const threeYearFromStart = addYears(systemStart, 3);
+  const fiveYearFromStart = addYears(systemStart, 5);
+
+  let checkStartDate;
+  if(isPost20240109){
+    // Post 2024-01-09: later of (all support ends, 3 years from system start)
+    const dateA = latestSupportEnd ? new Date(latestSupportEnd.getTime()+86400000) : null;
+    const dateB = threeYearFromStart;
+    if(dateA && dateB){
+      checkStartDate = dateA > dateB ? dateA : dateB;
+    } else {
+      checkStartDate = dateA || dateB;
+    }
+    // Also need to verify no future retirees within 5 years + 2 year continuous employment
+  } else {
+    // Pre 2024-01-09: later of (all support ends, 5 years from system start)
+    const dateA = latestSupportEnd ? new Date(latestSupportEnd.getTime()+86400000) : null;
+    const dateB = fiveYearFromStart;
+    if(dateA && dateB){
+      checkStartDate = dateA > dateB ? dateA : dateB;
+    } else {
+      checkStartDate = dateA || dateB;
+    }
+  }
+
+  const today = new Date();
+  const canCheck = checkStartDate && checkStartDate <= today;
+  const hasEligible = eligible.length > 0;
+
+  return {
+    canCheck,
+    checkStartDate,
+    latestSupportEnd,
+    isPost20240109,
+    reason: canCheck
+      ? `${formatDate(checkStartDate)}부터 고령자고용지원금 검토 가능`
+      : hasEligible
+        ? `계속고용 대상자 지원기간 종료 후 검토 가능 (예상: ${checkStartDate?formatDate(checkStartDate):'미정'})`
+        : '계속고용 대상자 없음 - 별도 확인 필요'
+  };
+}
+
+// ============ DISPLAY ============
+function displayResults(r){
+  document.getElementById('resultsArea').style.display='block';
+
+  // Summary
+  const sb=document.getElementById('summaryBanner');
+  sb.style.display='block';
+  if(r.eligible.length>0){
+    sb.className='summary-banner info';
+    sb.textContent=`총 ${r.all.length}명 중 ${r.eligible.length}명 대상자 추정 (제외: ${r.excluded.length}명) — 추가검토 필요`;
+  }else{
+    sb.className='summary-banner warn';
+    sb.textContent=`총 ${r.all.length}명 분석 완료. 대상자 추정 0명.${!r.hasHistory?' (기존 신청이력 없음)':''}`;
+  }
+
+  // Stats
+  const totalEstimate = r.eligible.reduce((s,w)=>s+w.totalEstimate,0);
+  document.getElementById('statsRow').innerHTML=`
+    <div class="stat-card"><div class="value">${r.all.length}</div><div class="label">전체 근로자</div></div>
+    <div class="stat-card"><div class="value">${r.eligible.length}</div><div class="label">대상자 추정</div></div>
+    <div class="stat-card"><div class="value">${r.excluded.length}</div><div class="label">제외 대상자</div></div>
+    <div class="stat-card"><div class="value">${r.hasHistory?(totalEstimate/10000).toFixed(0)+'만':'—'}</div><div class="label">추정 지원금액</div></div>
+  `;
+
+  // Retirement section
+  const retBody=document.getElementById('retirementBody');
+  retBody.innerHTML=`
+    <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">
+      <div><span style="color:var(--text-sub)">정년:</span> <b>만 ${retirementAge}세</b> (${getRetirementTypeLabel(retirementType)})</div>
+      <div><span style="color:var(--text-sub)">제도 시행일:</span> <b>${r.systemStart?formatDate(r.systemStart):'미입력'}</b></div>
+      <div><span style="color:var(--text-sub)">5년 만료:</span> <b>${r.fiveYearEnd?formatDate(r.fiveYearEnd):'—'}</b></div>
+      <div><span style="color:var(--text-sub)">소재지:</span> <b>${r.region==='metro'?'수도권':'비수도권'}</b></div>
+      <div><span style="color:var(--text-sub)">신청분기:</span> <b>${r.quarter}</b></div>
+      <div><span style="color:var(--text-sub)">기존이력:</span> <b>${r.hasHistory?'있음':'없음'}</b></div>
+    </div>
+    ${!r.hasHistory?'<div class="alert alert-warn" style="margin-top:12px">기존 신청이력 없음: 정년연장 등 사업장에 추가확인 필요한 바 검토금액 없음으로 산정</div>':''}
+  `;
+
+  // Tables
+  renderTable('tableAllWrap', r.all, 'all');
+  renderTable('tableEligibleWrap', r.eligible, 'eligible');
+  renderTable('tableExcludedWrap', r.excluded, 'excluded');
+
+  // Overlap
+  const ov=r.overlapCheck;
+  document.getElementById('overlapBody').innerHTML=`
+    <div class="alert ${ov.canCheck?'alert-success':'alert-info'}">
+      <b>고령자고용지원금 중복검토 결과</b><br>
+      ${ov.reason}
+    </div>
+    <div style="font-size:12px;color:var(--text-sub);margin-top:8px">
+      <p>- 계속고용제도 시행일: ${r.systemStart?formatDate(r.systemStart):'미입력'} (${r.isPost20240109?'2024.1.9 이후':'2024.1.9 이전'})</p>
+      ${ov.latestSupportEnd?`<p>- 대상자 최종 지원기간 종료: ${formatDate(ov.latestSupportEnd)}</p>`:''}
+      ${ov.checkStartDate?`<p>- 고령자고용지원금 검토 가능일: ${formatDate(ov.checkStartDate)}</p>`:''}
+    </div>
+  `;
+
+  // Scroll to results
+  document.getElementById('resultsArea').scrollIntoView({behavior:'smooth'});
+}
+
+function renderTable(containerId, workers, mode){
+  if(!workers.length){
+    document.getElementById(containerId).innerHTML='<div class="alert alert-info">해당하는 근로자가 없습니다.</div>';
+    return;
+  }
+
+  const showAmount = analysisResult && analysisResult.hasHistory;
+
+  let html='<table class="data-table"><thead><tr>';
+  html+='<th>No.</th><th>성명</th><th>생년월일</th><th>만 나이</th><th>입사일</th><th>상실일</th><th>재직</th>';
+  html+='<th>정년도달일</th><th>판정</th>';
+  if(showAmount) html+='<th>추정금액</th>';
+  html+='<th>비고</th>';
+  html+='</tr></thead><tbody>';
+
+  workers.forEach((w,i)=>{
+    let rowClass='';
+    if(w.eligibilityStatus.startsWith('eligible')) rowClass='eligible';
+    else if(w.eligibilityStatus==='excluded') rowClass='excluded';
+    else if(w.eligibilityStatus==='not_eligible') rowClass='';
+
+    html+=`<tr class="${rowClass}">`;
+    html+=`<td>${i+1}</td>`;
+    html+=`<td><b>${w.name}</b></td>`;
+    html+=`<td>${w.birthDate?formatDate(w.birthDate):'—'}</td>`;
+    html+=`<td>${w.age!==null?w.age:'—'}</td>`;
+    html+=`<td>${w.hireDate?formatDate(w.hireDate):'—'}</td>`;
+    html+=`<td>${w.lossDate?formatDate(w.lossDate):'—'}</td>`;
+    html+=`<td>${w.isCurrentlyEmployed?'<span class="badge badge-ok">재직</span>':'<span class="badge badge-neutral">퇴사</span>'}</td>`;
+    html+=`<td>${w.retirementReachDate?formatDate(w.retirementReachDate):'—'}</td>`;
+    html+=`<td>${getStatusBadge(w.eligibilityStatus)}</td>`;
+    if(showAmount) html+=`<td>${w.totalEstimate?(w.totalEstimate/10000).toFixed(0)+'만':'—'}</td>`;
+    html+=`<td style="font-size:11px">${w.notes.join('; ')}${w.exclusionReason?' [제외: '+w.exclusionReason+']':''}${w.supportDetail?' | '+w.supportDetail:''}</td>`;
+    html+=`</tr>`;
+  });
+
+  html+='</tbody></table>';
+  document.getElementById(containerId).innerHTML=html;
+}
+
+function getStatusBadge(status){
+  const map={
+    'eligible_active':'<span class="badge badge-ok">대상추정(재직)</span>',
+    'eligible_contract_end':'<span class="badge badge-warn">대상추정(계약만료)</span>',
+    'eligible_resigned':'<span class="badge badge-warn">대상추정(퇴사)</span>',
+    'eligible_review':'<span class="badge badge-info">추가검토</span>',
+    'excluded':'<span class="badge badge-fail">제외</span>',
+    'not_eligible':'<span class="badge badge-neutral">비대상</span>',
+    'too_young':'<span class="badge badge-neutral">정년미달</span>',
+    'no_birth':'<span class="badge badge-fail">생년월일 미확인</span>',
+    'unknown':'<span class="badge badge-neutral">—</span>'
+  };
+  return map[status]||status;
+}
+
+function formatDate(d){
+  if(!d) return '';
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ============ TABS ============
+function switchTab(id){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  // Find the matching button
+  const tabs=document.querySelectorAll('.tab-btn');
+  const idx=['tabAll','tabEligible','tabExcluded','tabOverlap'].indexOf(id);
+  if(idx>=0 && tabs[idx]) tabs[idx].classList.add('active');
+}
+
+// ============ EXPORT ============
+function exportExcel(){
+  if(!analysisResult) return;
+  const wb=XLSX.utils.book_new();
+
+  // All workers
+  const allData=analysisResult.all.map((w,i)=>({
+    'No.':i+1,
+    '성명':w.name,
+    '생년월일':w.birthDate?formatDate(w.birthDate):'',
+    '만나이':w.age,
+    '입사일':w.hireDate?formatDate(w.hireDate):'',
+    '상실일':w.lossDate?formatDate(w.lossDate):'',
+    '재직여부':w.isCurrentlyEmployed?'재직':'퇴사',
+    '정년도달일':w.retirementReachDate?formatDate(w.retirementReachDate):'',
+    '판정':w.eligibilityStatus,
+    '추정금액(원)':w.totalEstimate||'',
+    '비고':w.notes.join('; ')+(w.exclusionReason?' [제외: '+w.exclusionReason+']':'')
+  }));
+  const ws1=XLSX.utils.json_to_sheet(allData);
+  XLSX.utils.book_append_sheet(wb,ws1,'전체근로자');
+
+  // Eligible
+  const eligData=analysisResult.eligible.map((w,i)=>({
+    'No.':i+1,
+    '성명':w.name,
+    '생년월일':w.birthDate?formatDate(w.birthDate):'',
+    '만나이':w.age,
+    '입사일':w.hireDate?formatDate(w.hireDate):'',
+    '상실일':w.lossDate?formatDate(w.lossDate):'',
+    '재직여부':w.isCurrentlyEmployed?'재직':'퇴사',
+    '정년도달일':w.retirementReachDate?formatDate(w.retirementReachDate):'',
+    '추정금액(원)':w.totalEstimate||'',
+    '지원상세':w.supportDetail||'',
+    '비고':w.notes.join('; ')
+  }));
+  const ws2=XLSX.utils.json_to_sheet(eligData);
+  XLSX.utils.book_append_sheet(wb,ws2,'대상자추정');
+
+  const companyName=document.getElementById('companyName').value||'사업장';
+  XLSX.writeFile(wb,`고령자계속고용_대상자_${companyName}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+</script>
+</body>
+</html>
