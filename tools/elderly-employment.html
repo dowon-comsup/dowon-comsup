@@ -5,6 +5,7 @@
 <title>고령자 계속고용 지원금 대상자 판독 | 노무법인 도원</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
 :root{--bg:#ffffff;--bg-sub:#f8f9fa;--border:#e5e7eb;--border-dark:#d1d5db;--text:#1a1a1a;--text-sub:#6b7280;--text-muted:#9ca3af;--accent:#111827;--accent-light:#f3f4f6;--blue:#2563eb;--green:#059669;--red:#dc2626;--orange:#d97706;--shadow:0 1px 3px rgba(0,0,0,.06);--shadow-md:0 4px 12px rgba(0,0,0,.08);--radius:8px;--radius-lg:12px}
@@ -370,12 +371,26 @@ function setStatus(msg){document.getElementById('statusText').textContent=msg;}
 function setProgress(pct){const b=document.getElementById('progressBar');b.style.display='block';document.getElementById('progressFill').style.width=pct+'%';}
 
 // ============ STEP 2: Parse Rules ============
-// 페이지별 텍스트 추출
-async function pdfToTextByPage(file){
+// PDF 페이지 → canvas 렌더링
+async function renderPageCanvas(pdf, pageNum, scale){
+  const page=await pdf.getPage(pageNum);
+  const vp=page.getViewport({scale});
+  const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+  await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+  return c;
+}
+
+// 페이지별 텍스트 추출 (텍스트 레이어 → 없으면 OCR 폴백)
+async function pdfToTextByPage(file, statusFn){
   const buf=await file.arrayBuffer();
-  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  const totalPages=pdf.numPages;
+
+  // 1차: PDF.js 텍스트 레이어로 추출 시도
+  if(statusFn) statusFn(`텍스트 레이어 추출 중... (${totalPages}페이지)`);
   const pages=[];
-  for(let i=1;i<=pdf.numPages;i++){
+  let totalChars=0;
+  for(let i=1;i<=totalPages;i++){
     const page=await pdf.getPage(i);
     const tc=await page.getTextContent();
     const items=tc.items.map(it=>({x:it.transform[4],y:it.transform[5],s:it.str})).sort((a,b)=>b.y-a.y||a.x-b.x);
@@ -383,9 +398,29 @@ async function pdfToTextByPage(file){
     items.forEach(it=>{if(curY===null||Math.abs(it.y-curY)>3){cur=[];lines.push(cur);curY=it.y;}cur.push(it);});
     let pageText='';
     lines.forEach(L=>{pageText+=L.map(o=>o.s).join(' ').replace(/\s+/g,' ').trim()+'\n';});
+    totalChars+=pageText.trim().length;
     pages.push({pageNum:i, text:pageText});
   }
-  return {pages, pdf};
+
+  // 텍스트가 충분하면 바로 반환
+  if(totalChars > totalPages * 20){
+    return {pages, usedOcr:false};
+  }
+
+  // 2차: 스캔본 — Tesseract OCR 폴백
+  if(statusFn) statusFn(`스캔 PDF 감지. OCR 엔진 초기화 중... (최초 1회 한글 데이터 다운로드)`);
+  const worker=await Tesseract.createWorker('kor',1,{
+    logger:m=>{if(m.status==='recognizing text' && statusFn) statusFn(`OCR 진행: ${(m.progress*100).toFixed(0)}%`);}
+  });
+
+  for(let i=0;i<pages.length;i++){
+    if(statusFn) statusFn(`OCR: ${i+1}/${totalPages} 페이지 처리 중...`);
+    const canvas=await renderPageCanvas(pdf, pages[i].pageNum, 2.5);
+    const {data}=await worker.recognize(canvas);
+    pages[i].text=data.text;
+  }
+  await worker.terminate();
+  return {pages, usedOcr:true};
 }
 
 async function pdfToText(file){
@@ -396,7 +431,7 @@ async function pdfToText(file){
 // 특정 페이지만 이미지로 렌더링
 async function renderPageImage(file, pageNum, scale=2.0){
   const buf=await file.arrayBuffer();
-  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
   const page=await pdf.getPage(pageNum);
   const vp=page.getViewport({scale});
   const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
@@ -412,11 +447,12 @@ async function parseRules(){
   const btn=document.getElementById('btnParseRules');
   btn.disabled=true;
   document.getElementById('rulesResult').innerHTML='<div class="alert alert-info">취업규칙 텍스트 추출 중...</div>';
+  const rulesStatus = msg => { document.getElementById('rulesResult').innerHTML=`<div class="alert alert-info">${msg}</div>`; };
 
   try{
-    // 1) 페이지별 텍스트 추출
-    const {pages} = await pdfToTextByPage(rulesFiles[0]);
-    const fullText = pages.map(p=>`[${p.pageNum}페이지]\n${p.text}`).join('\n');
+    // 1) 페이지별 텍스트 추출 (스캔본이면 자동 OCR)
+    const {pages, usedOcr} = await pdfToTextByPage(rulesFiles[0], rulesStatus);
+    const fullText = (usedOcr?'[OCR로 추출됨]\n\n':'') + pages.map(p=>`[${p.pageNum}페이지]\n${p.text}`).join('\n');
     document.getElementById('dbgRulesText').textContent = fullText;
 
     // 2) "정년" 키워드가 포함된 페이지 찾기 (전후 1페이지씩 포함)
