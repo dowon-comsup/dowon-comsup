@@ -439,15 +439,16 @@ async function parseRules(){
     if(targetPageNums.length===0){
       status(`스캔 PDF 감지. Vision으로 정년 페이지 탐색 중... (${numPages}페이지)`);
 
-      // Pass 1: 중화질 썸네일로 정년 페이지 번호 찾기 (15페이지씩 배치)
-      const batchSize = 15;
+      // Pass 1: 저화질 썸네일로 정년 페이지 번호 찾기 (5페이지씩 배치, rate limit 대응)
+      const batchSize = 5;
       const foundPages = [];
       for(let b=0; b<numPages; b+=batchSize){
+        if(b>0) await new Promise(r=>setTimeout(r,3000)); // rate limit 대응 딜레이
         const batchEnd = Math.min(b+batchSize, numPages);
         status(`페이지 탐색 중: ${b+1}~${batchEnd} / ${numPages}`);
         const batchParts = [];
         for(let pn=b+1; pn<=batchEnd; pn++){
-          const img = await pdfPageToImage(rulesFiles[0], pn, 1.2);
+          const img = await pdfPageToImage(rulesFiles[0], pn, 0.8);
           batchParts.push({type:'text',text:`[${pn}페이지]`});
           batchParts.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:img}});
         }
@@ -483,8 +484,9 @@ async function parseRules(){
     // Pass 2: 타겟 페이지 고화질 이미지 → 상세 추출
     status(`정년 관련 ${targetPageNums.join(',')}페이지 상세 분석 중...`);
     const contentParts = [];
-    for(const pn of targetPageNums.slice(0,15)){
-      const img = await pdfPageToImage(rulesFiles[0], pn, 1.5);
+    if(targetPageNums.length>0) await new Promise(r=>setTimeout(r,3000)); // rate limit 대응 딜레이
+    for(const pn of targetPageNums.slice(0,8)){
+      const img = await pdfPageToImage(rulesFiles[0], pn, 1.2);
       contentParts.push({type:'text',text:`[${pn}페이지]`});
       contentParts.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:img}});
     }
