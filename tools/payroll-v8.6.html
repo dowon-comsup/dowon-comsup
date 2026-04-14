@@ -367,12 +367,12 @@ tr:hover{background:var(--light)}
         <button class="btn btn-outline" style="margin-top:6px" onclick="parseTextRequest()">텍스트 파싱</button>
       </div>
       <div id="requestExcelMode" class="hidden">
-        <div class="upload-zone" id="excelZone">
+        <label class="upload-zone" id="excelZone">
           <div class="upload-icon">📊</div>
           <div class="upload-label">요청서 엑셀(.xlsx) 드래그 또는 클릭</div>
           <div class="upload-filename" id="excelName"></div>
           <input type="file" accept=".xlsx,.xls,.csv" onchange="handleExcelUpload(this)">
-        </div>
+        </label>
       </div>
       <div id="parsedRequestPreview" class="hidden" style="margin-top:10px;max-height:140px;overflow-y:auto;font-size:11px;background:var(--light);padding:8px;border-radius:6px"></div>
     </div>
@@ -381,11 +381,11 @@ tr:hover{background:var(--light)}
     <div class="step-card">
       <h3><span class="step-num">2</span> 급여서류 PDF 업로드 (복수 가능)</h3>
       <p style="font-size:11px;color:var(--gray);margin-bottom:8px">급여대장/명세서 + 이체확인증이 하나의 PDF일 수도, 별도 파일일 수도 있습니다.</p>
-      <div class="upload-zone" id="pdfZone">
+      <label class="upload-zone" id="pdfZone">
         <div class="upload-icon">📄</div>
         <div class="upload-label">PDF 파일 드래그 또는 클릭 (복수 선택 가능)</div>
         <input type="file" accept=".pdf" multiple onchange="handlePdfUpload(this)">
-      </div>
+      </label>
       <div class="file-list" id="pdfFileList"></div>
       <div id="pdfInfo" style="margin-top:6px;font-size:11px;color:var(--gray)"></div>
       <!-- Vision AI 설정 (Gemini 1차 + Claude 폴백) -->
