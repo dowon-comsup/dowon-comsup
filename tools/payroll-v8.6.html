@@ -1059,6 +1059,33 @@ function normalizeRequestText(s) {
     .replace(/[ \t]+/g, ' ');
 }
 
+// 사람 이름이 아닌 일반 명사 블랙리스트 (이름 오추출 방지)
+const NAME_BLACKLIST = new Set([
+  // 대상자 관련
+  '근로자','근로자의','근로자명','대상자','대상자의','대상자명','직원','직원의','사원','사원의',
+  '담당자','담당자의','담당자명','사업주','사업주의','사업장','사업장의','고용주','고용주의',
+  // 서류/기간 관련
+  '기간','일자','날짜','내역','내용','사항','목록','명단','해당','해당월','귀속','귀속분','귀속월',
+  '지급','지급일','지급월','지원','지원금','지원기간','신청','신청서','요청','요청서',
+  // 급여 관련
+  '급여','급여월','급여일','급여대장','명세서','명세','이체','확인증','통장','계좌','입금',
+  '실수령','실지급','차인','총액','합계','공제','세전','세후',
+  // 문서/양식
+  '예시','참고','비고','작성','작성자','작성일','성함','성명','이름','본인','귀하','님들',
+  // 기타
+  '월별','주별','일별','매월','매주','매일','반복','정기','월간','주간','분기','연간',
+  '경우','경우의','경우는','경우에','관련','다음','이번','저번','해당','기준','기준일',
+]);
+
+function isLikelyName(name) {
+  if(!name) return false;
+  if(NAME_BLACKLIST.has(name)) return false;
+  // "~의", "~명", "~자" 로 끝나는 2~4자 단어 대부분은 이름이 아님 (단, 이씨 외엔 단독 이름 희박)
+  if(name.length >= 3 && /[의들]$/.test(name)) return false;
+  if(name.length >= 4 && /(자|장|증|서|부|표)$/.test(name) && NAME_BLACKLIST.has(name)) return false;
+  return true;
+}
+
 function parseTextRequest() {
   const raw = document.getElementById('requestText').value.trim();
   if(!raw) return alert('요청서 내용을 붙여넣어주세요.');
@@ -1075,6 +1102,7 @@ function parseTextRequest() {
     if(m && m.length === 5) { m.splice(4, 0, m[2]); } // 단일연도 보정: y2 = y1
     if(!m) continue;
     let [,name,y1,m1,y2,m2] = m;
+    if(!isLikelyName(name)) continue;
     if(seen.has(name)) continue;
     seen.add(name);
     y1 = +y1; y2 = +y2;
@@ -1112,6 +1140,7 @@ function parseTextRequest() {
       let rm;
       while((rm = rowRe.exec(text)) !== null) {
         const name = rm[2];
+        if(!isLikelyName(name)) continue;
         if(seen.has(name)) continue;
         seen.add(name);
         S.workers.push({name, periodStr, months: commonMonths.slice()});
