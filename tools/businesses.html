@@ -244,21 +244,29 @@ ${dowonManager} 드림`;
 
 // —— API ——
 const API = {
-  async fetchBusinesses() {
-    const cached = sessionStorage.getItem('dowon_biz_cache');
+  async fetchBusinesses(filter = 'all', search = '') {
+    const cacheKey = `dowon_biz_${filter}_${search}`;
+    const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
       const { ts, data } = JSON.parse(cached);
-      if (Date.now() - ts < 10 * 60 * 1000) return data;
+      if (Date.now() - ts < 5 * 60 * 1000) return data;
     }
-    const res = await fetch('https://n8n-docker.dowonbiz.com/webhook/businesses');
+    const params = new URLSearchParams();
+    if (filter && filter !== 'all') params.set('filter', filter);
+    if (search) params.set('search', search);
+    const url = 'https://n8n-docker.dowonbiz.com/webhook/businesses' + (params.toString() ? '?' + params.toString() : '');
+    const res = await fetch(url);
     if (!res.ok) throw new Error(res.status);
     const json = await res.json();
-    sessionStorage.setItem('dowon_biz_cache', JSON.stringify({ ts: Date.now(), data: json.data }));
-    return json.data;
+    const data = Array.isArray(json) ? json
+              : Array.isArray(json?.data) ? json.data
+              : json && typeof json === 'object' ? [json]
+              : [];
+    sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data }));
+    return data;
   },
-  async refresh() {
-    sessionStorage.removeItem('dowon_biz_cache');
-    return this.fetchBusinesses();
+  clearCache() {
+    Object.keys(sessionStorage).filter(k => k.startsWith('dowon_biz_')).forEach(k => sessionStorage.removeItem(k));
   },
   async logZeroMail(pageId) {
     fetch('https://n8n-docker.dowonbiz.com/webhook/log-zero-mail', {
@@ -270,10 +278,11 @@ const API = {
 };
 
 // —— 상태 ——
-let allBiz = [];
 let filtered = [];
 let currentFilter = 'all';
+let currentSearch = '';
 let selectedRow = null;
+let searchTimer = null;
 
 // —— 금액 포맷 ——
 const fmt = (v) => {
@@ -282,27 +291,28 @@ const fmt = (v) => {
   return n >= 10000 ? (n / 10000).toFixed(0) + '만원' : n.toLocaleString() + '원';
 };
 
-// —— 필터 적용 ——
-function applyFilter(q = '') {
-  let data = [...allBiz];
-  if (q) {
-    const lq = q.toLowerCase();
-    data = data.filter(b =>
-      b.name?.includes(q) ||
-      (b.contact_person||'').includes(q) ||
-      (b.biz_reg_no||'').replace(/-/g,'').includes(q.replace(/-/g,'')) ||
-      (b.dowon_subsidy_manager||'').includes(q)
-    );
+// —— 데이터 로드 ——
+async function loadData() {
+  const wrap = document.getElementById('tableWrap');
+  const countEl = document.getElementById('headerCount');
+  wrap.innerHTML = '<div class="loading"><div class="spinner"></div>불러오는 중...</div>';
+  countEl.textContent = '...';
+  document.getElementById('summaryBar').style.display = 'none';
+
+  try {
+    const data = await API.fetchBusinesses(currentFilter, currentSearch);
+    filtered = data;
+    document.getElementById('headerCount').textContent = `${data.length}개`;
+    document.getElementById('summaryBar').style.display = 'flex';
+    document.getElementById('sumTotal').textContent = data.length;
+    document.getElementById('sumImmediate').textContent = data.filter(b => Number(b.subsidy_immediate) > 0).length;
+    document.getElementById('sumDone').textContent = data.filter(b => b.review_complete === true).length;
+    document.getElementById('sumNoEmail').textContent = data.filter(b => !b.contact_email).length;
+    renderTable();
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">&#9888;</div>데이터 로드 실패<br><span style="font-size:12px;color:#64748b">${e.message}</span></div>`;
+    countEl.textContent = '오류';
   }
-  switch(currentFilter) {
-    case 'immediate': data = data.filter(b => Number(b.subsidy_immediate) > 0); break;
-    case 'done':      data = data.filter(b => b.review_complete === true || b.review_complete === 'true'); break;
-    case 'undone':    data = data.filter(b => !b.review_complete || b.review_complete === false); break;
-    case 'zero':      data = data.filter(b => (!b.subsidy_immediate || Number(b.subsidy_immediate) === 0) &&
-                                              (!b.subsidy_future   || Number(b.subsidy_future)   === 0)); break;
-  }
-  filtered = data;
-  renderTable();
 }
 
 // —— 테이블 렌더 ——
@@ -459,38 +469,50 @@ function closePanel() {
 }
 
 // —— 초기화 ——
-async function init() {
-  try {
-    allBiz = await API.fetchBusinesses();
-    document.getElementById('headerCount').textContent = `${allBiz.length}개`;
-    document.getElementById('summaryBar').style.display = 'flex';
-    document.getElementById('sumTotal').textContent = allBiz.length;
-    document.getElementById('sumImmediate').textContent = allBiz.filter(b => Number(b.subsidy_immediate) > 0).length;
-    document.getElementById('sumDone').textContent = allBiz.filter(b => b.review_complete === true || b.review_complete === 'true').length;
-    document.getElementById('sumNoEmail').textContent = allBiz.filter(b => !b.contact_email).length;
-    applyFilter('');
-  } catch(e) {
-    document.getElementById('tableWrap').innerHTML =
-      `<div class="empty"><div class="empty-icon">&#9888;</div>데이터 로드 실패<br><span style="font-size:12px;color:#64748b">${e.message}</span></div>`;
-  }
+function init() {
+  document.getElementById('tableWrap').innerHTML =
+    `<div class="empty"><div class="empty-icon">&#128269;</div>필터를 선택하거나 검색어를 입력하세요</div>`;
+  document.getElementById('headerCount').textContent = '-';
 }
 
-// —— 이벤트 ——
-document.getElementById('searchInput').addEventListener('input', e => applyFilter(e.target.value.trim()));
+document.getElementById('searchInput').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  currentSearch = q;
+  if (q.length === 0 && currentFilter === 'all') {
+    filtered = [];
+    document.getElementById('tableWrap').innerHTML =
+      `<div class="empty"><div class="empty-icon">&#128269;</div>필터를 선택하거나 검색어를 입력하세요</div>`;
+    document.getElementById('headerCount').textContent = '-';
+    document.getElementById('summaryBar').style.display = 'none';
+    return;
+  }
+  if (q.length >= 2 || currentFilter !== 'all') {
+    searchTimer = setTimeout(() => loadData(), 400);
+  }
+});
+
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentFilter = btn.dataset.filter;
-    applyFilter(document.getElementById('searchInput').value.trim());
+    loadData();
   });
 });
-document.getElementById('refreshBtn').addEventListener('click', async () => {
-  document.getElementById('tableWrap').innerHTML = '<div class="loading"><div class="spinner"></div>새로고침 중...</div>';
-  allBiz = await API.refresh();
-  document.getElementById('headerCount').textContent = `${allBiz.length}개`;
-  applyFilter(document.getElementById('searchInput').value.trim());
+
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  API.clearCache();
+  if (currentFilter !== 'all' || currentSearch.length >= 2) {
+    loadData();
+  } else {
+    document.getElementById('tableWrap').innerHTML =
+      `<div class="empty"><div class="empty-icon">&#128269;</div>필터를 선택하거나 검색어를 입력하세요</div>`;
+    document.getElementById('headerCount').textContent = '-';
+    document.getElementById('summaryBar').style.display = 'none';
+  }
 });
+
 document.getElementById('panelClose').addEventListener('click', closePanel);
 document.getElementById('panelOverlay').addEventListener('click', closePanel);
 
