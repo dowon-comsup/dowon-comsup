@@ -441,35 +441,26 @@ function checkActiveCoCeo(officers){
  return {isActive:activeCeos.length>=2, count:activeCeos.length, names:activeCeos.map(c=>c.name)};
 }
 
-// 주소 정규화 + Dice 계수 유사도
+// 주소 정규화 (완전 동일 여부만 판정)
 function normAddr(s){
  return (s||'').replace(/[\s,()\-.·]/g,'')
                .replace(/광역시|특별시|특별자치시|특별자치도/g,'')
                .toLowerCase();
 }
-function bigrams(s){const r=new Set();for(let i=0;i<s.length-1;i++)r.add(s.slice(i,i+2));return r;}
-function addrSim(a,b){
- const A=normAddr(a),B=normAddr(b);
- if(!A||!B)return 0;
- if(A===B)return 1;
- const ba=bigrams(A),bb=bigrams(B);
- if(!ba.size||!bb.size)return 0;
- let inter=0; ba.forEach(x=>{if(bb.has(x))inter++;});
- return 2*inter/(ba.size+bb.size);
-}
-// 두 인물(여러 주소 보유 가능)의 최대 유사도
+// 두 인물(여러 주소 보유 가능)의 주소 동일 여부: 하나라도 완전 일치하면 동일
 function bestPairSim(addrsA,addrsB){
- let best=0,pair=['',''];
+ let pair=['',''], same=false;
  (addrsA||[]).forEach(a=>(addrsB||[]).forEach(b=>{
-  const s=addrSim(a,b); if(s>best){best=s;pair=[a,b];}
+  const A=normAddr(a),B=normAddr(b);
+  if(A&&B&&A===B){ same=true; pair=[a,b]; }
  }));
- return {sim:best,a:pair[0],b:pair[1]};
+ if(!same){
+  pair=[(addrsA||[])[0]||'', (addrsB||[])[0]||''];
+ }
+ return {same, a:pair[0], b:pair[1]};
 }
-function classifyKin(sim){
- if(sim>=0.999) return {label:'친족 확실',color:'#fdd'};
- if(sim>=0.90)  return {label:'의심 필요',color:'#ffd'};
- if(sim>=0.60)  return {label:'낮음(부분일치)',color:'#eef'};
- return {label:'낮음',color:'#fff'};
+function classifyKin(same){
+ return same ? {label:'친족',color:'#fdd'} : {label:'비친족',color:'#fff'};
 }
 function renderCeoHistory(periods,officers){
  const host=document.getElementById('ceoHist');
@@ -524,15 +515,15 @@ function renderCeoHistory(periods,officers){
    p.addrs.forEach(a=>{if(a&&!persons[k].addrs.includes(a))persons[k].addrs.push(a);});
   });
   const arr=Object.values(persons);
-  h+='<h3 style="font-size:13px;margin:12px 0 4px">▶ 친족 의심 분석 (주소 유사도)</h3>';
-  h+='<table><thead><tr><th style="width:10%">대표이사 A</th><th>A 주소</th><th style="width:10%">대표이사 B</th><th>B 주소</th><th style="width:8%">유사도</th><th style="width:11%">분류</th></tr></thead><tbody>';
+  h+='<h3 style="font-size:13px;margin:12px 0 4px">▶ 친족 판정 (주소 동일 여부)</h3>';
+  h+='<table><thead><tr><th style="width:10%">대표이사 A</th><th>A 주소</th><th style="width:10%">대표이사 B</th><th>B 주소</th><th style="width:11%">판정</th></tr></thead><tbody>';
   for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++){
    const r=bestPairSim(arr[i].addrs,arr[j].addrs);
-   const c=classifyKin(r.sim);
-   h+=`<tr style="background:${c.color}"><td>${arr[i].name}</td><td class="reason">${r.a||'(주소 없음)'}</td><td>${arr[j].name}</td><td class="reason">${r.b||'(주소 없음)'}</td><td><b>${(r.sim*100).toFixed(1)}%</b></td><td><b>${c.label}</b></td></tr>`;
+   const c=classifyKin(r.same);
+   h+=`<tr style="background:${c.color}"><td>${arr[i].name}</td><td class="reason">${r.a||'(주소 없음)'}</td><td>${arr[j].name}</td><td class="reason">${r.b||'(주소 없음)'}</td><td><b>${c.label}</b></td></tr>`;
   }
   h+='</tbody></table>';
-  h+='<p class="small">※ 100% 일치 = 친족 확실, 90%이상 = 의심 필요. 주소가 시간차로 다른 표기(도로명/지번)일 수 있어 의심 이하라도 별도 확인 권장.</p>';
+  h+='<p class="small">※ 주소가 완전히 동일할 경우에만 친족으로 판정합니다. (도로명/지번 등 표기 차이는 비친족으로 처리)</p>';
  }
  host.innerHTML=h;
 }
