@@ -632,55 +632,91 @@ function parseEmpText(txt){
  }
  return out;
 }
-async function parseEmployment(file){
+// Excel sheets(이미 파싱된 aoa 배열)에서 recs 추출 — 순수함수
+function parseEmploymentFromSheets(sheets){
+ const firstSheet=sheets[0];
+ const aoa=firstSheet.aoa;
+ let hi=aoa.findIndex(r=>r&&r.some(c=>/성명|이름|근로자명/.test(c))&&r.some(c=>/취득|고용시작/.test(c)));
+ if(hi<0)hi=0;
+ const H=aoa[hi].map(c=>String(c||'').trim());
+ const colExact=k=>H.findIndex(h=>h===k);
+ const colLoose=k=>H.findIndex(h=>new RegExp(k).test(h));
+ const pickExact=(...ks)=>{for(const k of ks){const i=colExact(k);if(i>=0)return i;}return -1;};
+ const ci={
+  name: pickExact('근로자명','성명','이름') >=0 ? pickExact('근로자명','성명','이름') : colLoose('성명|이름|근로자\\s*명'),
+  rrn: pickExact('주민번호','주민등록번호') >=0 ? pickExact('주민번호','주민등록번호') : colLoose('주민'),
+  eAcq: pickExact('취득일','자격취득일','고용취득일'),
+  eLoss: pickExact('상실일','자격상실일','고용상실일'),
+  sAcq: pickExact('고용시작일','산재취득일','산재시작일'),
+  sLoss: pickExact('고용종료일','산재상실일','산재종료일'),
+  type: pickExact('보험구분','보험종류')
+ };
+ if(ci.eAcq<0 && ci.sAcq<0){
+  ci.eAcq=colLoose('취득일|고용시작일|자격취득일');
+  ci.eLoss=colLoose('상실일|고용종료일|자격상실일');
+ }
+ const sheetType=/산재|산업재해/.test(firstSheet.name)?'산재':'고용';
+ const dualFormat = ci.eAcq>=0 && ci.sAcq>=0;
+ const rows=[];
+ for(let i=hi+1;i<aoa.length;i++){
+  const r=aoa[i];if(!r||ci.name<0||!r[ci.name])continue;
+  const name=String(r[ci.name]).trim();
+  const rrn=ci.rrn>=0?String(r[ci.rrn]||'').replace(/\D/g,'').slice(0,6):'';
+  if(dualFormat){
+   const eAcq=fmtDate(r[ci.eAcq]), eLoss=fmtDate(r[ci.eLoss]);
+   const sAcq=fmtDate(r[ci.sAcq]), sLoss=fmtDate(r[ci.sLoss]);
+   if(eAcq) rows.push({name,rrn,acq:eAcq,loss:eLoss,type:'고용'});
+   if(sAcq) rows.push({name,rrn,acq:sAcq,loss:sLoss,type:'산재'});
+  } else {
+   const tv=ci.type>=0?String(r[ci.type]||''):'';
+   let type=sheetType;
+   if(/산재|산업재해|산재보험|산업재해보상/.test(tv)) type='산재';
+   else if(/고용|고용보험/.test(tv)) type='고용';
+   const acq=fmtDate(r[ci.eAcq]);
+   if(!acq) continue;
+   rows.push({name,rrn,acq,loss:fmtDate(r[ci.eLoss]),type});
+  }
+ }
+ // 멀티 시트: 듀얼포맷이면 이미 고용·산재 모두 추출했으므로 건너뜀 (중복 방지)
+ if(!dualFormat && sheets.length>1){
+  for(let si=1;si<sheets.length;si++){
+   const sn=sheets[si].name;
+   const extraType=/산재|산업재해/.test(sn)?'산재':(/고용/.test(sn)?'고용':null);
+   if(!extraType) continue;
+   const aoa2=sheets[si].aoa;
+   let hi2=aoa2.findIndex(r=>r&&r.some(c=>/성명|이름|근로자/.test(c))&&r.some(c=>/취득|고용시작/.test(c)));
+   if(hi2<0) continue;
+   const H2=aoa2[hi2].map(c=>c||'');
+   const col2=k=>H2.findIndex(h=>new RegExp(k).test(h));
+   const ci2={name:col2('성명|이름|근로자'),rrn:col2('주민'),acq:col2('취득일|고용시작일|자격취득일'),loss:col2('상실일|고용종료일|자격상실일')};
+   for(let j=hi2+1;j<aoa2.length;j++){
+    const r=aoa2[j];if(!r||!r[ci2.name])continue;
+    const rrn2=String(r[ci2.rrn]||'').replace(/\D/g,'').slice(0,6);
+    rows.push({name:String(r[ci2.name]).trim(),rrn:rrn2,acq:fmtDate(r[ci2.acq]),loss:fmtDate(r[ci2.loss]),type:extraType});
+   }
+  }
+ }
+ return rows;
+}
+
+// 파일을 한 번만 읽고 캐시 — PDF는 네이티브 텍스트, Excel은 시트별 aoa + 사업장정보
+async function ensureParsedFile(entry){
+ if(entry.parsed) return entry.parsed;
+ const file=entry.file;
  const ext=file.name.toLowerCase().split('.').pop();
  if(ext==='pdf'){
-  return parseEmpText(await pdfToText(file));
+  const text=await pdfToText(file);
+  entry.parsed={type:'pdf',nativeText:text,biz:extractBizInfo(text)};
  } else {
   const buf=await file.arrayBuffer();
   const wb=XLSX.read(buf,{type:'array'});
-  const ws=wb.Sheets[wb.SheetNames[0]];
-  const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
-  // 헤더 자동 감지
-  let hi=aoa.findIndex(r=>r&&r.some(c=>/성명|이름|근로자명/.test(c))&&r.some(c=>/취득|고용시작/.test(c)));
-  if(hi<0)hi=0;
-  const H=aoa[hi].map(c=>c||'');
-  const col=k=>H.findIndex(h=>new RegExp(k).test(h));
-  const ci={name:col('성명|이름|근로자명|근로자\\s*명'),rrn:col('주민'),acq:col('취득일|고용시작일|자격취득일'),loss:col('상실일|고용종료일|자격상실일'),type:col('보험구분|보험종류|보험\\s*구분|구분')};
-  // 시트명에서 보험구분 감지 (시트별로 분리된 경우)
-  const sheetType=/산재|산업재해/.test(wb.SheetNames[0])?'산재':'고용';
-  const rows=[];
-  for(let i=hi+1;i<aoa.length;i++){
-   const r=aoa[i];if(!r||!r[ci.name])continue;
-   const rrn=String(r[ci.rrn]||'').replace(/\D/g,'').slice(0,6);
-   const tv=ci.type>=0?String(r[ci.type]||''):'';
-   let type=sheetType; // 기본값: 시트명 기반
-   if(/산재|산업재해|산재보험|산업재해보상/.test(tv)) type='산재';
-   else if(/고용|고용보험/.test(tv)) type='고용';
-   rows.push({name:String(r[ci.name]).trim(),rrn,acq:fmtDate(r[ci.acq]),loss:fmtDate(r[ci.loss]),type});
-  }
-  // 멀티 시트: 추가 시트에서도 산재/고용 데이터 추출
-  if(wb.SheetNames.length>1){
-   for(let si=1;si<wb.SheetNames.length;si++){
-    const sn=wb.SheetNames[si];
-    const extraType=/산재|산업재해/.test(sn)?'산재':(/고용/.test(sn)?'고용':null);
-    if(!extraType) continue;
-    const ws2=wb.Sheets[sn];
-    const aoa2=XLSX.utils.sheet_to_json(ws2,{header:1,raw:false});
-    let hi2=aoa2.findIndex(r=>r&&r.some(c=>/성명|이름|근로자/.test(c))&&r.some(c=>/취득|고용시작/.test(c)));
-    if(hi2<0) continue;
-    const H2=aoa2[hi2].map(c=>c||'');
-    const col2=k=>H2.findIndex(h=>new RegExp(k).test(h));
-    const ci2={name:col2('성명|이름|근로자'),rrn:col2('주민'),acq:col2('취득일|고용시작일|자격취득일'),loss:col2('상실일|고용종료일|자격상실일')};
-    for(let j=hi2+1;j<aoa2.length;j++){
-     const r=aoa2[j];if(!r||!r[ci2.name])continue;
-     const rrn2=String(r[ci2.rrn]||'').replace(/\D/g,'').slice(0,6);
-     rows.push({name:String(r[ci2.name]).trim(),rrn:rrn2,acq:fmtDate(r[ci2.acq]),loss:fmtDate(r[ci2.loss]),type:extraType});
-    }
-   }
-  }
-  return rows;
+  const sheets=wb.SheetNames.map(sn=>({
+   name:sn,
+   aoa:XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false})
+  }));
+  entry.parsed={type:'excel',sheets,biz:extractBizInfoFromSheet(sheets[0].aoa)};
  }
+ return entry.parsed;
 }
 function fmtDate(v){if(!v)return null;const s=String(v).trim();const m=s.match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:null;}
 
@@ -943,27 +979,16 @@ function removeEmpFile(idx){
  empFiles.splice(idx,1);
  renderFileList();
 }
-// 파일 선택 시 누적 추가
+// 파일 선택 시 누적 추가 — 파싱 결과를 entry.parsed에 캐시
 fileInput.addEventListener('change',async()=>{
  const files=Array.from(fileInput.files);
  for(const file of files){
   // 중복 방지
   if(empFiles.some(f=>f.file.name===file.name&&f.file.size===file.size)) continue;
   const entry={file,label:file.name,bizNo:'',bizName:''};
-  // 사업장 정보 미리 추출 시도
   try{
-   const ext=file.name.toLowerCase().split('.').pop();
-   if(ext==='pdf'){
-    const txt=await pdfToText(file);
-    const info=extractBizInfo(txt);
-    entry.bizNo=info.bizNo; entry.bizName=info.bizName;
-   } else {
-    const buf=await file.arrayBuffer();
-    const wb=XLSX.read(buf,{type:'array'});
-    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false});
-    const info=extractBizInfoFromSheet(aoa);
-    entry.bizNo=info.bizNo; entry.bizName=info.bizName;
-   }
+   const p=await ensureParsedFile(entry);
+   entry.bizNo=p.biz.bizNo; entry.bizName=p.biz.bizName;
   }catch(e){console.warn('사업장정보 사전추출 실패:',e);}
   entry.label=entry.bizNo?(entry.bizName?`${entry.bizName} (${entry.bizNo})`:entry.bizNo):file.name;
   empFiles.push(entry);
@@ -978,6 +1003,9 @@ let ALL_BIZ_RESULTS={}; // {bizKey: {bizNo,bizName,fileName,results:[],recs:[],o
 document.getElementById('btnRun').onclick=async()=>{
  const f1=document.getElementById('pdfReg').files[0];
  if(!f1||!empFiles.length){alert('등기부 PDF와 고용현황 파일을 모두 선택하세요');return;}
+ const btnRun=document.getElementById('btnRun');
+ if(btnRun.disabled) return;
+ btnRun.disabled=true;
  document.getElementById('result').innerHTML='<p>처리 중...</p>';
  try{
   // 1) 등기부 파싱 (공통)
@@ -1018,9 +1046,9 @@ document.getElementById('btnRun').onclick=async()=>{
    setStatus(`고용현황 파싱 중... (${fi+1}/${empFiles.length}) ${f2.name}`);
 
    let recs, empText='';
-   const ext=f2.name.toLowerCase().split('.').pop();
-   if(ext==='pdf'){
-    empText=await pdfToText(f2);
+   const parsed=await ensureParsedFile(ef);
+   if(parsed.type==='pdf'){
+    empText=parsed.nativeText;
     const empPages=empText.split('\n\n');
     const empScanned=empPages.filter(p=>detectScannedPage(p)).length/Math.max(empPages.length,1);
     if(empScanned>0.5||empText.replace(/\s/g,'').length<200){
@@ -1028,20 +1056,10 @@ document.getElementById('btnRun').onclick=async()=>{
      else{setStatus('⚠ 고용현황 스캔 PDF — API 키 없어 텍스트 추출만 사용');}
     }
     recs=parseEmpText(empText);
-    // 사업장 정보 재추출 (파싱 시 더 정확)
     if(!ef.bizNo){const info=extractBizInfo(empText);ef.bizNo=info.bizNo;ef.bizName=info.bizName;}
    } else {
-    recs=await parseEmployment(f2);
-    // Excel에서 사업장 정보 재추출
-    if(!ef.bizNo){
-     try{
-      const buf=await f2.arrayBuffer();
-      const wb=XLSX.read(buf,{type:'array'});
-      const aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false});
-      const info=extractBizInfoFromSheet(aoa);
-      ef.bizNo=info.bizNo;ef.bizName=info.bizName;
-     }catch(e){}
-    }
+    recs=parseEmploymentFromSheets(parsed.sheets);
+    if(!ef.bizNo){ef.bizNo=parsed.biz.bizNo;ef.bizName=parsed.biz.bizName;}
    }
    dbgEmpTextAll+=`\n===== [${f2.name}] =====\n`+empText.slice(0,2000);
 
@@ -1076,6 +1094,8 @@ document.getElementById('btnRun').onclick=async()=>{
  }catch(e){
   document.getElementById('result').innerHTML='<p style="color:red">오류: '+e.message+'</p>';
   console.error(e);
+ }finally{
+  btnRun.disabled=false;
  }
 };
 
