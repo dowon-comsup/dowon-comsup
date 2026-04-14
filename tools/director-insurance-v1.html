@@ -1079,24 +1079,18 @@ document.getElementById('btnRun').onclick=async()=>{
  }
 };
 
-// === 사업장별 결과 렌더링 (모달 팝업) ===
+// === 사업장별 결과 렌더링 (인라인) ===
 function renderAllResults(){
  const bizKeys=Object.keys(ALL_BIZ_RESULTS);
  const host=document.getElementById('result');
- host.innerHTML='<p>분석 완료 — 결과를 팝업으로 표시합니다.</p>';
 
- // CEO history 섹션을 모달 상단에 포함
- let modalHtml='';
- const ceoHistEl=document.getElementById('ceoHist');
- if(ceoHistEl && ceoHistEl.innerHTML && !ceoHistEl.innerHTML.includes('분석 실행 후')){
-  modalHtml+='<div style="margin-bottom:16px">'+ceoHistEl.innerHTML+'</div><hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">';
- }
+ let inlineHtml='';
 
  if(bizKeys.length===1){
   // 단일 사업장: 플랫 렌더링
   const biz=ALL_BIZ_RESULTS[bizKeys[0]];
   const header=biz.bizNo?`<p style="margin:4px 0"><b>사업장:</b> ${biz.bizName||''} <span class="small">${biz.bizNo}</span> — 파일: ${biz.fileName}</p>`:'';
-  modalHtml+=header+renderSummary(biz.results)+renderResultTable(biz.results);
+  inlineHtml+=header+renderSummary(biz.results)+renderResultTable(biz.results);
  } else {
   // 복수 사업장: 탭 UI
   let tabH='<div class="tab-bar" id="bizTabs">';
@@ -1108,12 +1102,12 @@ function renderAllResults(){
   });
   tabH+='</div>';
   tabH+='<div id="bizTabContent"></div>';
-  modalHtml+=tabH;
+  inlineHtml+=tabH;
  }
 
- DwModal.show('등기임원 4대보험 판정 결과', modalHtml);
+ host.innerHTML=inlineHtml;
 
- // 복수 사업장인 경우 탭 핸들러 바인딩 (모달 내부 DOM에서)
+ // 복수 사업장인 경우 탭 핸들러 바인딩
  if(bizKeys.length>1){
   document.querySelectorAll('#bizTabs button').forEach(btn=>{
    btn.onclick=()=>{
