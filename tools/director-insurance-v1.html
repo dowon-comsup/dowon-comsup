@@ -479,7 +479,11 @@ function renderCeoHistory(periods,officers){
  const activeCoCeo=officers?checkActiveCoCeo(officers):null;
 
  if(coCeo.isCoCeo){
-  h+='<h3 style="font-size:13px;margin:12px 0 4px;color:#c50">▶ 공동대표이사 감지</h3>';
+  const activeBadge=(activeCoCeo && activeCoCeo.isActive)
+   ? ` <span style="color:#c50">(현재 ${activeCoCeo.count}인 체제)</span>` : '';
+  h+='<details style="margin:12px 0 4px">';
+  h+=`<summary style="cursor:pointer;font-size:13px;font-weight:bold;color:#c50">▶ 공동대표이사 감지${activeBadge} <span class="small" style="font-weight:normal">(클릭하여 펼치기)</span></summary>`;
+  h+='<div style="margin-top:6px">';
   if(activeCoCeo && activeCoCeo.isActive){
    h+=`<p style="margin:4px 0;padding:8px 12px;background:#ffeedd;border:1px solid #e8a;border-radius:4px;font-size:13px"><b>현재 공동대표 ${activeCoCeo.count}인 체제</b>: ${activeCoCeo.names.join(', ')}</p>`;
   }
@@ -492,6 +496,7 @@ function renderCeoHistory(periods,officers){
   });
   h+='</tbody></table>';
   h+='<p class="small">※ 공동대표이사는 각각 독립적으로 회사를 대표하므로, 고용/산재보험 적용제외 여부를 개별 판단합니다. 공동대표 간 친족관계 여부도 함께 확인하세요.</p>';
+  h+='</div></details>';
  } else {
   h+='<p class="small" style="margin-top:6px;color:#090">▶ 공동대표이사: 해당 없음 (단독 대표 체제)</p>';
  }
@@ -505,7 +510,7 @@ function renderCeoHistory(periods,officers){
   h+='<p class="small" style="margin-top:6px">▶ 대표이사 변경 이력 없음 (단일 대표)</p>';
  }
 
- // 친족 분석 (서로 다른 인물 간 주소 유사도)
+ // 친족 분석 (주소 완전 동일한 쌍만 표시)
  if(distinct.length>=2){
   // 인물별 모든 주소 집합
   const persons={};
@@ -515,15 +520,22 @@ function renderCeoHistory(periods,officers){
    p.addrs.forEach(a=>{if(a&&!persons[k].addrs.includes(a))persons[k].addrs.push(a);});
   });
   const arr=Object.values(persons);
-  h+='<h3 style="font-size:13px;margin:12px 0 4px">▶ 친족 판정 (주소 동일 여부)</h3>';
-  h+='<table><thead><tr><th style="width:10%">대표이사 A</th><th>A 주소</th><th style="width:10%">대표이사 B</th><th>B 주소</th><th style="width:11%">판정</th></tr></thead><tbody>';
+  const kinRows=[];
   for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++){
    const r=bestPairSim(arr[i].addrs,arr[j].addrs);
-   const c=classifyKin(r.same);
-   h+=`<tr style="background:${c.color}"><td>${arr[i].name}</td><td class="reason">${r.a||'(주소 없음)'}</td><td>${arr[j].name}</td><td class="reason">${r.b||'(주소 없음)'}</td><td><b>${c.label}</b></td></tr>`;
+   if(r.same) kinRows.push({a:arr[i].name,b:arr[j].name,addrA:r.a,addrB:r.b});
   }
-  h+='</tbody></table>';
-  h+='<p class="small">※ 주소가 완전히 동일할 경우에만 친족으로 판정합니다. (도로명/지번 등 표기 차이는 비친족으로 처리)</p>';
+  h+='<h3 style="font-size:13px;margin:12px 0 4px">▶ 친족 판정 (주소 동일 쌍만 표시)</h3>';
+  if(kinRows.length){
+   h+='<table><thead><tr><th style="width:12%">대표이사 A</th><th>A 주소</th><th style="width:12%">대표이사 B</th><th>B 주소</th></tr></thead><tbody>';
+   kinRows.forEach(k=>{
+    h+=`<tr style="background:#fdd"><td>${k.a}</td><td class="reason">${k.addrA}</td><td>${k.b}</td><td class="reason">${k.addrB}</td></tr>`;
+   });
+   h+='</tbody></table>';
+  } else {
+   h+='<p class="small" style="color:#090">▶ 친족 관계 없음 (주소 동일한 대표이사 쌍 없음)</p>';
+  }
+  h+='<p class="small">※ 주소가 완전히 동일할 경우에만 친족으로 판정합니다. (도로명/지번 등 표기 차이는 비친족으로 처리되어 표시되지 않음)</p>';
  }
  host.innerHTML=h;
 }
