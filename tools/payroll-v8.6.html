@@ -377,14 +377,14 @@ tr:hover{background:var(--light)}
       <div id="parsedRequestPreview" class="hidden" style="margin-top:10px;max-height:140px;overflow-y:auto;font-size:11px;background:var(--light);padding:8px;border-radius:6px"></div>
     </div>
 
-    <!-- STEP 2: PDF (복수 업로드) -->
+    <!-- STEP 2: PDF/Excel (복수 업로드) -->
     <div class="step-card">
-      <h3><span class="step-num">2</span> 급여서류 PDF 업로드 (복수 가능)</h3>
-      <p style="font-size:11px;color:var(--gray);margin-bottom:8px">급여대장/명세서 + 이체확인증이 하나의 PDF일 수도, 별도 파일일 수도 있습니다.</p>
+      <h3><span class="step-num">2</span> 급여서류 업로드 (PDF · Excel 혼합 가능)</h3>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:8px">급여대장/명세서 + 이체확인증이 하나의 PDF일 수도, 별도 파일일 수도 있습니다. 급여대장은 엑셀(.xlsx/.xls)도 지원합니다.</p>
       <label class="upload-zone" id="pdfZone">
         <div class="upload-icon">📄</div>
-        <div class="upload-label">PDF 파일 드래그 또는 클릭 (복수 선택 가능)</div>
-        <input type="file" accept=".pdf" multiple onchange="handlePdfUpload(this)">
+        <div class="upload-label">PDF 또는 Excel 드래그/클릭 (복수 선택 가능)</div>
+        <input type="file" accept=".pdf,.xlsx,.xls" multiple onchange="handlePdfUpload(this)">
       </label>
       <div class="file-list" id="pdfFileList"></div>
       <div id="pdfInfo" style="margin-top:6px;font-size:11px;color:var(--gray)"></div>
@@ -607,10 +607,23 @@ function showApiKeyModal() {
   setTimeout(() => input.focus(), 100);
 }
 
+// localStorage 안전 저장 — 시크릿 모드/쿼터 초과 시 경고
+function _safeLSset(k, v) {
+  try { localStorage.setItem(k, v); return true; }
+  catch(e) {
+    console.warn('localStorage 저장 실패:', k, e.message);
+    try {
+      const st = document.getElementById('apiKeyStatus');
+      if(st && k.includes('API_KEY')) { st.textContent = '⚠️ 브라우저 저장 실패 (시크릿 모드?)'; st.style.color = 'var(--warn)'; }
+    } catch(_) {}
+    return false;
+  }
+}
+
 function confirmApiKeyModal() {
   const key = document.getElementById('modalApiKeyInput').value.trim();
   if(key.length < 10) return;
-  localStorage.setItem('GEMINI_API_KEY', key);
+  _safeLSset('GEMINI_API_KEY', key);
   _visionApiKey = key;
   document.getElementById('visionApiKey').value = key;
   document.getElementById('apiKeyModal').style.display = 'none';
@@ -620,14 +633,14 @@ function confirmApiKeyModal() {
 function skipApiKeyModal() {
   _visionModel = 'none';
   document.getElementById('visionModel').value = 'none';
-  localStorage.setItem('vision_model', 'none');
+  _safeLSset('vision_model', 'none');
   document.getElementById('apiKeyModal').style.display = 'none';
   onVisionModelChange();
 }
 
 function onVisionModelChange() {
   _visionModel = document.getElementById('visionModel').value;
-  localStorage.setItem('vision_model', _visionModel);
+  _safeLSset('vision_model', _visionModel);
   const keyArea = document.getElementById('apiKeyArea');
   const keyInput = document.getElementById('visionApiKey');
   const costHint = document.getElementById('visionCostHint');
@@ -662,14 +675,14 @@ function onVisionModelChange() {
 function onApiKeyChange() {
   _visionApiKey = document.getElementById('visionApiKey').value.trim();
   // standalone: localStorage에 저장 (영구)
-  localStorage.setItem('GEMINI_API_KEY', _visionApiKey);
+  _safeLSset('GEMINI_API_KEY', _visionApiKey);
   updateApiKeyStatus();
 }
 
 function onClaudeFallbackKeyChange() {
   _claudeFallbackKey = document.getElementById('claudeFallbackKey').value.trim();
-  localStorage.setItem('CLAUDE_API_KEY', _claudeFallbackKey);
-  if(_claudeFallbackKey.startsWith('sk-ant-')) localStorage.setItem('ANTHROPIC_API_KEY', _claudeFallbackKey);
+  _safeLSset('CLAUDE_API_KEY', _claudeFallbackKey);
+  if(_claudeFallbackKey.startsWith('sk-ant-')) _safeLSset('ANTHROPIC_API_KEY', _claudeFallbackKey);
   updateClaudeFallbackStatus();
 }
 
@@ -782,7 +795,7 @@ function addApiUsage(pages) {
   const costPerPage = _visionModel === 'gemini' ? VISION_MODELS.primary.costPerPage : VISION_MODELS.fallback.costPerPage;
   u.pages += pages;
   u.cost += pages * costPerPage;
-  localStorage.setItem('api_usage_' + today, JSON.stringify(u));
+  _safeLSset('api_usage_' + today, JSON.stringify(u));
   updateApiUsageDisplay();
 }
 function updateApiUsageDisplay() {
@@ -1153,13 +1166,18 @@ function showParsed(){
   div.classList.remove('hidden');
 }
 
-// ===== PDF (복수 업로드) =====
+// ===== 급여서류 업로드 (PDF/Excel 복수) =====
+// S.pdfFiles 는 PDF+Excel 혼합 저장 (레거시 이름 유지)
+function _isExcelFile(f) {
+  return /\.(xlsx|xls)$/i.test(f.name || '');
+}
+
 function handlePdfUpload(input){
   const files = Array.from(input.files);
   if(!files.length) return;
 
   for(const f of files) {
-    // 중복 방지
+    // 중복 방지 (이름+크기)
     if(!S.pdfFiles.some(existing => existing.name === f.name && existing.size === f.size)) {
       S.pdfFiles.push(f);
     }
@@ -1187,15 +1205,133 @@ function renderPdfFileList() {
   }
   zone.classList.add('loaded');
   const totalSize = S.pdfFiles.reduce((s,f)=>s+f.size, 0);
-  document.getElementById('pdfInfo').textContent = `총 ${S.pdfFiles.length}개 파일, ${(totalSize/1024/1024).toFixed(1)}MB`;
+  const pdfCount = S.pdfFiles.filter(f => !_isExcelFile(f)).length;
+  const xlsCount = S.pdfFiles.length - pdfCount;
+  const label = xlsCount > 0 ? `PDF ${pdfCount}개 · Excel ${xlsCount}개` : `총 ${S.pdfFiles.length}개 파일`;
+  document.getElementById('pdfInfo').textContent = `${label}, ${(totalSize/1024/1024).toFixed(1)}MB`;
 
   list.innerHTML = S.pdfFiles.map((f, i) =>
     `<div class="file-item">
-      <span class="file-name">${f.name}</span>
+      <span class="file-name">${_isExcelFile(f) ? '📊 ' : '📄 '}${f.name}</span>
       <span class="file-size">${(f.size/1024/1024).toFixed(1)}MB</span>
       <span class="file-remove" onclick="removePdfFile(${i})" title="제거">&times;</span>
     </div>`
   ).join('');
+}
+
+// ===== Excel 급여대장 파서 =====
+// 파일 하나 → 시트 배열 → 각 시트를 합성 페이지 객체로 변환
+// 반환: [{ fileName, sheetName, month, type:'payroll', names:[], amounts:{}, netPayAmounts:[], grades:{} }, ...]
+async function _parseExcelPayrollFile(file, fileIdx) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const pages = [];
+
+  // 파일명 기반 월 후보
+  const fmMatch = (file.name || '').match(/(20\d{2})[-_.\s]?(0[1-9]|1[0-2])(?!\d)/);
+  const fileMonth = fmMatch ? `${fmMatch[1]}-${fmMatch[2]}` : null;
+
+  const nameHdrRe = /(성\s*명|이\s*름|근로자|직원명|대상자)/;
+  // 차인지급액 우선, 없으면 실지급액/실수령액/차감지급액/지급총액
+  const netPayHdrPriority = [
+    /차\s*인\s*지\s*급\s*액/,
+    /실\s*수\s*령\s*액/,
+    /실\s*지\s*급\s*액/,
+    /차\s*감\s*지\s*급\s*액/,
+    /지\s*급\s*총\s*액/,
+  ];
+
+  for(const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    if(!ws) continue;
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+    if(!data || data.length < 2) continue;
+
+    // 헤더행 탐색 (상위 15행 내)
+    let hRow = -1, nCol = -1, payCol = -1;
+    const scanLimit = Math.min(15, data.length);
+    for(let r = 0; r < scanLimit; r++) {
+      const row = data[r] || [];
+      let foundName = -1;
+      const foundPayByPri = new Array(netPayHdrPriority.length).fill(-1);
+      for(let c = 0; c < row.length; c++) {
+        const v = String(row[c] || '').trim();
+        if(!v) continue;
+        if(foundName < 0 && nameHdrRe.test(v)) foundName = c;
+        netPayHdrPriority.forEach((re, pi) => { if(foundPayByPri[pi] < 0 && re.test(v)) foundPayByPri[pi] = c; });
+      }
+      const payIdx = foundPayByPri.find(c => c >= 0);
+      if(foundName >= 0 && typeof payIdx === 'number' && payIdx >= 0) {
+        hRow = r; nCol = foundName; payCol = payIdx;
+        break;
+      }
+    }
+    if(hRow < 0) {
+      // 헤더 없음 — 시트 스킵
+      continue;
+    }
+
+    // 시트명/셀값에서 월 탐색
+    let sheetMonth = null;
+    const smMatch = sheetName.match(/(20\d{2})[-_.\s년]?\s*(0?[1-9]|1[0-2])월?/);
+    if(smMatch) {
+      const mm = String(parseInt(smMatch[2])).padStart(2, '0');
+      sheetMonth = `${smMatch[1]}-${mm}`;
+    }
+    // 헤더 상단 셀 어디에든 YYYY-MM 있으면 사용
+    if(!sheetMonth) {
+      for(let r = 0; r <= hRow; r++) {
+        const joined = (data[r] || []).map(v => String(v||'')).join(' ');
+        const cm = joined.match(/(20\d{2})\s*[-.년]?\s*(0?[1-9]|1[0-2])\s*월?/);
+        if(cm) {
+          const mm = String(parseInt(cm[2])).padStart(2, '0');
+          sheetMonth = `${cm[1]}-${mm}`;
+          break;
+        }
+      }
+    }
+    const month = sheetMonth || fileMonth || null;
+
+    // 데이터 행 파싱
+    const names = [];
+    const amounts = {};
+    const grades = {};
+    const netPayAmounts = [];
+    for(let r = hRow + 1; r < data.length; r++) {
+      const row = data[r] || [];
+      const rawName = String(row[nCol] || '').trim();
+      const rawPay = String(row[payCol] || '').trim();
+      if(!rawName || !rawPay) continue;
+      // 합계 행 제외
+      if(/^(합\s*계|총\s*계|계|소\s*계|total)$/i.test(rawName)) continue;
+      const amt = parseInt(rawPay.replace(/[^\d-]/g, ''));
+      if(!isFinite(amt) || amt <= 0) continue;
+      const matched = matchToWorkerName(rawName);
+      const nameToUse = matched || rawName;
+      names.push(nameToUse);
+      // Excel 은 직접 데이터 → Grade 'A' (OCR/Vision 불필요한 최고 신뢰)
+      grades[nameToUse] = _lastMatchResult.grade === 'D' ? 'A' : _lastMatchResult.grade;
+      // 동일 이름 중복 시 최대값 사용 (일반적으로 급여대장은 1인 1행이지만 분할 지급 등 예외 대비)
+      if(!amounts[nameToUse] || amt > amounts[nameToUse]) amounts[nameToUse] = amt;
+      netPayAmounts.push(amt);
+    }
+
+    if(names.length === 0) continue;
+
+    pages.push({
+      fileName: file.name,
+      fileIdx,
+      sheetName,
+      month,
+      type: 'payroll',
+      names: Array.from(new Set(names)),
+      amounts,
+      netPayAmounts,
+      grades,
+      isExcel: true,
+    });
+  }
+  return pages;
 }
 
 function checkReady(){
@@ -3302,30 +3438,57 @@ function extractTransferAmounts(p, lines) {
 }
 
 // ===== MAIN VERIFICATION (v4.4: 병렬 OCR) =====
+let _verifying = false;
 async function runVerification(){
+  if(_verifying) { log('warn', '이미 검증 진행 중 — 중복 실행 차단'); return; }
+  _verifying = true;
   document.getElementById('progressSection').classList.remove('hidden');
   document.getElementById('verifyBtn').disabled=true;
   document.getElementById('statusText').textContent='OCR 검증 진행 중...';
+  // 전 run 잔존 상태 완전 초기화
   S.pages=[]; S.payroll={}; S.transfer={}; S.results=[]; S.findings=[]; S.logs=[]; S.ocrPreviews=[]; S.manualChecks=[]; S.phaseTimers={};
+  _confirmedWorkers.clear();
   document.getElementById('logArea').innerHTML = '';
   document.querySelectorAll('.phase-step').forEach(el => { el.className = 'phase-step'; el.textContent = el.textContent.split('(')[0].trim(); });
 
   try {
     const startTime = Date.now();
     startPhase('load');
-    log('info', `총 ${S.pdfFiles.length}개 PDF 파일 처리 시작 (${OCR_PARALLEL}워커 병렬)`);
-    setProgress(2, 'PDF 로딩');
+    // PDF와 Excel 분리
+    const pdfFileIdx = [];
+    const excelFileIdx = [];
+    S.pdfFiles.forEach((f, i) => { (_isExcelFile(f) ? excelFileIdx : pdfFileIdx).push(i); });
+    log('info', `입력: PDF ${pdfFileIdx.length}개 · Excel ${excelFileIdx.length}개 (${OCR_PARALLEL}워커 병렬)`);
+    setProgress(2, 'PDF/Excel 로딩');
+
+    // ===== Excel 선처리: 시트별 합성 페이지 구축 (OCR/Vision 건너뜀) =====
+    const excelPages = [];
+    for(const fi of excelFileIdx) {
+      try {
+        const pages = await _parseExcelPayrollFile(S.pdfFiles[fi], fi);
+        if(pages.length === 0) {
+          log('warn', `[Excel] ${S.pdfFiles[fi].name}: 급여대장 형식 헤더(성명/차인지급액 등)를 찾지 못함 — 스킵`);
+          continue;
+        }
+        pages.forEach(pg => {
+          log('info', `[Excel] ${pg.fileName} / ${pg.sheetName}: ${pg.names.length}명 추출, 월=${pg.month||'미식별'}`);
+          excelPages.push(pg);
+        });
+      } catch(e) {
+        log('error', `[Excel] ${S.pdfFiles[fi].name} 파싱 실패: ${e.message}`);
+      }
+    }
 
     let totalPages = 0;
-    const pdfDocs = [];
-    for(let fi = 0; fi < S.pdfFiles.length; fi++) {
+    const pdfDocs = []; // pdfFileIdx 와 동일 순서
+    for(const fi of pdfFileIdx) {
       const buf = await S.pdfFiles[fi].arrayBuffer();
       const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-      pdfDocs.push(pdf);
+      pdfDocs.push({ pdf, fileIdx: fi });
       totalPages += pdf.numPages;
       log('info', `[${S.pdfFiles[fi].name}] ${pdf.numPages}페이지 로드`);
     }
-    log('info', `전체 ${totalPages}페이지 OCR 처리 예정`);
+    log('info', `PDF 전체 ${totalPages}페이지 OCR 처리 예정 + Excel 합성 ${excelPages.length}페이지`);
 
     // PHASE 1: 모든 PDF 페이지를 렌더링하고 이미지 데이터 준비
     setProgress(5, 'PDF 페이지 렌더링 중...');
@@ -3335,8 +3498,7 @@ async function runVerification(){
     const pageJobs = []; // [{globalPageNum, fileIdx, fileName, localPage, imageData, origPixels, vp, origVp, isScanned, nativeText, thumbDataUrl}]
 
     let globalPageNum = 0;
-    for(let fi = 0; fi < pdfDocs.length; fi++) {
-      const pdf = pdfDocs[fi];
+    for(const { pdf, fileIdx: fi } of pdfDocs) {
       const fileName = S.pdfFiles[fi].name;
       for(let i = 1; i <= pdf.numPages; i++) {
         globalPageNum++;
@@ -3565,6 +3727,32 @@ async function runVerification(){
       if(methods) log('ocr', `P${job.globalPageNum} 이름매칭: ${methods}`);
     }
 
+    // PHASE 2.6: Excel 합성 페이지를 S.pages 에 병합 (Vision 건너뜀, 분류·추출 완료 상태)
+    for(const xp of excelPages) {
+      globalPageNum++;
+      const pageData = {
+        pageNum: globalPageNum,
+        fileIdx: xp.fileIdx,
+        fileName: xp.fileName,
+        localPage: 0,
+        sheetName: xp.sheetName,
+        width: 0, height: 0, isLandscape: false, isScanned: false,
+        ocrText: '',
+        ocrConf: 100,
+        type: 'payroll',
+        month: xp.month,
+        names: xp.names,
+        amounts: xp.amounts,
+        netPayAmounts: xp.netPayAmounts,
+        grades: xp.grades,
+        visionDataUrl: null,
+        isExcel: true,
+        classifyReason: `Excel sheet "${xp.sheetName}"`,
+      };
+      S.pages.push(pageData);
+      log('info', `[Excel] P${globalPageNum} (${xp.fileName}/${xp.sheetName}): 급여대장 ${xp.names.length}명, 월 ${xp.month||'미식별'}`);
+    }
+
     // PHASE 2.7: Vision API 금액 추출 (API 키 있을 때)
     endPhase('ocr');
     startPhase('vision');
@@ -3577,8 +3765,9 @@ async function runVerification(){
     if(hasVisionApi()) {
       const modelLabel = _visionModel === 'gemini' ? VISION_MODELS.primary.label : VISION_MODELS.fallback.label;
       const fallbackInfo = (_visionModel === 'gemini' && hasClaudeFallback()) ? ` (503→${VISION_MODELS.fallback.label} 폴백 준비됨)` : '';
-      const transferPages = S.pages.filter(p => p.type === 'transfer');
-      const payrollPages = S.pages.filter(p => p.type === 'payroll');
+      // Excel 합성 페이지는 Vision 건너뜀 (이미지 없음, 이미 데이터 확보)
+      const transferPages = S.pages.filter(p => p.type === 'transfer' && !p.isExcel);
+      const payrollPages = S.pages.filter(p => p.type === 'payroll' && !p.isExcel);
       const totalPages = transferPages.length + payrollPages.length;
 
       log('info', `${modelLabel} Vision: 이체확인증 ${transferPages.length}p (병렬) + 급여대장 ${payrollPages.length}p (순차) 처리 시작...${fallbackInfo}`);
@@ -3715,8 +3904,10 @@ async function runVerification(){
     log('error', `오류: ${err.message}`);
     document.getElementById('statusText').textContent = '오류 발생';
     console.error(err);
+  } finally {
+    _verifying = false;
+    document.getElementById('verifyBtn').disabled = false;
   }
-  document.getElementById('verifyBtn').disabled = false;
 }
 
 // ===== GROUP BY MONTH =====
@@ -3894,7 +4085,7 @@ function groupByMonth() {
     if(!m) continue;
 
     if(p.type === 'payroll') {
-      if(!S.payroll[m]) S.payroll[m] = {pages:[], names:new Set(), netPayByName:{}, netPayAmounts:[], gradeByName:{}};
+      if(!S.payroll[m]) S.payroll[m] = {pages:[], names:new Set(), netPayByName:{}, netPayAmounts:[], gradeByName:{}, conflicts:[]};
       S.payroll[m].pages.push(p.pageNum);
       p.names.forEach(n => S.payroll[m].names.add(n));
       if(p.netPayAmounts && p.netPayAmounts.length > 0) {
@@ -3903,13 +4094,25 @@ function groupByMonth() {
       }
       if(p.amounts && Object.keys(p.amounts).length > 0) {
         Object.entries(p.amounts).forEach(([name, amount]) => {
-          if(!S.payroll[m].netPayByName[name]) {
+          const prev = S.payroll[m].netPayByName[name];
+          if(prev === undefined) {
             S.payroll[m].netPayByName[name] = amount;
+          } else if(prev !== amount) {
+            // 동일 월/동일 이름 금액 충돌 — Excel(A등급) 우선, 그 외엔 더 큰 값 유지 + 충돌 기록
+            const prevGrade = (S.payroll[m].gradeByName && S.payroll[m].gradeByName[name]) || 'D';
+            const curGrade = (p.grades && p.grades[name]) || 'D';
+            const excelWins = (curGrade === 'A' && p.isExcel) && !(prevGrade === 'A');
+            const replace = excelWins || (amount > prev && !(prevGrade === 'A'));
+            S.payroll[m].conflicts.push({ name, month: m, prev, current: amount, prevPage: S.payroll[m].pages[0], curPage: p.pageNum, chosen: replace ? amount : prev });
+            if(replace) S.payroll[m].netPayByName[name] = amount;
+            log('warn', `[급여대장 충돌] ${m} ${name}: ${formatNum(prev)} vs ${formatNum(amount)} → ${formatNum(replace ? amount : prev)} 채택 (P${p.pageNum})`);
           }
         });
-        // grade 정보도 저장
+        // grade 정보도 저장 — 더 높은 등급(A<B<C<D 순)이 이기도록
         if(p.grades) Object.entries(p.grades).forEach(([name, g]) => {
-          if(!S.payroll[m].gradeByName[name]) S.payroll[m].gradeByName[name] = g;
+          const prev = S.payroll[m].gradeByName[name];
+          const order = { A:0, B:1, C:2, D:3 };
+          if(!prev || (order[g] ?? 9) < (order[prev] ?? 9)) S.payroll[m].gradeByName[name] = g;
         });
         log('info', `월 ${m} 급여대장 이름별 금액: ${Object.entries(p.amounts).map(([n,a])=>`${n}=${formatNum(a)}`).join(', ')} (P${p.pageNum})`);
       }
@@ -4388,6 +4591,16 @@ function generateFindings() {
   const lowOcrPages = S.pages.filter(p=>p.isScanned && p.ocrText.length < 50).length;
   if(lowOcrPages > 0) {
     S.findings.push({type:'warning', title:`OCR 인식률 저조 (${lowOcrPages}페이지)`, desc:`${lowOcrPages}개 페이지에서 텍스트가 거의 추출되지 않았습니다.`, action:'해당 페이지 수동 확인 필요. 더 선명한 스캔본 요청 권장.'});
+  }
+
+  // 급여대장 금액 충돌 (같은 월/이름이 여러 페이지에서 다른 금액으로 잡힌 경우)
+  const payConflicts = [];
+  Object.entries(S.payroll).forEach(([m, data]) => {
+    (data.conflicts || []).forEach(c => payConflicts.push(c));
+  });
+  if(payConflicts.length > 0) {
+    const desc = payConflicts.map(c => `${c.name} ${c.month}: P${c.prevPage}=${formatNum(c.prev)} vs P${c.curPage}=${formatNum(c.current)} → ${formatNum(c.chosen)} 채택`).join('\n');
+    S.findings.push({type:'warning', title:`급여대장 금액 충돌 ${payConflicts.length}건`, desc, action:'동일 월/이름에 서로 다른 금액이 추출됨. 원본 확인 후 정본 결정 필요.'});
   }
 
   // 정상 확인
