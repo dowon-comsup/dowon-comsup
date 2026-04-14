@@ -202,9 +202,10 @@ const BusinessSelector = {
     };
 
     input.addEventListener('focus', () => {
-      if (allBiz.length > 0) {
-        const q = input.value.trim();
-        renderList(q ? allBiz.filter(b => b.name.includes(q) || (b.contact_person||'').includes(q) || (b.biz_reg_no||'').includes(q)) : allBiz);
+      // 빈 상태 포커스에서는 자동으로 드롭다운을 열지 않음 (아래 업로드 영역 클릭 가로채는 문제 방지)
+      const q = input.value.trim();
+      if (q && allBiz.length > 0) {
+        renderList(allBiz.filter(b => b.name.includes(q) || (b.contact_person||'').includes(q) || (b.biz_reg_no||'').includes(q)));
         dropdown.style.display = 'block';
       }
     });
@@ -212,21 +213,24 @@ const BusinessSelector = {
     input.addEventListener('input', () => {
       const q = input.value.trim();
       if (!q) {
-        renderList(allBiz);
-      } else {
-        renderList(allBiz.filter(b =>
-          b.name.includes(q) ||
-          (b.contact_person||'').includes(q) ||
-          (b.biz_reg_no||'').includes(q) ||
-          (b.mgmt_no||'').includes(q)
-        ));
+        dropdown.style.display = 'none';
+        return;
       }
+      renderList(allBiz.filter(b =>
+        b.name.includes(q) ||
+        (b.contact_person||'').includes(q) ||
+        (b.biz_reg_no||'').includes(q) ||
+        (b.mgmt_no||'').includes(q)
+      ));
       dropdown.style.display = 'block';
     });
 
-    input.addEventListener('blur', () => {
-      setTimeout(() => { dropdown.style.display = 'none'; }, 150);
-    });
+    // 바깥 클릭 시 즉시 드롭다운 숨김 (setTimeout 제거 → 업로드 영역 클릭 가로채기 방지)
+    document.addEventListener('mousedown', (e) => {
+      if (!container.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    }, true);
 
     clearBtn.addEventListener('click', clearSelection);
 
@@ -276,8 +280,9 @@ const BusinessSelector = {
       .bs-refresh:hover { background: #334155; color: #e2e8f0; }
       .bs-dropdown { position: absolute; top: 100%; left: 0; right: 40px; z-index: 1000;
         background: #1e293b; border: 1px solid #334155; border-radius: 8px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-height: 280px; overflow-y: auto;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-height: 220px; overflow-y: auto;
         margin-top: 4px; }
+      .bs-dropdown[style*="display: none"], .bs-dropdown[style*="display:none"] { pointer-events: none; }
       .bs-list { }
       .bs-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #1a2535;
         transition: background 0.15s; }
