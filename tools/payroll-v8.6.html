@@ -768,7 +768,8 @@ const S = {
   ocrPreviews: [],   // [{pageNum, imgDataUrl, text}]
   manualChecks: [],  // [{type, name, month, content, action, pageNum, grade}]
   phaseTimers: {},   // 단계별 소요시간
-  docScope: { payroll: true, transfer: true } // 검증 대상 서류 (체크박스로 제어)
+  docScope: { payroll: true, transfer: true }, // 검증 대상 서류 (체크박스로 제어)
+  meta: { handler: null, stage: null, docTypes: [] } // 요청 메일 메타 (담당자·단계·문서유형)
 };
 
 // 검증 대상 서류 체크박스 변경
@@ -1047,6 +1048,66 @@ function switchRequestMode(mode) {
   document.getElementById('requestExcelMode').classList.toggle('hidden', mode!=='excel');
 }
 
+// ─── 요청 메일 메타데이터 감지 (담당자·단계·문서유형) ────────────────────────
+// 담당자: 전화번호 (가장 명확) → 실패 시 서명/직함
+const _HANDLERS = {
+  '손지영': '010-7532-3172',
+  '정보람': '010-8417-3354',
+  '김우석': '010-5889-3354',
+  '길경찬': '010-8329-3354',
+  '곽대영': '010-2403-3354',
+  '박유경': '010-5849-3351',
+};
+// 단계: 키워드 매치 수 기반 점수제
+const _STAGES = [
+  ['지급신청',   /지급\s*신청|급여\s*(?:대장|명세서)|급여\s*이체\s*확인|이체\s*확인증|필요\s*서류|\d+\s*회차/],
+  ['사업참여',   /사업\s*참여|기업\s*심사|사업주(?:용)?\s*동의서/],
+  ['명단통보',   /명단\s*통보|채용자\s*서류|명단\s*제출|적정여부\s*심사|대상근로자|지원대상자/],
+  ['대상자확인', /대상자\s*(?:요건|확인)|지원\s*적정여부|확인\s*사항|주민등록번호\s*성명|성명\s*주민등록번호/],
+  ['최초신청',   /최초\s*신청|재직\s*증명서|대체\s*인력/],
+];
+// 단계별 월 검증 강제 여부 — 지급신청·최초신청만 월 단위 정산 대상
+const _MONTH_REQUIRED_STAGES = new Set(['지급신청']);
+// 문서 유형 감지
+const _DOC_TYPES = [
+  ['급여대장',     /급여\s*(?:대장|명세서)|임금\s*대장|월별\s*급여/],
+  ['이체확인증',   /급여\s*이체\s*확인|이체\s*확인증|급여이체/],
+  ['근로계약서',   /근로\s*계약서|연봉\s*계약서/],
+  ['졸업증명서',   /졸업\s*증명서|최종\s*학력/],
+  ['재직증명서',   /재직\s*증명서/],
+  ['부가세증명',   /부가가치세|부가세\s*과세표준|면세\s*수입금액/],
+  ['공동인증서',   /공동\s*인증서/],
+  ['동의서',       /사업주(?:용)?\s*동의서|개인정보\s*(?:이용|수집)\s*동의서/],
+  ['자기확인서',   /자기\s*확인서/],
+  ['주민등록등본', /주민등록\s*등본/],
+];
+
+function detectMetadata(text) {
+  const meta = { handler: null, stage: null, docTypes: [] };
+  // 담당자
+  for(const [name, tel] of Object.entries(_HANDLERS)) {
+    if(text.includes(tel)) { meta.handler = name; break; }
+  }
+  if(!meta.handler) {
+    for(const name of Object.keys(_HANDLERS)) {
+      if(new RegExp(`${name}\\s*(?:드림|매니저|스탭)`).test(text)) { meta.handler = name; break; }
+    }
+  }
+  // 단계 (점수제 최다 매치)
+  const scores = [];
+  for(const [stage, re] of _STAGES) {
+    const count = (text.match(new RegExp(re.source, 'g')) || []).length;
+    if(count) scores.push([stage, count]);
+  }
+  scores.sort((a, b) => b[1] - a[1]);
+  if(scores.length) meta.stage = scores[0][0];
+  // 문서 유형
+  for(const [type, re] of _DOC_TYPES) {
+    if(re.test(text)) meta.docTypes.push(type);
+  }
+  return meta;
+}
+
 // 요청서 텍스트에서 자주 등장하는 특수문자(전각/반각 콜론, 불릿, 괄호, 화살표 등)를
 // 공백으로 정규화하여 정규식 매칭이 실패하지 않도록 한다.
 // 예) "성명: 박철수 → 2026년 1월~3월", "・박철수 ː 26년(1~3월)" 등도 인식 가능.
@@ -1064,6 +1125,8 @@ function normalizeRequestText(s) {
     // 다양한 대시/물결 → 표준 ~
     .replace(/[‐-―−–—ｰ]/g, '-')
     .replace(/[〜∼～]/g, '~')
+    // 이름 뒤 "님 + (조사)" 제거 — 이름 접두 매칭 단순화 ("나인숙 님의", "홍길동 님께서는" 등)
+    .replace(/([가-힣]{2,4})\s*님(?:의|들|은|는|이|도|과|와|께서는?|께|에게)?(?=\s|[^가-힣])/g, '$1 ')
     // 연속 공백 정리
     .replace(/[ \t]+/g, ' ');
 }
@@ -1092,7 +1155,88 @@ function isLikelyName(name) {
   // "~의", "~명", "~자" 로 끝나는 2~4자 단어 대부분은 이름이 아님 (단, 이씨 외엔 단독 이름 희박)
   if(name.length >= 3 && /[의들]$/.test(name)) return false;
   if(name.length >= 4 && /(자|장|증|서|부|표)$/.test(name) && NAME_BLACKLIST.has(name)) return false;
+  // "님의"·"님들" 같이 조사형 잔재는 이름이 아님 (정규화 미흡 케이스 방어망)
+  if(/^님/.test(name)) return false;
   return true;
+}
+
+// 이름 접두 매칭: "(비한글) 이름 (선택)님 (공백/구분자 0-6자)"
+const _NAME_PREFIX = '(?:^|[^가-힣])([가-힣]{2,4})(?:님)?[^가-힣\\d]{0,6}';
+const _SEP_PAT = '[-~−–—]';
+
+// 줄별 "이름 + 개별기간" 추출. 매치되면 {name, y1, m1, y2, m2}, 아니면 null.
+// 지원 포맷(담당자별 실제 메일 기반):
+//   A1: "이름 ... YY[YY]년 M월 ~ YY[YY]년 M월"          (정보람/박유경: "2025년 12월 ~ 2026년 3월")
+//   A2: "이름 ... YY[YY]년 M월 ~ M월"                   (단일연도 축약)
+//   A3: "이름 ... YYYY-MM-DD ~ YYYY-MM-DD"              (손지영 출산육아: "2025-07-22~2025-08-28")
+//   A4: "이름 ... YYYY-MM ~ YYYY-MM"                    (길경찬: "김지은(2025-09~2026-03)")
+//   A5: "이름 ... YY[YY]년 M월 귀속(분|월)?"             (손지영: "윤현지 26년 1월 귀속분" — 단일월)
+function _tryPerLineNameAndPeriod(line) {
+  let m;
+  m = line.match(new RegExp(_NAME_PREFIX + `(\\d{2,4})년?\\s*(\\d{1,2})월\\s*${_SEP_PAT}\\s*(\\d{2,4})년?\\s*(\\d{1,2})월`));
+  if(m) return _fixYear({name:m[1], y1:+m[2], m1:+m[3], y2:+m[4], m2:+m[5]});
+  m = line.match(new RegExp(_NAME_PREFIX + `(\\d{2,4})년?\\s*(\\d{1,2})월\\s*${_SEP_PAT}\\s*(\\d{1,2})월`));
+  if(m) return _fixYear({name:m[1], y1:+m[2], m1:+m[3], y2:+m[2], m2:+m[4]});
+  m = line.match(new RegExp(_NAME_PREFIX + `(\\d{4})[-/.](\\d{1,2})[-/.]\\d{1,2}\\s*${_SEP_PAT}\\s*(\\d{4})[-/.](\\d{1,2})[-/.]\\d{1,2}`));
+  if(m) return _fixYear({name:m[1], y1:+m[2], m1:+m[3], y2:+m[4], m2:+m[5]});
+  m = line.match(new RegExp(_NAME_PREFIX + `(\\d{4})[-/.](\\d{1,2})\\s*${_SEP_PAT}\\s*(\\d{4})[-/.](\\d{1,2})(?![-/.]?\\d)`));
+  if(m) return _fixYear({name:m[1], y1:+m[2], m1:+m[3], y2:+m[4], m2:+m[5]});
+  m = line.match(new RegExp(_NAME_PREFIX + `(\\d{2,4})년?\\s*(\\d{1,2})월\\s*귀속(?:분|월)?`));
+  if(m) return _fixYear({name:m[1], y1:+m[2], m1:+m[3], y2:+m[2], m2:+m[3]});
+  return null;
+}
+
+// 공통기간 추출. 매치되면 {y1, m1, y2, m2}, 아니면 null.
+//   B1: "YY[YY]년 M월 ~ YY[YY]년 M월"
+//   B2: "YY[YY]년 M ~ M월" (단일연도)
+//   B3: "YYYY-MM-DD ~ YYYY-MM-DD"                       (손지영/정보람 출산육아)
+//   B4: "YYYY-MM ~ YYYY-MM"                             (길경찬 스타일)
+function _tryCommonPeriod(text) {
+  let m;
+  m = text.match(new RegExp(`(\\d{2,4})년\\s*\\(?\\s*(\\d{1,2})월?\\s*${_SEP_PAT}\\s*(\\d{2,4})년\\s*(\\d{1,2})월`));
+  if(m) return _fixYear({y1:+m[1], m1:+m[2], y2:+m[3], m2:+m[4]});
+  m = text.match(new RegExp(`(\\d{2,4})년\\s*\\(?\\s*(\\d{1,2})\\s*월?\\s*${_SEP_PAT}\\s*(\\d{1,2})\\s*월`));
+  if(m) return _fixYear({y1:+m[1], m1:+m[2], y2:+m[1], m2:+m[3]});
+  m = text.match(new RegExp(`(\\d{4})[-/.](\\d{1,2})[-/.]\\d{1,2}\\s*${_SEP_PAT}\\s*(\\d{4})[-/.](\\d{1,2})[-/.]\\d{1,2}`));
+  if(m) return _fixYear({y1:+m[1], m1:+m[2], y2:+m[3], m2:+m[4]});
+  m = text.match(new RegExp(`(\\d{4})[-/.](\\d{1,2})\\s*${_SEP_PAT}\\s*(\\d{4})[-/.](\\d{1,2})(?![-/.]?\\d)`));
+  if(m) return _fixYear({y1:+m[1], m1:+m[2], y2:+m[3], m2:+m[4]});
+  return null;
+}
+
+// 2자리 연도 → 4자리 보정
+function _fixYear(o) {
+  if(o.y1 < 100) o.y1 += 2000;
+  if(o.y2 < 100) o.y2 += 2000;
+  return o;
+}
+
+// 공통기간이 매치된 후 본문에서 대상자 이름 후보들 수집 (5 가지 경로, seen 공유)
+// C1: "ID(숫자 1-3자리) 한글이름 YYYY-MM-DD"           (기존 엑셀 표 형식)
+// C2: "마스킹 주민번호 한글이름 [YYYY-MM-DD]"          (정보람: "000216-3****** 최강 2026-02-02")
+// C3: "대상자/근로자/채용자 키워드 근방 한글이름 + 6자리 생년월일"  (손지영: "#. 대상자: 강미옥(640710)")
+// C4: "한글이름 YYYY-MM-DD" 단독                        (기존 엑셀 표 기본형)
+// C5: "[대상근로자]/[지원대상자] 라벨 + 한글이름" — 날짜 없음   (곽대영 명단통보: "[대상근로자] 김민혁")
+function _collectNames(text, seen) {
+  const names = [];
+  const tryAdd = (name) => {
+    if(!name || !isLikelyName(name)) return;
+    if(seen.has(name)) return;
+    seen.add(name); names.push(name);
+  };
+  const scan = (re, idx) => {
+    let m;
+    while((m = re.exec(text)) !== null) {
+      tryAdd(m[idx]);
+      re.lastIndex = m.index + m[0].length - 1;
+    }
+  };
+  scan(/(?:^|[\s\D])(\d{1,3})\s*([가-힣]{2,4})\s*(\d{4}-\d{2}-\d{2})/g, 2);
+  scan(/(\d{6}-(?:\d\*+|\*+))\s*([가-힣]{2,4})(?:\s+\d{4}-\d{2}-\d{2})?/g, 2);
+  scan(/(?:대상자?|근로자|직원|채용자|신청자)[^가-힣]{0,20}([가-힣]{2,4})\s*(\d{6})(?!\d)/g, 1);
+  scan(/(?:^|[^\w가-힣])([가-힣]{2,4})\s+(\d{4}-\d{2}-\d{2})/g, 1);
+  scan(/(?:^|[^가-힣])(?:대상근로자|지원대상자)[^가-힣]{0,10}([가-힣]{2,4})(?![가-힣])/g, 1);
+  return names;
 }
 
 function parseTextRequest() {
@@ -1100,62 +1244,40 @@ function parseTextRequest() {
   if(!raw) return alert('요청서 내용을 붙여넣어주세요.');
   const text = normalizeRequestText(raw);
   S.workers = [];
+  S.meta = detectMetadata(text);
   const seen = new Set();
 
-  // 1) 줄별 "이름 + 개별기간" 패턴 (하위 호환)
-  // 이름과 날짜 사이 임의 구분자(콜론/하이픈/공백 등) 허용. SEP 매크로로 양/단일 연도 모두 처리.
-  const _SEP1 = '[-~−–—]';
+  // 1) 줄별 "이름 + 개별기간"
   for(const line of text.split('\n')) {
-    const m = line.match(new RegExp(`(?:^|[^가-힣])([가-힣]{2,4})(?:님)?[^가-힣\\d]{0,6}(\\d{2,4})년?\\s*(\\d{1,2})월\\s*${_SEP1}\\s*(\\d{2,4})년?\\s*(\\d{1,2})월`))
-           || line.match(new RegExp(`([가-힣]{2,4})(?:님)?[^가-힣\\d]{0,6}(\\d{2,4})년?\\s*(\\d{1,2})월\\s*${_SEP1}\\s*(\\d{1,2})월`));
-    if(m && m.length === 5) { m.splice(4, 0, m[2]); } // 단일연도 보정: y2 = y1
-    if(!m) continue;
-    let [,name,y1,m1,y2,m2] = m;
-    if(!isLikelyName(name)) continue;
-    if(seen.has(name)) continue;
-    seen.add(name);
-    y1 = +y1; y2 = +y2;
-    if(y1 < 100) y1 += 2000;
-    if(y2 < 100) y2 += 2000;
-    const months = buildMonths(y1, +m1, y2, +m2);
-    S.workers.push({name, periodStr:`${String(y1).slice(2)}년 ${m1}월 ~ ${String(y2).slice(2)}년 ${m2}월`, months});
+    const p = _tryPerLineNameAndPeriod(line);
+    if(!p) continue;
+    if(!isLikelyName(p.name)) continue;
+    if(seen.has(p.name)) continue;
+    seen.add(p.name);
+    S.workers.push({
+      name: p.name,
+      periodStr: `${String(p.y1).slice(2)}년 ${p.m1}월 ~ ${String(p.y2).slice(2)}년 ${p.m2}월`,
+      months: buildMonths(p.y1, p.m1, p.y2, p.m2)
+    });
   }
 
-  // 2) 매칭 0건이면: 공통기간 + 이름목록 형식 시도
+  // 2) 매칭 0건이면: 공통기간 + 이름목록
   if(S.workers.length === 0) {
-    // 공통기간 패턴: "2026년 1~3월", "2026년 1월~3월", "2026년 1월 ~ 2026년 3월", "26년 1월~26년 3월"
-    let cy1, cm1, cy2, cm2;
-    const SEP = '[-~−–—]';
-    // 양 연도 명시: "2026년 1월 ~ 2026년 3월" / "26년 1월-26년 3월"
-    let cm = text.match(new RegExp(`(\\d{2,4})년\\s*\\(?\\s*(\\d{1,2})월?\\s*${SEP}\\s*(\\d{2,4})년\\s*(\\d{1,2})월`));
-    if(cm) {
-      cy1 = +cm[1]; cm1 = +cm[2]; cy2 = +cm[3]; cm2 = +cm[4];
-    } else {
-      // 단일 연도: "2026년 1~3월", "26년(1-3월)", "2026년 1월~3월"
-      cm = text.match(new RegExp(`(\\d{2,4})년\\s*\\(?\\s*(\\d{1,2})\\s*월?\\s*${SEP}\\s*(\\d{1,2})\\s*월`));
-      if(cm) { cy1 = cy2 = +cm[1]; cm1 = +cm[2]; cm2 = +cm[3]; }
-    }
-
-    if(cm) {
-      if(cy1 < 100) cy1 += 2000;
-      if(cy2 < 100) cy2 += 2000;
-      const commonMonths = buildMonths(cy1, cm1, cy2, cm2);
-      const periodStr = `${String(cy1).slice(2)}년 ${cm1}월 ~ ${String(cy2).slice(2)}년 ${cm2}월`;
-
-      // 표 형식 우선: "ID(숫자) + 한글이름 + 생년월일(YYYY-MM-DD)" 패턴
-      // 줄바꿈이 살아있을 때와 한 줄로 붙었을 때 모두 처리
-      // 예: "1\t권태용\t1965-02-27\t..." 또는 "...일1권태용1965-02-272023-04-26-2김진단..."
-      const rowRe = /(?:^|[\s\D])(\d{1,3})\s*([가-힣]{2,4})\s*(\d{4}-\d{2}-\d{2})/g;
-      let rm;
-      while((rm = rowRe.exec(text)) !== null) {
-        const name = rm[2];
-        if(!isLikelyName(name)) continue;
-        if(seen.has(name)) continue;
-        seen.add(name);
+    const cp = _tryCommonPeriod(text);
+    if(cp) {
+      const commonMonths = buildMonths(cp.y1, cp.m1, cp.y2, cp.m2);
+      const periodStr = `${String(cp.y1).slice(2)}년 ${cp.m1}월 ~ ${String(cp.y2).slice(2)}년 ${cp.m2}월`;
+      for(const name of _collectNames(text, seen)) {
         S.workers.push({name, periodStr, months: commonMonths.slice()});
-        // 다음 매칭이 직전 위치 직후에서 시작되도록 lastIndex 되돌림
-        rowRe.lastIndex = rm.index + rm[0].length - 1;
       }
+    }
+  }
+
+  // 3) 여전히 0건 + 기간불요 단계면: 이름만 수집 (명단통보/사업참여/대상자확인)
+  //    월 단위 정산 불필요 → months:[], stageOnly:true 로 표시 후 월범위 검증에서 제외
+  if(S.workers.length === 0 && S.meta.stage && !_MONTH_REQUIRED_STAGES.has(S.meta.stage)) {
+    for(const name of _collectNames(text, seen)) {
+      S.workers.push({name, periodStr:`(${S.meta.stage})`, months:[], stageOnly:true});
     }
   }
 
@@ -1200,7 +1322,16 @@ function buildMonths(sy,sm,ey,em){
 function showParsed(){
   const div=document.getElementById('parsedRequestPreview');
   if(!S.workers.length){div.innerHTML='<span style="color:var(--danger)">대상자 파싱 실패. 형식을 확인해주세요.</span>';div.classList.remove('hidden');return}
-  div.innerHTML=`<strong>파싱 결과: ${S.workers.length}명</strong><br>`+S.workers.map(w=>`<span style="color:var(--primary)">&bull; ${w.name}</span> ${w.periodStr} (${w.months.length}개월)`).join('<br>');
+  const meta=S.meta||{};
+  const metaParts=[];
+  if(meta.handler) metaParts.push(`담당 ${meta.handler}`);
+  if(meta.stage) metaParts.push(`단계 ${meta.stage}`);
+  if(meta.docTypes&&meta.docTypes.length) metaParts.push(`서류 ${meta.docTypes.join('·')}`);
+  const metaLine=metaParts.length?`<div style="color:var(--muted);font-size:0.9em;margin-bottom:4px">${metaParts.join(' | ')}</div>`:'';
+  div.innerHTML=metaLine+`<strong>파싱 결과: ${S.workers.length}명</strong><br>`+S.workers.map(w=>{
+    const tail=w.stageOnly?'<span style="color:var(--muted)">(기간불요)</span>':`(${w.months.length}개월)`;
+    return `<span style="color:var(--primary)">&bull; ${w.name}</span> ${w.periodStr} ${tail}`;
+  }).join('<br>');
   div.classList.remove('hidden');
 }
 
@@ -4294,13 +4425,19 @@ function groupByMonth() {
   // ============================================================
   // 요청 기간 경계 검증 — 요청서 기간 밖 월은 검증에서 제외
   // 1월 급여대장에 다른 달 페이지가 섞여 들어가는 주요 원인 제거.
+  // 기간불요 단계(명단통보/사업참여/대상자확인)는 모든 월 허용 — 월 단위 정산 대상이 아님.
   // ============================================================
+  const _allStageOnly = S.workers.length > 0 && S.workers.every(w => w.stageOnly);
   const _validMonths = new Set(S.workers.flatMap(w => w.months));
-  for(const p of S.pages) {
-    if(!p.month) continue;
-    if(!_validMonths.has(p.month)) {
-      log('warn', `P${p.pageNum}: 요청 기간 밖의 월 ${p.month} 감지 → 검증 제외 (수기확인)`);
-      p.monthOutOfRange = true;
+  if(_allStageOnly) {
+    log('info', '기간불요 단계 — 월범위 검증 생략');
+  } else {
+    for(const p of S.pages) {
+      if(!p.month) continue;
+      if(!_validMonths.has(p.month)) {
+        log('warn', `P${p.pageNum}: 요청 기간 밖의 월 ${p.month} 감지 → 검증 제외 (수기확인)`);
+        p.monthOutOfRange = true;
+      }
     }
   }
 
