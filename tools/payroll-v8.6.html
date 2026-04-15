@@ -1270,13 +1270,20 @@ async function _parseExcelPayrollFile(file, fileIdx) {
   const fileMonth = fmMatch ? `${fmMatch[1]}-${fmMatch[2]}` : null;
 
   const nameHdrRe = /(성\s*명|이\s*름|근로자|직원명|대상자)/;
-  // 차인지급액 우선, 없으면 실지급액/실수령액/차감지급액/지급총액
+  // 차인지급액 계열 우선순위 — 정확도 우선(공제 후 실지급 금액만 인정)
+  // ⚠️ "지급총액"은 공제 전 금액이라 차인지급액과 다름 → 제외
   const netPayHdrPriority = [
+    /공\s*제\s*후\s*차\s*감\s*지\s*급\s*액/,
+    /공\s*제\s*후\s*차\s*인\s*지\s*급\s*액/,
+    /공\s*제\s*후\s*지\s*급\s*액/,
     /차\s*인\s*지\s*급\s*액/,
-    /실\s*수\s*령\s*액/,
-    /실\s*지\s*급\s*액/,
     /차\s*감\s*지\s*급\s*액/,
-    /지\s*급\s*총\s*액/,
+    /차\s*인\s*금\s*액/,
+    /실\s*지\s*급\s*총\s*액/,
+    /실\s*지\s*급\s*액/,
+    /실\s*수\s*령\s*액/,
+    /세\s*후\s*지\s*급\s*액/,
+    /지\s*급\s*액\s*계/,
   ];
 
   for(const sheetName of wb.SheetNames) {
@@ -2049,10 +2056,12 @@ function classifyPage(p) {
       const fnm = p.fileName.match(/(20\d{2})[-_.\s]?(0[1-9]|1[0-2])(?!\d)/);
       if(fnm) mm = [null, fnm[1], fnm[2]];
     }
-    // 0.05순위: "출력일시"/"인쇄일자"/"발행일자" 라인은 월 식별에서 제외 (오인식 방지)
+    // 0.05순위: 급여 귀속월이 아닌 날짜(입사/퇴사/생년월일/주민번호/송금일 등) 라인 제외
     // OCR이 공백을 끼워 넣을 수 있으므로 글자별 \s* 허용
-    const cleanedText = fullText.replace(/(?:출\s*력|인\s*쇄|발\s*행|작\s*성)\s*(?:일\s*시|일\s*자)[^\n]{0,40}/g, ' ');
-    const cleanedHeader = header.replace(/(?:출\s*력|인\s*쇄|발\s*행|작\s*성)\s*(?:일\s*시|일\s*자)[^\n]{0,40}/g, ' ');
+    // 주의: "지급일자"(송금일)는 제거하되 "지급년월일"(귀속월)은 유지해야 하므로 뒤에 "년/월"이 오지 않는 경우만 제거
+    const _noiseDateRe = /(?:출\s*력|인\s*쇄|발\s*행|작\s*성)\s*(?:일\s*시|일\s*자)[^\n]{0,40}|(?:입\s*사|퇴\s*사|재\s*직\s*기\s*간|근\s*속|생\s*년\s*월\s*일|출\s*생|주\s*민\s*(?:등\s*록\s*)?번\s*호|계\s*좌\s*번\s*호)[^\n]{0,30}|(?:지\s*급|이\s*체|처\s*리|송\s*금|거\s*래)\s*일\s*자(?!\s*(?:년|월))[^\n]{0,25}/g;
+    const cleanedText = fullText.replace(_noiseDateRe, ' ');
+    const cleanedHeader = header.replace(_noiseDateRe, ' ');
     // 0.1순위: 임금/급여대장 헤더의 "(YYYY-MM)" 패턴 — OCR 공백 깨짐 허용
     // \d{4} 대신 \d\s*\d\s*\d\s*\d 로 연도 중간 공백도 허용 ("(202 3-05)")
     if(!mm) {
@@ -2092,10 +2101,11 @@ function classifyPage(p) {
     }
     // 6순위: 전체에서 "YYYY년 M월"
     if(!mm) mm = cleanedText.match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);
-    // 7순위: "YYYY-MM-DD"
+    // 7순위: context-bound "YYYY-MM-DD" — 귀속/급여/임금/산정/대장/명세 맥락이 앞에 있을 때만
+    // 과거: 본문 전체에서 아무 YYYY-MM-DD를 잡아 입사일/지급송금일을 귀속월로 오인식하는 문제 → 엄격화
     if(!mm) {
-      const dateM = cleanedText.match(/(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})/);
-      if(dateM) mm = [null, dateM[1], dateM[2]];
+      const ctxDate = cleanedText.match(/(?:귀\s*속|급\s*여|임\s*금|산\s*정|대\s*장|명\s*세|지\s*급\s*월)[^\n]{0,20}(\d{4})[-\/\.\s](\d{1,2})[-\/\.\s](\d{1,2})/);
+      if(ctxDate) mm = [null, ctxDate[1], ctxDate[2]];
     }
     // 8순위: 2자리 연도
     if(!mm) {
@@ -2220,33 +2230,29 @@ function matchToWorkerName(extractedName) {
   const sameFamily = origFamily || confFamily;
 
   if(bestDist === 1 && sameFamily) {
-    // Grade B: dist=1 + 성 일치 → safe
+    // Grade B: dist=1 + 성 일치 → safe (유일한 자동 수락 fuzzy 케이스)
     _lastMatchResult = {name:bestName, grade:'B', method:`fuzzy-safe dist=1`};
     return bestName;
-  } else if(bestDist === 1 && !sameFamily) {
-    // Grade C: dist=1 + 성 불일치 → risky
-    _lastMatchResult = {name:bestName, grade:'C', method:`fuzzy-risky dist=1 성불일치`};
-    return bestName;
-  } else if(bestDist === 2 && sameFamily) {
-    // Grade C: dist=2 + 성 일치 → risky but accepted
-    _lastMatchResult = {name:bestName, grade:'C', method:`fuzzy-risky dist=2`};
-    return bestName;
-  } else if(bestDist === 2 && !sameFamily) {
-    // Grade D: dist=2 + 성 불일치 → reject
+  }
+  // 정확도 우선 원칙: Grade C 자동 수락 폐지 → 모두 D 강등, 원본 반환
+  // 후보 정보는 method에 기록하여 수기확인 시 판단 보조
+  if(bestDist === 1 && !sameFamily) {
+    _lastMatchResult = {name:extractedName, grade:'D', method:`reject dist=1 성불일치 (후보:${bestName})`};
+    return extractedName;
+  }
+  if(bestDist === 2 && sameFamily) {
+    _lastMatchResult = {name:extractedName, grade:'D', method:`reject dist=2 성일치 (후보:${bestName})`};
+    return extractedName;
+  }
+  if(bestDist === 2 && !sameFamily) {
     _lastMatchResult = {name:extractedName, grade:'D', method:`unmatched dist=2 성불일치`};
     return extractedName;
-  } else if(bestDist <= 3 && e.length >= 4 && sameFamily) {
-    // Grade C: 4글자+ dist≤3 + 성 일치
-    _lastMatchResult = {name:bestName, grade:'C', method:`fuzzy-risky dist=${bestDist}`};
-    return bestName;
   }
-
-  // 성+이름첫글자 일치 (최후 수단)
-  const nameMatch = allNames.find(n => { const nc = n.replace(/\s/g,''); return nc.length >= 2 && e.length >= 2 && nc[0] === e[0] && nc[1] === e[1]; });
-  if(nameMatch) {
-    _lastMatchResult = {name:nameMatch, grade:'C', method:'성+이름1 일치'};
-    return nameMatch;
+  if(bestDist <= 3 && e.length >= 4 && sameFamily) {
+    _lastMatchResult = {name:extractedName, grade:'D', method:`reject dist=${bestDist} 4글자+ (후보:${bestName})`};
+    return extractedName;
   }
+  // "성+이름1 일치 최후수단" 제거 — 동명이인 가능성 높아 오탐 위험
 
   _lastMatchResult = {name:extractedName, grade:'D', method:'unmatched'};
   return extractedName;
@@ -2720,9 +2726,9 @@ doc_type 필드에 아래 중 하나:
 - is_handwritten: 이 이미지가 손글씨(수기)가 포함되면 true, 인쇄문서면 false
 
 [금액 우선순위]
-1) "공제후 차감지급액" / "공제후차감지급액"  ← 명세서 최우선
-2) "차인지급액" / "차감지급액"
-3) "실지급액" / "실수령액"
+1) "공제후 차감지급액" / "공제후차감지급액" / "공제후차인지급액" / "공제후지급액"  ← 명세서 최우선
+2) "차인지급액" / "차감지급액" / "차인금액"
+3) "실지급액" / "실수령액" / "실지급총액" / "세후지급액"
 4) "지급액계" (지급총액 ≠ 차인지급액 주의)
 
 [금지]
@@ -3306,7 +3312,8 @@ function extractData(p) {
 
 function extractPayrollAmounts(p, lines) {
   const text = p.ocrText;
-  const compressed = text.replace(/[\s\u00A0\u3000]/g, '');
+  // 공백·NBSP·전각공백 + 천단위 쉼표 제거 (쉼표를 남기면 L3360 정규식이 "2,445,640"을 세 조각으로 쪼갬)
+  const compressed = text.replace(/[\s\u00A0\u3000,]/g, '');
 
   // ★ 급여대장 가로 테이블 — 이름별 차인지급액 정확 추출
   // 헤더 행: [항목] [홍길동] [김동우] [계] [김철수] ...
@@ -3347,7 +3354,7 @@ function extractPayrollAmounts(p, lines) {
   }
 
   // --- 3. 차인지급액 행에서 금액 추출 + "계" 금액 스킵 ---
-  const ciKeywords = ['공제후차감지급액', '공제후차인지급액', '차인지급액', '차감지급액', '차인지급', '실수령액', '실지급액', '지급액계'];
+  const ciKeywords = ['공제후차감지급액', '공제후차인지급액', '공제후지급액', '차인지급액', '차감지급액', '차인금액', '차인지급', '실지급총액', '실수령액', '실지급액', '세후지급액', '지급액계'];
   let ciIdx = -1;
   let ciKeyLen = 0;
   for(const kw of ciKeywords) {
@@ -3420,7 +3427,7 @@ function extractPayrollAmounts(p, lines) {
   // --- 폴백 1: 원본 텍스트 라인별 탐색 ---
   for(let li = 0; li < lines.length; li++) {
     const line = lines[li];
-    if(/차인|실수령|실지급|차감지급/.test(line)) {
+    if(/차인|실수령|실지급|차감지급|공제후|세후지급|지급액계/.test(line)) {
       const amounts = [];
       const re = /[\d,]{5,}/g;
       let m;
@@ -4388,7 +4395,7 @@ async function _majorityVoteExtract(workerName, pageType, visionDataUrl) {
   const base64 = visionDataUrl.split(',')[1];
   const mediaType = 'image/jpeg';
   const prompt = pageType === 'payroll'
-    ? `이 이미지는 급여대장입니다. "${workerName}" 직원의 차인지급액(또는 실지급액, 실수령액, 차감지급액)을 찾아주세요.\n숫자만 정수로 반환하세요 (쉼표 제거). 찾을 수 없으면 -1 반환.\nJSON만 답하세요: {"name":"${workerName}","amount":2445640}`
+    ? `이 이미지는 급여대장입니다. "${workerName}" 직원의 차인지급액(또는 공제후차감지급액, 공제후지급액, 차감지급액, 차인금액, 실지급액, 실수령액, 실지급총액, 세후지급액)을 찾아주세요. ⚠️ 지급총액·공제총액·과세급여합계는 net_pay 아님(제외).\n숫자만 정수로 반환하세요 (쉼표 제거). 찾을 수 없으면 -1 반환.\nJSON만 답하세요: {"name":"${workerName}","amount":2445640}`
     : `이 이미지는 이체확인증입니다. "${workerName}" 수취인의 이체금액을 찾아주세요.\n숫자만 정수로 반환하세요 (쉼표 제거). 찾을 수 없으면 -1 반환.\nJSON만 답하세요: {"name":"${workerName}","amount":2445640}`;
   try {
     const text = await callVisionApi(base64, mediaType, prompt, 0);
@@ -4466,7 +4473,7 @@ async function crossVerify() {
         transferStatus = 'fail';
       }
 
-      // 금액 비교 (isAmountMatch 통일 — 2%, 최소 2,000원, 최대 100,000원)
+      // 금액 비교 (isAmountMatch — 1원 차이도 불일치)
       if(payAmount && trfAmount) {
         amountMatch = isAmountMatch(payAmount, trfAmount);
         amountDiff = trfAmount - payAmount;
@@ -4574,13 +4581,11 @@ async function crossVerify() {
       const prevAmt = getPrevMonthAmount(r.worker, r.month);
       const prevChange = prevAmt ? Math.abs(r.trfAmount - prevAmt) / prevAmt : 0;
 
-      // 발동 조건 (비용 절감을 위해 의심구간 축소)
-      const condA = !r.amountMatch && diff >= 1 && diff <= 100000; // 차액 1~10만원 → 다수결
+      // 발동 조건 — 정확도 원칙: 모든 불일치는 재확인(금액 클수록 더 중요)
+      const condA = !r.amountMatch && diff >= 1; // 1원 이상 차이는 모두 다수결 대상
       const condB = prevAmt && prevChange >= 0.05 && prevChange <= 0.35; // 전월 대비 5~35% 변동
-      const condC = r.grade === 'C' && r.amountMatch; // Grade C + 금액 일치 → 매칭 재확인
-
-      // 10만원 초과 불일치 → 다수결 스킵, 즉시 수기확인 (2단계에서 이미 추가됨)
-      if(!r.amountMatch && diff > 100000) continue;
+      // Grade C 분기는 A 옵션 적용으로 더 이상 발생하지 않음(모두 D 강등) — 조건 유지하되 실질 미발동
+      const condC = r.grade === 'C' && r.amountMatch;
 
       if(!condA && !condB && !condC) continue;
 
@@ -5066,7 +5071,7 @@ function renderAmounts() {
   const withDiff = S.results.filter(r => r.amountDiff !== null && r.amountDiff !== 0 && !r.amountMatch);
 
   let h = '<h4 style="margin-bottom:8px;font-size:13px">근로자별 차인지급액 대조 (급여대장 ↔ 이체확인증)</h4>';
-  h += '<p style="font-size:11px;color:var(--gray);margin-bottom:10px">급여대장 차인지급액과 이체확인증 이체금액을 인원별/월별로 직접 비교합니다. ✓=일치 ✗=불일치+차액 (허용오차: 금액의 2%, 최소 2,000원, 최대 100,000원)</p>';
+  h += '<p style="font-size:11px;color:var(--gray);margin-bottom:10px">급여대장 차인지급액과 이체확인증 이체금액을 인원별/월별로 직접 비교합니다. ✓=완전 일치 ✗=불일치+차액 (1원 차이도 불일치로 표시)</p>';
   h += `<div style="display:flex;gap:16px;margin-bottom:12px;font-size:12px">
     <span style="color:var(--primary)">금액 추출: <b>${extracted.length}</b>/${S.results.length}건</span>
     <span style="color:var(--success)">일치: <b>${matched.length}</b>건</span>
@@ -5387,7 +5392,7 @@ function exportResults() {
     let trfTotal = trfData?.totalAmount || 0;
     if(!trfTotal && trfData) Object.values(trfData.amountByName).forEach(v=>trfTotal+=v);
     const diff = (payTotal&&trfTotal) ? payTotal-trfTotal : null;
-    const verdict = diff===null?'미확인':Math.abs(diff)<=1000?'일치':'불일치';
+    const verdict = diff===null?'미확인':diff===0?'일치':'불일치';
     totData.push([m, payTotal||'', trfTotal||'', diff??'', verdict]);
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(totData), '월별총합계검증');
