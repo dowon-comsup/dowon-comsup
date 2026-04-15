@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>급여서류 검증도구 v8.7 (Gemini+Claude ì´ì¤í) | 노무법인 도원</title>
+<title>급여서류 검증도구 v9 (Gemini+Claude 이중화) | 노무법인 도원</title>
 <script src="../js/dowon-api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -277,7 +277,7 @@ tr:hover{background:var(--light)}
 
 <div class="header">
   <h1>급여서류 검증도구</h1>
-  <span class="badge v4">v8.6</span>
+  <span class="badge v4">v9</span>
   <span class="badge ocr" id="headerModelBadge">Gemini 2.5 Flash</span>
   <span class="badge">노무법인 도원</span>
   <div class="api-usage" id="apiUsageArea">
@@ -535,21 +535,27 @@ const VISION_MODELS = {
     label: 'Gemini 2.5 Flash'
   },
   fallback: {
-    name: 'claude-sonnet-4-20250514',
+    name: 'claude-sonnet-4-6',
     costPerPage: 5,
-    maxRetries: 1,
-    label: 'Claude Sonnet'
+    maxRetries: 3,
+    label: 'Claude Sonnet 4.6'
+  },
+  escalate: {
+    name: 'gemini-2.5-pro',
+    costPerPage: 2.5,
+    maxRetries: 2,
+    label: 'Gemini 2.5 Pro'
   }
 };
+const CLAUDE_MODEL_CHAIN = ['claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-sonnet-4-20250514'];
 let GEMINI_MODEL = VISION_MODELS.primary.name;
 const CLAUDE_MODEL = VISION_MODELS.fallback.name;
 
 // 오차 허용 함수 (2%, 최소 2,000원, 최대 100,000원)
+// 정확 일치 전용: 급여대장과 이체확인증 금액은 반드시 동일해야 함.
+// 과거 2% 허용치는 반올림/공제 오차를 흡수했으나, 그만큼 실제 불일치를 숨겼음.
 function isAmountMatch(a, b) {
-  if(!a || !b) return false;
-  const diff = Math.abs(a - b);
-  const tolerance = Math.min(Math.max(Math.round(Math.max(a,b) * 0.02), 2000), 100000);
-  return diff <= tolerance;
+  return typeof a === 'number' && typeof b === 'number' && a > 0 && a === b;
 }
 
 // ===== Vision AI 설정 및 API 키 관리 (Gemini + Claude 폴백) =====
@@ -829,12 +835,15 @@ function startPhase(phase) {
 // 수기확인 항목 추가 (우선순위 자동 판정)
 function addManualCheck(type, name, month, content, action, pageNum) {
   let priority = 'P2'; // 기본값
-  if(type === '불일치') {
+  if(type === '분류애매' || type === '월범위') {
+    // 정확도 핵심: 페이지가 엉뚱한 달/타입으로 집계될 위험 → 최우선
+    priority = 'P1';
+  } else if(type === '불일치') {
     // 금액 차이 10만원 초과 → P1
     const diffMatch = content.match(/차액[=:]\s*([0-9,]+)/);
     const diff = diffMatch ? parseInt(diffMatch[1].replace(/,/g, '')) : 0;
     priority = diff > 100000 ? 'P1' : 'P2';
-  } else if(type === '매칭' || type === '중복') {
+  } else if(type === '저신뢰' || type === '매칭' || type === '중복') {
     priority = 'P2';
   } else if(type === '추출' || type === '이상변동') {
     priority = 'P3';
@@ -842,7 +851,7 @@ function addManualCheck(type, name, month, content, action, pageNum) {
   S.manualChecks.push({type, name, month, content, action, pageNum, checked: false, priority});
 }
 
-// ===== OCR ENGINE INIT (v4.8: file:// 완전 지원) =====
+// ===== OCR ENGINE INIT =====
 // 핵심 원리: fetch()는 file://에서도 CDN 접근 가능
 //           Worker(blobURL)은 origin 상관없이 항상 동작
 //           → 워커 스크립트를 fetch해서 Blob으로 만든 뒤 Worker 생성
@@ -927,7 +936,7 @@ initOCR();
 initVisionSettings();
 updateApiUsageDisplay();
 
-// v8.6+: 스캔 PDF 감지 강화. 단순 문자수가 아닌 한글 비율/유효문자 기준으로 판단.
+// 스캔 PDF 감지 강화. 단순 문자수가 아닌 한글 비율/유효문자 기준으로 판단.
 // CID 깨짐(\u0000~\u001F, replacement char), 의미 없는 공백/기호만 있는 경우도 스캔으로 간주.
 function detectScannedPage(nativeText) {
   const t = (nativeText || '').replace(/[\s\u00A0\u3000]+/g, '');
@@ -1003,7 +1012,7 @@ async function runOcrTest(input) {
     const names = extractKoreanNames(strippedText);
     const amounts = extractAllAmounts(text);
 
-    // v4.1: 요청서 대상자 이름 퍼지 매칭 테스트
+    // 요청서 대상자 이름 퍼지 매칭 테스트
     let fuzzyMatched = [];
     if(S.workers.length > 0) {
       for(const w of S.workers) {
@@ -1038,7 +1047,7 @@ function switchRequestMode(mode) {
   document.getElementById('requestExcelMode').classList.toggle('hidden', mode!=='excel');
 }
 
-// v8.6+: 요청서 텍스트에서 자주 등장하는 특수문자(전각/반각 콜론, 불릿, 괄호, 화살표 등)를
+// 요청서 텍스트에서 자주 등장하는 특수문자(전각/반각 콜론, 불릿, 괄호, 화살표 등)를
 // 공백으로 정규화하여 정규식 매칭이 실패하지 않도록 한다.
 // 예) "성명: 박철수 → 2026년 1월~3월", "・박철수 ː 26년(1~3월)" 등도 인식 가능.
 function normalizeRequestText(s) {
@@ -1094,7 +1103,7 @@ function parseTextRequest() {
   const seen = new Set();
 
   // 1) 줄별 "이름 + 개별기간" 패턴 (하위 호환)
-  // v8.6+: 이름과 날짜 사이 임의 구분자(콜론/하이픈/공백 등) 허용. SEP 매크로로 양/단일 연도 모두 처리.
+  // 이름과 날짜 사이 임의 구분자(콜론/하이픈/공백 등) 허용. SEP 매크로로 양/단일 연도 모두 처리.
   const _SEP1 = '[-~−–—]';
   for(const line of text.split('\n')) {
     const m = line.match(new RegExp(`(?:^|[^가-힣])([가-힣]{2,4})(?:님)?[^가-힣\\d]{0,6}(\\d{2,4})년?\\s*(\\d{1,2})월\\s*${_SEP1}\\s*(\\d{2,4})년?\\s*(\\d{1,2})월`))
@@ -1364,7 +1373,7 @@ async function _parseExcelPayrollFile(file, fileIdx) {
 }
 
 function checkReady(){
-  // v4.7: OCR 준비 안 돼도 파일만 있으면 버튼 활성화 (텍스트 PDF 처리 가능)
+  // OCR 준비 안 돼도 파일만 있으면 버튼 활성화 (텍스트 PDF 처리 가능)
   // 단, OCR 상태 표시
   const hasFiles = S.workers.length > 0 && S.pdfFiles.length > 0;
   document.getElementById('verifyBtn').disabled = !hasFiles;
@@ -1386,7 +1395,7 @@ function findNameInText(name, text) {
   const sIdx = stripped.indexOf(name);
   if(sIdx >= 0) return {found:true, method:'space-stripped', pos:sIdx};
 
-  // 3순위: 글자 사이에 공백/특수문자 허용하는 정규식 매칭 (v4.2: 0,3 → 0,5로 확대)
+  // 3순위: 글자 사이에 공백/특수문자 허용하는 정규식 매칭
   // "박주용" → /박[\s\S]{0,5}주[\s\S]{0,5}용/
   const chars = [...name];
   const pattern = chars.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s\\S]{0,5}');
@@ -1394,7 +1403,7 @@ function findNameInText(name, text) {
   const reMatch = re.exec(text);
   if(reMatch) return {found:true, method:'spaced-regex', pos:reMatch.index};
 
-  // 3.5순위: 각 라인에서 공백 제거 후 매칭 (v4.2 추가 — 라인별 정밀 탐색)
+  // 3.5순위: 각 라인에서 공백 제거 후 매칭
   const lines = text.split('\n');
   for(let li = 0; li < lines.length; li++) {
     const lineStripped = lines[li].replace(/[\s\u00A0\u3000]+/g, '');
@@ -1472,7 +1481,7 @@ function extractKoreanNames(text) {
   while((match = re.exec(text)) !== null) {
     const name = match[0];
     if(!EXCLUDE_NAMES.has(name) && !names.includes(name) && name.length >= 2 && name.length <= 4) {
-      // v4: 추가 필터 - 요청서 대상자 이름과 매칭되는지 우선 확인
+      // 추가 필터 - 요청서 대상자 이름과 매칭되는지 우선 확인
       names.push(name);
     }
   }
@@ -1517,7 +1526,7 @@ function preprocessImage(imgData) {
         blurred[y*w+x] = Math.round(sum / kSize);
       }
     }
-    const strength = 2.0; // v4.2: 1.5→2.0 더 강한 샤프닝
+    const strength = 2.0; // 1.5→2.0 더 강한 샤프닝
     for(let i = 0; i < gray.length; i++) {
       gray[i] = Math.max(0, Math.min(255, Math.round(gray[i] + strength * (gray[i] - blurred[i]))));
     }
@@ -1870,7 +1879,7 @@ function _countVisionExtractions(text, pageType) {
         return parsed.workers.filter(w => w.name && w.net_pay && w.net_pay !== -1).length;
       }
       if(parsed.netPayAmounts && Array.isArray(parsed.netPayAmounts)) {
-        return parsed.netPayAmounts.filter(a => typeof a === 'number' && a >= 500000).length;
+        return parsed.netPayAmounts.filter(a => typeof a === 'number' && a > 0).length;
       }
     } else if(pageType === 'transfer') {
       if(parsed.transfers && Array.isArray(parsed.transfers)) {
@@ -1881,15 +1890,15 @@ function _countVisionExtractions(text, pageType) {
   return 0;
 }
 
-// ===== PAGE CLASSIFICATION (v4.5: 강화된 분류 - 비율/강한지표/키워드 계층) =====
+// ===== PAGE CLASSIFICATION =====
 function classifyPage(p) {
   const t = p.ocrText;
-  // 문서 상단(첫 25% 텍스트)에서 제목을 우선 확인 (v4.5: 20→25%)
+  // 문서 상단(첫 25% 텍스트)에서 제목을 우선 확인
   const headerLen = Math.max(300, Math.floor(t.length * 0.25));
   const header = t.substring(0, headerLen);
   const fullText = t;
 
-  // v4.5: 페이지 비율로 강한 가로/세로 판단 (단순 isLandscape보다 정밀)
+  // 페이지 비율로 강한 가로/세로 판단 (단순 isLandscape보다 정밀)
   const ratio = p.width > 0 ? p.height / p.width : 1;
   // ratio < 0.65: 명확한 가로형(급여대장) / ratio > 1.4: 명확한 세로형(이체확인증) / 그 사이: 애매
   const strongLandscape = ratio < 0.65;   // 확실한 가로
@@ -1897,7 +1906,7 @@ function classifyPage(p) {
   const ambiguousRatio  = !strongLandscape && !strongPortrait;
 
   // ============================================================
-  // 가중치 점수 기반 분류 (v8.6)
+  // 가중치 점수 기반 분류
   // 각 지표마다 점수를 부여하고 합산 → 최종 type 결정
   // 강한 지표(definitive)는 +5, 키워드는 +2~+3, 비율/방향은 +1
   // ============================================================
@@ -1915,17 +1924,17 @@ function classifyPage(p) {
   if(trfDefCount > 0) { trfScore += 5 + Math.min(trfDefCount-1, 3); reasons.push(`이체강한지표×${trfDefCount}(+${5 + Math.min(trfDefCount-1, 3)})`); }
 
   // 급여대장/명세서: 차인지급액/공제총액/지급총액/지급년월일/사업장:전체/기본급/연장근로/주민등록번호 다수
-  // v8.7: 명세서 고유 키워드 추가 (공제후차감지급액, 임금지급총액, 임금산정기간, 급여지급및공제내역)
+  // 명세서 고유 키워드 추가 (공제후차감지급액, 임금지급총액, 임금산정기간, 급여지급및공제내역)
   const payDefRe = /차인\s*지급\s*액|차감\s*지급\s*액|공제\s*후\s*차감\s*지급\s*액|임금\s*지급\s*총\s*액|임금\s*산정\s*기간|급여\s*지급\s*및\s*공제\s*내역|공제\s*총\s*액|지급\s*총\s*액|지급\s*년\s*월\s*일|사업장\s*:\s*전체|사업장:전체|기본\s*급|연장\s*근로|국민\s*연금|건강\s*보험|고용\s*보험|과세\s*급여|비과세\s*급여|장기\s*요양/g;
   const payDefCount = count(payDefRe, fullText);
   if(payDefCount > 0) { payScore += 5 + Math.min(payDefCount-1, 5); reasons.push(`급여강한지표×${payDefCount}(+${5 + Math.min(payDefCount-1, 5)})`); }
-  // v8.7: 1인 명세서 표식 (단독 시 강한 가중치)
+  // 1인 명세서 표식 (단독 시 강한 가중치)
   const payslipDefRe = /급\s*여\s*명\s*세\s*서|임금\s*명세\s*서|공제\s*후\s*차감\s*지급\s*액/;
   const isPayslipLikely = payslipDefRe.test(fullText);
   if(isPayslipLikely) { payScore += 6; reasons.push('명세서표식(+6)'); }
 
   // --- 2. 제목 키워드 (header) ---
-  // v8.6+: 단순 키워드 OR 매칭으로 변경. 헤더에 (임금|급여|월급|봉급) 또는 (대장|명세서|명세) 중
+  // 단순 키워드 OR 매칭으로 변경. 헤더에 (임금|급여|월급|봉급) 또는 (대장|명세서|명세) 중
   // 어느 하나라도 들어있으면 급여 문서로 간주. OCR 깨짐/공백 삽입에 강함.
   // 기존 결합형은 강한 신호로 추가 가점.
   const payHeaderWordRe = /임\s*금|급\s*여|월\s*급|봉\s*급|대\s*장|명\s*세\s*서|명\s*세/;
@@ -1944,34 +1953,46 @@ function classifyPage(p) {
   // --- 4. 페이지 비율 (보조 지표) ---
   if(strongLandscape) { payScore += 2; reasons.push(`가로형(${ratio.toFixed(2)},+2)`); }
   else if(strongPortrait) {
-    // v8.7: 명세서는 세로형이 정상 — payslip 표식 있으면 trf 가중치 무효화
+    // 명세서는 세로형이 정상 — payslip 표식 있으면 trf 가중치 무효화
     if(!isPayslipLikely) { trfScore += 2; reasons.push(`세로형(${ratio.toFixed(2)},+2)`); }
     else { reasons.push(`세로형(${ratio.toFixed(2)},명세서로 무효)`); }
   }
   else if(p.isLandscape) { payScore += 1; reasons.push('가로(약,+1)'); }
   else if(!isPayslipLikely) { trfScore += 1; reasons.push('세로(약,+1)'); }
 
-  // --- 5. 결정 ---
-  if(payScore > trfScore) {
+  // --- 5. 결정 (정확도 우선) ---
+  // 핵심 원칙: 두 타입의 강한 증거가 동시에 있으면 '모호'로 남기고 수기확인으로 넘김.
+  // 과거엔 점수 차이만으로 결정 후 isLandscape 폴백 → 이체확인증이 급여대장으로 오분류.
+  const scoreDiff = payScore - trfScore;       // >0 급여 우세, <0 이체 우세
+  const bothHaveEvidence = payDefCount > 0 && trfDefCount > 0;
+  const bothStrong = payScore >= 3 && trfScore >= 3;
+
+  if(bothHaveEvidence || bothStrong) {
+    // 양방 모두 강한 증거 → 한 페이지에 두 문서가 섞였을 가능성, 분류 보류
+    p.type = 'unknown';
+    p.classifyReason = `양방 증거 충돌 → 수기확인 필요 (${reasons.join(', ')})`;
+    p.classifyConfidence = 0;
+  } else if(Math.abs(scoreDiff) < 2) {
+    // 점수 차이 1 이하 = 불안정 → 모호
+    p.type = 'unknown';
+    p.classifyReason = `점수 근소[급여${payScore} vs 이체${trfScore}] → 수기확인 (${reasons.join(', ')})`;
+    p.classifyConfidence = 0;
+  } else if(scoreDiff >= 2) {
     p.type = 'payroll';
-  } else if(trfScore > payScore) {
-    p.type = 'transfer';
+    p.classifyReason = `점수[급여${payScore} vs 이체${trfScore}] ${reasons.join(', ')}`;
+    p.classifyConfidence = scoreDiff;
   } else {
-    // 동점 → 강한 지표 우선, 없으면 비율
-    if(payDefCount > trfDefCount) p.type = 'payroll';
-    else if(trfDefCount > payDefCount) p.type = 'transfer';
-    else p.type = p.isLandscape ? 'payroll' : 'transfer';
+    p.type = 'transfer';
+    p.classifyReason = `점수[급여${payScore} vs 이체${trfScore}] ${reasons.join(', ')}`;
+    p.classifyConfidence = -scoreDiff;
   }
   p.classifyScore = { pay: payScore, trf: trfScore };
-  p.classifyReason = `점수[급여${payScore} vs 이체${trfScore}] ${reasons.join(', ')}`;
-  // 신뢰도 (점수 차이)
-  p.classifyConfidence = Math.abs(payScore - trfScore);
 
   // === 월(月) 식별: 문서 유형별 다른 전략 ===
   let mm = null;
 
   if(p.type === 'transfer') {
-    // ★ 이체확인증: "거래일자" 필드의 날짜 최우선 (v4.6: 공백제거 버전 추가)
+    // ★ 이체확인증: "거래일자" 필드의 날짜 최우선
     // 먼저 공백을 제거한 텍스트에서 탐색 (OCR이 글자 사이 공백 삽입 대응)
     const compressed = fullText.replace(/[\s\u00A0\u3000]/g, '');
 
@@ -2022,29 +2043,29 @@ function classifyPage(p) {
     }
   } else {
     // ★ 급여대장/명세서
-    // v8.6+ 0순위: 파일명에서 YYYY-MM / YYYY.MM / YYYY_MM / YYYYMM 추출 (가장 신뢰도 높음)
+    // 0순위: 파일명에서 YYYY-MM / YYYY.MM / YYYY_MM / YYYYMM 추출 (가장 신뢰도 높음)
     // 예: "2023.05임금대장.pdf", "2023-05_급여대장.pdf", "202305_payroll.pdf"
     if(p.fileName) {
       const fnm = p.fileName.match(/(20\d{2})[-_.\s]?(0[1-9]|1[0-2])(?!\d)/);
       if(fnm) mm = [null, fnm[1], fnm[2]];
     }
-    // v8.6+ 0.05순위: "출력일시"/"인쇄일자"/"발행일자" 라인은 월 식별에서 제외 (오인식 방지)
+    // 0.05순위: "출력일시"/"인쇄일자"/"발행일자" 라인은 월 식별에서 제외 (오인식 방지)
     // OCR이 공백을 끼워 넣을 수 있으므로 글자별 \s* 허용
     const cleanedText = fullText.replace(/(?:출\s*력|인\s*쇄|발\s*행|작\s*성)\s*(?:일\s*시|일\s*자)[^\n]{0,40}/g, ' ');
     const cleanedHeader = header.replace(/(?:출\s*력|인\s*쇄|발\s*행|작\s*성)\s*(?:일\s*시|일\s*자)[^\n]{0,40}/g, ' ');
-    // v8.6+ 0.1순위: 임금/급여대장 헤더의 "(YYYY-MM)" 패턴 — OCR 공백 깨짐 허용
+    // 0.1순위: 임금/급여대장 헤더의 "(YYYY-MM)" 패턴 — OCR 공백 깨짐 허용
     // \d{4} 대신 \d\s*\d\s*\d\s*\d 로 연도 중간 공백도 허용 ("(202 3-05)")
     if(!mm) {
       const titleYM = cleanedHeader.match(/(?:임\s*금|급\s*여)\s*(?:대\s*장|명\s*세)[^\n]{0,15}\(?\s*(\d\s*\d\s*\d\s*\d)\s*[-\/.\s]\s*(\d\s*\d?)\s*\)?/)
                    || cleanedHeader.match(/\(\s*(\d\s*\d\s*\d\s*\d)\s*[-\/.]\s*(\d\s*\d?)\s*\)/);
       if(titleYM) mm = [null, titleYM[1].replace(/\s/g,''), titleYM[2].replace(/\s/g,'')];
     }
-    // v8.7 0.1순위: 임금산정기간 YYYY-MM-DD ~ YYYY-MM-DD (명세서 핵심)
+    // 0.1순위: 임금산정기간 YYYY-MM-DD ~ YYYY-MM-DD (명세서 핵심)
     if(!mm) {
       const periodMatch = cleanedText.replace(/\s/g,'').match(/임금산정기간[:\s]*(\d{4})[-\/.](\d{1,2})[-\/.]\d{1,2}/);
       if(periodMatch) mm = [null, periodMatch[1], periodMatch[2]];
     }
-    // v8.7 0.5순위: "YYYY년 M월 급여지급 및 공제내역"
+    // 0.5순위: "YYYY년 M월 급여지급 및 공제내역"
     if(!mm) mm = cleanedText.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*급여\s*지급\s*및\s*공제\s*내역/);
     // 1순위: 헤더에서 "YYYY년 M월 급여/분/귀속/대장/명세"
     if(!mm) mm = cleanedHeader.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(?:분|급여|귀속|임금|대장|명세)/);
@@ -2059,7 +2080,7 @@ function classifyPage(p) {
     }
     // 4순위: 전체에서 "YYYY년 M월 급여/분"
     if(!mm) mm = cleanedText.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(?:분|급여|귀속|임금|대장|명세)/);
-    // 5순위: 지급년월일 필드 (v4.5: OCR 오인식 대응 강화)
+    // 5순위: 지급년월일 필드
     if(!mm) {
       const payDate = cleanedText.match(/지급\s*(?:년|넌|연)?\s*월\s*일[^\d]*(\d{4})\s*(?:년|넌|연)?\s*(\d{1,2})\s*월/);
       if(payDate) mm = [null, payDate[1], payDate[2]];
@@ -2086,7 +2107,7 @@ function classifyPage(p) {
   if(mm) {
     let year = +mm[1];
     let month = +mm[2];
-    // v4.6: classifyPage 단계에서도 연도 보정 (groupByMonth 이전에 처리)
+    // classifyPage 단계에서도 연도 보정 (groupByMonth 이전에 처리)
     // 2005→2025, 2006→2026 등 OCR 오인식 보정
     if(year >= 2000 && year < 2020) {
       const c20 = year + 20;
@@ -2234,12 +2255,10 @@ function matchToWorkerName(extractedName) {
 let _lastMatchMethod = '';
 
 // 금액 유효성 검증
+// 금액 자체에 대한 "정상 범위" 가정은 제거.
+// 남은 검사는 '전월 대비 변동률' (50% 급증) 하나뿐 — 시계열 이상치만 감지.
 function validateAmount(amount, name, month) {
   const warnings = [];
-  if(amount < 500000) warnings.push({type:'추출', msg:`최저임금 이하 의심 (${formatNum(amount)}원)`});
-  if(amount > 10000000) warnings.push({type:'추출', msg:`비현실적 고액 의심 (${formatNum(amount)}원)`});
-
-  // 전월 동일인 대비 50% 초과 증가 체크
   const prevResults = S.results.filter(r => r.worker === name && r.month < month);
   if(prevResults.length > 0) {
     const lastResult = prevResults.sort((a,b) => b.month.localeCompare(a.month))[0];
@@ -2266,12 +2285,14 @@ function checkDuplicateAmounts(amounts, pageNum) {
   return warnings;
 }
 
-// ===== VISION API 금액 추출 (Gemini 503 재시도 + Claude 폴백) =====
-// 503 발생 시: 2초→5초→10초 재시도 → 3회 실패 시 Claude Sonnet 폴백
+// ===== VISION API 금액 추출 (정확도 우선 — 3회 재시도 + Pro 승격 + Claude 폴백) =====
+// 재시도 대상: 5xx, 429, 네트워크, JSON 파싱 실패, 빈 응답
+// 체인: Gemini Flash ×3 → Gemini Pro ×2 → Claude ×3 → null
 // 급여대장: 금액 배열 추출 (employeeCount + netPayAmounts)
 // 이체확인증: 이름-금액 쌍 + 월 추출
 
 const RETRY_DELAYS_503 = [2000, 5000, 10000]; // 2초, 5초, 10초
+const _isRetryableStatus = (s) => s === 429 || s === 500 || s === 502 || s === 503 || s === 504 || s === 408;
 
 // Gemini 단일 호출 (404 시 모델 체인 자동 전환)
 async function _callGeminiRaw(model, base64, mediaType, prompt) {
@@ -2324,8 +2345,8 @@ async function _callGemini(base64, mediaType, prompt) {
   return resp;
 }
 
-// Claude 단일 호출 (apiKey를 명시적으로 받음)
-async function _callClaude(base64, mediaType, prompt, apiKey) {
+// Claude 단일 호출 (apiKey, model 명시적으로 받음 — 미지정 시 기본)
+async function _callClaude(base64, mediaType, prompt, apiKey, model) {
   return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -2335,8 +2356,8 @@ async function _callClaude(base64, mediaType, prompt, apiKey) {
       'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens: 1024,
+      model: model || CLAUDE_MODEL,
+      max_tokens: 2048,
       messages: [{
         role: 'user',
         content: [
@@ -2350,139 +2371,172 @@ async function _callClaude(base64, mediaType, prompt, apiKey) {
 
 async function callVisionApi(base64, mediaType, prompt, pageNum) {
 
-  // === 모드: claude만 ===
+  // === 모드: claude만 (3회 재시도 + 모델 체인) ===
   if(_visionModel === 'claude') {
     const apiKey = _visionApiKey.startsWith('sk-ant-') ? _visionApiKey : _claudeFallbackKey;
     if(!apiKey || !apiKey.startsWith('sk-ant-')) return null;
-    try {
-      const resp = await _callClaude(base64, mediaType, prompt, apiKey);
-      if(!resp.ok) {
-        const err = await resp.text();
-        if(resp.status === 429) {
-          log('warn', `[P${pageNum}] Claude 429 Rate limit → 2초 대기 후 재시도...`);
-          await new Promise(r => setTimeout(r, 2000));
-          const resp2 = await _callClaude(base64, mediaType, prompt, apiKey);
-          if(!resp2.ok) { log('warn', `[P${pageNum}] Claude 재시도 실패: ${resp2.status}`); return null; }
-          const data2 = await resp2.json();
-          return data2.content?.find(c => c.type === 'text')?.text || '';
+    for(const claudeModel of CLAUDE_MODEL_CHAIN) {
+      for(let attempt = 0; attempt < RETRY_DELAYS_503.length; attempt++) {
+        try {
+          if(attempt > 0) {
+            const delay = RETRY_DELAYS_503[attempt - 1];
+            log('warn', `[P${pageNum}] ${claudeModel} 재시도 ${attempt+1}/3 (${delay/1000}초 대기)...`);
+            _retryCount++;
+            await new Promise(r => setTimeout(r, delay));
+          }
+          const resp = await _callClaude(base64, mediaType, prompt, apiKey, claudeModel);
+          _claudeFallbackCallCount++;
+          updateApiUsageBar();
+          if(resp.ok) {
+            let data;
+            try { data = await resp.json(); } catch(pe) { continue; }
+            const text = data.content?.find(c => c.type === 'text')?.text || '';
+            if(text && text.trim().length > 0) {
+              if(attempt > 0) log('success', `[P${pageNum}] ${claudeModel} ${attempt+1}차 재시도 성공`);
+              return text;
+            }
+            continue;
+          }
+          if(resp.status === 404) {
+            log('warn', `[P${pageNum}] ${claudeModel} 404 → 다음 모델`);
+            break;
+          }
+          if(!_isRetryableStatus(resp.status)) {
+            const err = await resp.text();
+            log('warn', `[P${pageNum}] ${claudeModel} ${resp.status}: ${err.substring(0,100)} → 중단`);
+            return null;
+          }
+        } catch(e) {
+          log('warn', `[P${pageNum}] ${claudeModel} 네트워크 오류: ${e.message}`);
+          _retryCount++;
         }
-        log('warn', `[P${pageNum}] Claude API 오류: ${resp.status} ${err.substring(0,100)}`);
-        return null;
       }
-      const data = await resp.json();
-      return data.content?.find(c => c.type === 'text')?.text || '';
-    } catch(e) {
-      log('warn', `[P${pageNum}] Claude 네트워크 오류: ${e.message}`);
-      return null;
     }
+    log('warn', `[P${pageNum}] Claude 전체 체인 실패 → null`);
+    return null;
   }
 
-  // === 모드: gemini (1차) + claude 폴백 ===
+  // === 모드: gemini (Flash×3 → Pro×2 → Claude×3 → null) ===
   if(_visionModel === 'gemini') {
-    let last503 = false;
 
-    // Gemini 시도 (최초 + 503 재시도 3회)
-    for(let attempt = 0; attempt < 1 + RETRY_DELAYS_503.length; attempt++) {
+    // Stage 1: Gemini Flash (현재 활성 모델) — 최대 3회 재시도
+    for(let attempt = 0; attempt <= RETRY_DELAYS_503.length; attempt++) {
       try {
-        // 재시도 대기
         if(attempt > 0) {
           const delay = RETRY_DELAYS_503[attempt - 1];
-          log('warn', `[P${pageNum}] Gemini 503 → ${delay/1000}초 대기 후 ${attempt}차 재시도...`);
+          log('warn', `[P${pageNum}] ${_activeGeminiModel} 재시도 ${attempt}/3 (${delay/1000}초 대기)...`);
           _retryCount++;
           await new Promise(r => setTimeout(r, delay));
         }
-
         const resp = await _callGemini(base64, mediaType, prompt);
-
         if(resp.ok) {
           _geminiCallCount++;
           updateApiUsageBar();
-          const data = await resp.json();
+          let data;
+          try { data = await resp.json(); }
+          catch(pe) { log('warn', `[P${pageNum}] ${_activeGeminiModel} JSON 파싱 실패 → 재시도`); continue; }
           const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if(attempt > 0) {
-            log('success', `[P${pageNum}] ${attempt}차 재시도 성공 → 정상 처리`);
+          if(text && text.trim().length > 0) {
+            if(attempt > 0) log('success', `[P${pageNum}] ${_activeGeminiModel} ${attempt}차 재시도 성공`);
+            return text;
           }
-          return text;
+          log('warn', `[P${pageNum}] ${_activeGeminiModel} 빈 응답 → 재시도`);
+          continue;
         }
-
-        // 503 처리
-        if(resp.status === 503) {
-          last503 = true;
-          _geminiCallCount++;
-          if(attempt < RETRY_DELAYS_503.length) continue; // 다음 재시도로
-          // 3회 모두 실패
-          log('warn', `[P${pageNum}] Gemini 503 × ${RETRY_DELAYS_503.length}회 → Claude Sonnet 폴백 시작`);
-          updateApiUsageBar();
-          break;
+        _geminiCallCount++;
+        if(_isRetryableStatus(resp.status)) {
+          log('warn', `[P${pageNum}] ${_activeGeminiModel} ${resp.status} → 재시도`);
+          continue;
         }
+        // 비-재시도 상태 → 즉시 승격/폴백 단계로
+        const err = await resp.text();
+        log('warn', `[P${pageNum}] ${_activeGeminiModel} ${resp.status}: ${err.substring(0,100)} → Pro 승격/Claude 폴백`);
+        updateApiUsageBar();
+        break;
+      } catch(e) {
+        log('warn', `[P${pageNum}] ${_activeGeminiModel} 네트워크 오류: ${e.message} → 재시도`);
+        _retryCount++;
+        if(attempt < RETRY_DELAYS_503.length) continue;
+        break;
+      }
+    }
+    updateApiUsageBar();
 
-        // 429 Rate limit → 1회만 재시도
-        if(resp.status === 429) {
-          _geminiCallCount++;
-          log('warn', `[P${pageNum}] Gemini 429 Rate limit → 2초 대기 후 재시도...`);
-          await new Promise(r => setTimeout(r, 2000));
-          const resp2 = await _callGemini(base64, mediaType, prompt);
-          if(resp2.ok) {
+    // Stage 2: Gemini Pro 승격 (Flash 3회 실패 시, 현재 모델이 Pro가 아닐 때만)
+    if(_activeGeminiModel !== VISION_MODELS.escalate.name) {
+      log('info', `[P${pageNum}] ${VISION_MODELS.escalate.label} 승격 시도 (정확도 우선)...`);
+      for(let attempt = 0; attempt < VISION_MODELS.escalate.maxRetries; attempt++) {
+        try {
+          if(attempt > 0) {
+            _retryCount++;
+            await new Promise(r => setTimeout(r, 3000));
+          }
+          const resp = await _callGeminiRaw(VISION_MODELS.escalate.name, base64, mediaType, prompt);
+          if(resp.ok) {
             _geminiCallCount++;
             updateApiUsageBar();
-            const data2 = await resp2.json();
-            return data2.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            let data;
+            try { data = await resp.json(); } catch(pe) { continue; }
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if(text && text.trim().length > 0) {
+              log('success', `[P${pageNum}] ${VISION_MODELS.escalate.label} 승격 성공 (${attempt+1}차) — 후속 페이지는 Pro로 시작`);
+              _activeGeminiModel = VISION_MODELS.escalate.name; // sticky escalation: 정확도 우선
+              return text;
+            }
+            continue;
           }
-          const err2 = await resp2.text();
-          log('warn', `[P${pageNum}] Gemini 429 재시도 실패: ${resp2.status} ${err2.substring(0,80)}`);
-          break;
+          if(!_isRetryableStatus(resp.status)) break;
+        } catch(e) {
+          _retryCount++;
         }
-
-        // 기타 오류 → 즉시 폴백
-        const err = await resp.text();
-        _geminiCallCount++;
-        log('warn', `[P${pageNum}] Gemini 오류 ${resp.status}: ${err.substring(0,100)} → Claude 폴백`);
-        updateApiUsageBar();
-        break;
-
-      } catch(e) {
-        log('warn', `[P${pageNum}] Gemini 네트워크 오류: ${e.message} → Claude 폴백`);
-        updateApiUsageBar();
-        break;
       }
+      log('warn', `[P${pageNum}] ${VISION_MODELS.escalate.label} 승격 실패 → Claude 폴백`);
     }
 
-    // === Claude 폴백 (503 또는 기타 Gemini 실패 후) ===
+    // Stage 3: Claude 폴백 (3회 재시도, 모델 체인 순회)
     if(hasClaudeFallback()) {
-      try {
-        const resp = await _callClaude(base64, mediaType, prompt, _claudeFallbackKey);
-        _claudeFallbackCallCount++;
-        updateApiUsageBar();
-
-        if(!resp.ok) {
-          const err = await resp.text();
-          log('warn', `[P${pageNum}] Claude 폴백 오류: ${resp.status} ${err.substring(0,100)}`);
-          return null;
-        }
-
-        const data = await resp.json();
-        const text = data.content?.find(c => c.type === 'text')?.text || '';
-        if(text) {
-          // JSON 추출된 인원수 로그
+      for(const claudeModel of CLAUDE_MODEL_CHAIN) {
+        for(let attempt = 0; attempt < RETRY_DELAYS_503.length; attempt++) {
           try {
-            const peek = _parseVisionResponse(text) || {};
-            const count = peek.workers?.length || peek.transfers?.length || peek.total_workers || '?';
-            log('success', `[P${pageNum}] Claude Sonnet 폴백 → 추출 성공: ${count}명`);
-          } catch(_) {
-            log('success', `[P${pageNum}] Claude Sonnet 폴백 → 응답 수신`);
+            if(attempt > 0) {
+              const delay = RETRY_DELAYS_503[attempt - 1];
+              log('warn', `[P${pageNum}] ${claudeModel} 재시도 ${attempt+1}/3 (${delay/1000}초 대기)...`);
+              _retryCount++;
+              await new Promise(r => setTimeout(r, delay));
+            }
+            const resp = await _callClaude(base64, mediaType, prompt, _claudeFallbackKey, claudeModel);
+            _claudeFallbackCallCount++;
+            updateApiUsageBar();
+            if(resp.ok) {
+              let data;
+              try { data = await resp.json(); } catch(pe) { continue; }
+              const text = data.content?.find(c => c.type === 'text')?.text || '';
+              if(text && text.trim().length > 0) {
+                log('success', `[P${pageNum}] Claude (${claudeModel}) 폴백 성공 (${attempt+1}차)`);
+                return text;
+              }
+              continue;
+            }
+            if(resp.status === 404) {
+              log('warn', `[P${pageNum}] ${claudeModel} 404 → 다음 모델`);
+              break;
+            }
+            if(!_isRetryableStatus(resp.status)) {
+              const err = await resp.text();
+              log('warn', `[P${pageNum}] ${claudeModel} ${resp.status}: ${err.substring(0,100)} → 중단`);
+              break;
+            }
+          } catch(e) {
+            log('warn', `[P${pageNum}] ${claudeModel} 네트워크 오류: ${e.message}`);
+            _retryCount++;
           }
         }
-        return text;
-      } catch(e) {
-        log('warn', `[P${pageNum}] Claude 폴백 예외: ${e.message}`);
-        return null;
       }
+      log('warn', `[P${pageNum}] Claude 전체 체인 실패 → null (OCR 폴백 대상)`);
     } else {
-      if(last503) {
-        log('warn', `[P${pageNum}] Gemini 503 × 3회 실패 + Claude 폴백 키 없음 → 이 페이지 스킵`);
-      }
-      return null;
+      log('warn', `[P${pageNum}] Gemini 전체 실패 + Claude 키 없음 → null (OCR 폴백 대상)`);
     }
+    return null;
   }
 
   return null;
@@ -2578,7 +2632,7 @@ ${jsonInstruction}
       for(const w of workers) {
         if(!w.name || w.net_pay === -1) continue;
         const amt = typeof w.net_pay === 'number' ? w.net_pay : parseInt(String(w.net_pay).replace(/,/g,''));
-        if(isNaN(amt) || amt < 500000 || amt > 20000000) continue;
+        if(isNaN(amt) || amt <= 0) continue;
         const normalized = matchToWorkerName(w.name);
         if(seenNames.has(normalized)) continue; // 중복 방지 (첫 번째 것 사용)
         seenNames.add(normalized);
@@ -2641,31 +2695,38 @@ async function extractAmountsViaVision(p, canvasDataUrl, isRetry) {
 ${jsonInstruction}
 {"year_month":"2025-09","workers":[{"name":"박주용","net_pay":2445640,"reason":""}],"total_workers":1}`;
     } else if(p.type === 'payroll') {
-      // v8.7: 급여대장 + 1인 명세서 통합 프롬프트
+      // 급여대장 + 1인 명세서 통합 프롬프트 (v9: doc_type 필드로 분류 재확인)
       const isPayslipHint = /급\s*여\s*명\s*세\s*서|임금\s*명세\s*서|공제\s*후\s*차감\s*지급\s*액/.test(p.ocrText || '');
-      prompt = `이 이미지는 급여대장(다인 테이블) 또는 1인 급여명세서입니다.
+      prompt = `이 이미지를 먼저 정확히 분류한 뒤 데이터를 추출하세요.
 요청서 대상자 목록: ${workerNames}
-${isPayslipHint ? '★ 이 페이지는 1인 명세서일 가능성이 높습니다 (OCR에서 "급여명세서/공제후차감지급액" 발견).' : ''}
+${isPayslipHint ? '★ OCR 힌트: "급여명세서/공제후차감지급액" 포함 (1인 명세서 가능성 높음).' : ''}
 
-[추출 대상]
-1. year_month: 귀속 연월 (예: "2026-03")
-   - 1순위: "임금산정기간 YYYY-MM-DD ~ YYYY-MM-DD"의 시작일 연월
-   - 2순위: "YYYY년 M월 급여지급 및 공제내역" 같은 제목
-   - 3순위: "YYYY년 M월" 일반 표기
-   - ⚠️ "임금지급일/지급일자"는 무시 (실제 송금일이라 귀속월과 다를 수 있음)
-2. is_payslip: true=1인 명세서, false=다인 대장
-3. headers: 성명 배열 (대장이면 좌→우/위→아래 순서, 명세서면 1명만)
-4. 차인지급액: headers와 1:1 매핑된 금액 배열
+[1단계: 문서 분류 — 가장 중요]
+doc_type 필드에 아래 중 하나:
+- "payroll"  : 급여대장(다인 테이블) 또는 1인 급여명세서
+- "transfer" : 이체확인증/대량이체 영수증 (거래내역/이체금액/수수료)
+- "other"    : 두 유형 어느 쪽도 아님 (표지/공문/기타)
+- "unknown"  : 판단 불가 (혼재·품질 저하 등)
 
-[금액 우선순위 — 매우 중요]
-다음 라벨 순서로 찾으세요 (위가 우선):
+[2단계: 추출 (doc_type=payroll 일 때만)]
+- year_month: 귀속 연월 ("2026-03")
+  · 1순위: "임금산정기간 YYYY-MM-DD ~ YYYY-MM-DD"의 시작일 연월
+  · 2순위: "YYYY년 M월 급여지급 및 공제내역" 같은 제목
+  · 3순위: "YYYY년 M월" 일반 표기
+  · ⚠️ "임금지급일/지급일자"는 무시 (송금일≠귀속월)
+- is_payslip: true=1인 명세서, false=다인 대장
+- headers: 성명 배열 (대장은 좌→우/위→아래, 명세서는 1명만)
+- 차인지급액: headers와 1:1 매핑 금액 배열
+- is_handwritten: 이 이미지가 손글씨(수기)가 포함되면 true, 인쇄문서면 false
+
+[금액 우선순위]
 1) "공제후 차감지급액" / "공제후차감지급액"  ← 명세서 최우선
 2) "차인지급액" / "차감지급액"
 3) "실지급액" / "실수령액"
 4) "지급액계" (지급총액 ≠ 차인지급액 주의)
 
 [금지]
-- "임금지급총액", "지급총액", "과세급여 합계" → net_pay 아님 (공제 전 금액)
+- "임금지급총액", "지급총액", "과세급여 합계" → net_pay 아님
 - "공제총액", "4대보험 합계", "세액공제 합계" → net_pay 아님
 - "두루누리 지원금" → net_pay 아님
 - "총합계", "소계", "부서소계", "계" 행/열 제외
@@ -2673,20 +2734,30 @@ ${isPayslipHint ? '★ 이 페이지는 1인 명세서일 가능성이 높습니
 [규칙]
 - headers와 차인지급액 배열 길이 반드시 동일
 - 추출 불가 직원은 -1
-- 금액은 쉼표 제거 정수 (예: 2,055,200 → 2055200)
-- 명세서일 경우 페이지 상단의 "성명" 라벨 옆 이름이 headers[0]
+- 금액은 쉼표 제거 정수 (2,055,200 → 2055200)
+- 명세서면 "성명" 라벨 옆 이름이 headers[0]
+- doc_type이 payroll이 아니면 headers·차인지급액은 빈 배열
 
 ${jsonInstruction}
-명세서 예: {"year_month":"2026-03","is_payslip":true,"headers":["권태용"],"차인지급액":[2055200]}
-대장 예: {"year_month":"2025-09","is_payslip":false,"headers":["박주용","전유진"],"차인지급액":[2445640,2399730]}
-빈 페이지: {"year_month":"","is_payslip":false,"headers":[],"차인지급액":[]}`;
+예1(대장): {"doc_type":"payroll","year_month":"2025-09","is_payslip":false,"is_handwritten":false,"headers":["박주용","전유진"],"차인지급액":[2445640,2399730]}
+예2(명세): {"doc_type":"payroll","year_month":"2026-03","is_payslip":true,"is_handwritten":false,"headers":["권태용"],"차인지급액":[2055200]}
+예3(오분류): {"doc_type":"transfer","year_month":"2025-09","is_payslip":false,"is_handwritten":false,"headers":[],"차인지급액":[]}
+예4(모호): {"doc_type":"unknown","year_month":"","is_payslip":false,"is_handwritten":false,"headers":[],"차인지급액":[]}`;
     } else {
-      // 이체확인증 — 날짜 + 이름-금액 동시 추출
-      prompt = `이 이미지는 대량이체/자동이체 영수증입니다.
+      // 이체확인증 — 분류 재확인 + 날짜 + 이름-금액 동시 추출
+      prompt = `이 이미지를 먼저 정확히 분류한 뒤 데이터를 추출하세요.
 
-[추출 목표]
-1. 거래일자 또는 이체일자 (문서 상단에 있음)
+[1단계: 문서 분류]
+doc_type:
+- "transfer" : 대량이체/자동이체 영수증 (거래내역/이체금액/수수료)
+- "payroll"  : 급여대장·명세서 (잘못 분류된 경우)
+- "other"    : 두 유형 아님
+- "unknown"  : 판단 불가
+
+[2단계: 추출 (doc_type=transfer 일 때만)]
+1. month: 거래일자 또는 이체일자 (YYYY-MM)
 2. 각 수취인의 성명과 이체금액
+3. is_handwritten: 손글씨 포함 여부
 
 표 구조: 각 행 = 한 명 (계좌번호 | 이체금액 | 수수료 | 성명 | 처리결과)
 
@@ -2696,8 +2767,12 @@ ${jsonInstruction}
 - 수수료(0원)는 이체금액이 아닙니다
 - 이름이 흐릿하면 위 대상자/OCR 인식 이름에서 가장 유사한 이름으로 매핑
 - 날짜는 YYYY-MM 형식으로 (예: 2025-09)
+- doc_type이 transfer가 아니면 transfers는 빈 배열
+
 ${jsonInstruction}
-{"month":"2025-09","transfers":[{"name":"박주용","amount":2445640},{"name":"전유진","amount":2399730}]}`;
+정상: {"doc_type":"transfer","month":"2025-09","is_handwritten":false,"transfers":[{"name":"박주용","amount":2445640},{"name":"전유진","amount":2399730}]}
+오분류: {"doc_type":"payroll","month":"2025-09","is_handwritten":false,"transfers":[]}
+모호: {"doc_type":"unknown","month":"","is_handwritten":false,"transfers":[]}`;
     }
 
     // 원본 API 호출
@@ -2734,6 +2809,37 @@ ${jsonInstruction}
     const parsed = _parseVisionResponse(text, p.type, p.pageNum);
     if(!parsed) return false;
 
+    // v9: Vision이 확인한 doc_type이 OCR 분류와 다르면 재분류 (API 우선)
+    if(parsed.doc_type) {
+      const apiType = parsed.doc_type;
+      if(apiType === 'unknown' || apiType === 'other') {
+        log('warn', `P${p.pageNum} ⚠️ Vision 분류: ${apiType} → 수기확인 이동 (OCR: ${p.type})`);
+        p.type = 'unknown';
+        p.needsManualCheck = true;
+        p.classifyReason = `Vision API doc_type=${apiType} → 분류 보류`;
+        addManualCheck('분류애매', '', p.month||'', `Vision=${apiType}, OCR=${p.type}`, `P${p.pageNum} 원본 직접 확인 필요`, p.pageNum);
+        return false;
+      }
+      if(apiType !== p.type && (apiType === 'payroll' || apiType === 'transfer')) {
+        // v9: 프롬프트와 실제 doc_type 불일치 → 응답 데이터 구조 신뢰 불가 (payroll 프롬프트가 transfers 필드 미반환 등)
+        // 정확도 우선 원칙: 추출 시도 대신 수기확인 큐로 이동
+        const prevType = p.type;
+        log('warn', `P${p.pageNum} ⚠️ Vision 오분류 감지: OCR=${prevType}, API=${apiType} → 수기확인 이동 (데이터 구조 불일치)`);
+        p.type = apiType;
+        p.needsManualCheck = true;
+        p.classifyReason = `Vision API 재분류: ${prevType} → ${apiType} (프롬프트 구조 불일치로 자동추출 생략)`;
+        p.classifyConfidence = 10;
+        addManualCheck('분류애매', '', p.month||'', `OCR=${prevType} → Vision=${apiType} 재분류`, `P${p.pageNum} 원본 확인 후 직접 입력`, p.pageNum);
+        return false;
+      }
+    }
+
+    // v9: 수기문서 감지 시 경고 (OCR은 한글 수기 약함 — 이미 Vision 사용 중이라 OK)
+    if(parsed.is_handwritten === true) {
+      p.isHandwritten = true;
+      log('info', `P${p.pageNum} 수기문서 감지 → Vision API가 처리 (OCR 폴백 불가)`);
+    }
+
     // 급여대장 — "테이블 전체 JSON" 처리 (headers + 차인지급액 인덱스 매핑)
     let _jsonTableSuccess = false; // 분할 모드 판정용 플래그
     if(p.type === 'payroll' && parsed.headers && Array.isArray(parsed.headers) && parsed['차인지급액'] && Array.isArray(parsed['차인지급액'])) {
@@ -2750,7 +2856,7 @@ ${jsonInstruction}
           const rawName = headers[i];
           const amount = typeof amounts[i] === 'number' ? amounts[i] : parseInt(String(amounts[i]).replace(/,/g, ''));
           if(!rawName || amount === -1 || isNaN(amount)) { skipped++; continue; }
-          if(amount < 500000 || amount > 20000000) { skipped++; continue; }
+          if(amount <= 0) { skipped++; continue; }
 
           const normalized = matchToWorkerName(rawName);
           const {grade, method} = _lastMatchResult;
@@ -2848,7 +2954,7 @@ ${jsonInstruction}
 
         if(extracted > 0) {
           _jsonTableSuccess = true;
-          // v8.7: 1인 명세서 표식 — _findPageFor에서 정확일치 강제
+          // 1인 명세서 표식 — _findPageFor에서 정확일치 강제
           if(parsed.is_payslip === true && Object.keys(p.amounts).length === 1) {
             p.isPayslip = true;
             p.singleSubject = Object.keys(p.amounts)[0];
@@ -2899,7 +3005,7 @@ ${jsonInstruction}
           skipped++;
           continue;
         }
-        if(amount < 500000 || amount > 20000000) { skipped++; continue; }
+        if(amount <= 0) { skipped++; continue; }
 
         const normalized = matchToWorkerName(w.name);
         const {grade, method} = _lastMatchResult;
@@ -2942,7 +3048,7 @@ ${jsonInstruction}
       }
       p.netPayAmounts = validAmounts;
 
-      // v8.7: workers 폴백에서도 1인 명세서 표식
+      // workers 폴백에서도 1인 명세서 표식
       if(parsed.is_payslip === true && Object.keys(p.amounts).length === 1) {
         p.isPayslip = true;
         p.singleSubject = Object.keys(p.amounts)[0];
@@ -3160,12 +3266,12 @@ ${jsonInstruction}
   }
 }
 
-// ===== DATA EXTRACTION (v5.0: Vision API 우선, OCR 폴백) =====
+// ===== DATA EXTRACTION =====
 function extractData(p) {
   const text = p.ocrText;
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-  // v4.1: 공백제거 + 퍼지 매칭으로 요청서 대상자 이름 찾기
+  // 공백제거 + 퍼지 매칭으로 요청서 대상자 이름 찾기
   const requestedNames = new Set(S.workers.map(w => w.name));
   const foundNames = [];
   const matchMethods = {}; // 매칭 방법 기록 (디버깅용)
@@ -3190,7 +3296,7 @@ function extractData(p) {
   p.matchMethods = matchMethods; // 디버깅용
 
   // Extract amounts
-  // v5.1: API 키 있으면 금액 추출은 Vision API가 담당 → OCR 금액 추출 스킵
+  // API 키 있으면 금액 추출은 Vision API가 담당 → OCR 금액 추출 스킵
   if(p.type === 'payroll') {
     if(!hasApiKey()) extractPayrollAmounts(p, lines);
   } else if(p.type === 'transfer') {
@@ -3202,7 +3308,7 @@ function extractPayrollAmounts(p, lines) {
   const text = p.ocrText;
   const compressed = text.replace(/[\s\u00A0\u3000]/g, '');
 
-  // ★ v6.0 전략: 급여대장 가로 테이블 — 이름별 차인지급액 정확 추출
+  // ★ 급여대장 가로 테이블 — 이름별 차인지급액 정확 추출
   // 헤더 행: [항목] [홍길동] [김동우] [계] [김철수] ...
   //   → "계" = 부서 소계 컬럼, 실제 사람 아님 → 제외
   // 맨 마지막 행(차인지급액): 각 열의 최종 금액
@@ -3256,7 +3362,7 @@ function extractPayrollAmounts(p, lines) {
     let m;
     while((m = re.exec(afterCi)) !== null) {
       const v = parseInt(m[1]);
-      if(v >= 500000 && v <= 20000000) {
+      if(v > 0) {
         allAmounts.push({value: v, globalPos: ciIdx + ciKeyLen + m.index});
       }
       if(allAmounts.length > 40) break;
@@ -3320,7 +3426,7 @@ function extractPayrollAmounts(p, lines) {
       let m;
       while((m = re.exec(line)) !== null) {
         const v = parseInt(m[0].replace(/,/g,''));
-        if(v >= 500000 && v <= 20000000) amounts.push(v);
+        if(v > 0) amounts.push(v);
       }
       if(namePositionMap.length > 0 && amounts.length > 0) {
         const n = Math.min(namePositionMap.length, amounts.length);
@@ -3354,7 +3460,7 @@ function extractPayrollAmounts(p, lines) {
         const am = afterKw.match(/(\d{6,8})/);
         if(am) {
           const v = parseInt(am[1]);
-          if(v >= 500000 && v <= 20000000) p.amounts[name] = v;
+          if(v > 0) p.amounts[name] = v;
         }
         break;
       }
@@ -3367,7 +3473,7 @@ function extractTransferAmounts(p, lines) {
   const compressed = text.replace(/[\s\u00A0\u3000]/g, '');
   const requestedNames = new Set(S.workers.map(w => w.name));
 
-  // ★ v4.9 전략: 이체확인증은 세로 테이블
+  // ★ 이체확인증은 세로 테이블
   // 각 행: "일련번호 | 계좌번호 | 이체금액 | 수수료 | 성명 | 처리결과 | 비고"
   // → 각 OCR 라인에서 이름 + 금액을 함께 찾음
 
@@ -3395,7 +3501,7 @@ function extractTransferAmounts(p, lines) {
     let m;
     while((m = re.exec(line)) !== null) {
       const v = parseInt(m[0].replace(/,/g,''));
-      if(v >= 500000 && v <= 10000000) lineAmounts.push(v);
+      if(v > 0) lineAmounts.push(v);
     }
 
     if(lineAmounts.length > 0) {
@@ -3410,7 +3516,7 @@ function extractTransferAmounts(p, lines) {
         let m2;
         while((m2 = re2.exec(beforeName)) !== null) {
           const v2 = parseInt(m2[0].replace(/,/g,''));
-          if(v2 >= 500000 && v2 <= 10000000) beforeAmounts.push(v2);
+          if(v2 > 0) beforeAmounts.push(v2);
         }
         if(beforeAmounts.length > 0) {
           p.amounts[foundName] = beforeAmounts[beforeAmounts.length - 1]; // 이름 바로 앞 금액
@@ -3428,7 +3534,7 @@ function extractTransferAmounts(p, lines) {
       let m3;
       while((m3 = re3.exec(ctx)) !== null) {
         const v3 = parseInt(m3[0].replace(/,/g,''));
-        if(v3 >= 500000 && v3 <= 10000000) ctxAmounts.push(v3);
+        if(v3 > 0) ctxAmounts.push(v3);
       }
       if(ctxAmounts.length > 0) p.amounts[foundName] = ctxAmounts[0];
     }
@@ -3450,7 +3556,7 @@ function extractTransferAmounts(p, lines) {
     let m;
     while((m = re.exec(before)) !== null) {
       const v = parseInt(m[1]);
-      if(v >= 500000 && v <= 10000000) amounts.push(v);
+      if(v > 0) amounts.push(v);
     }
     if(amounts.length > 0) {
       p.amounts[name] = amounts[amounts.length - 1]; // 이름 바로 앞 금액
@@ -3466,7 +3572,7 @@ function extractTransferAmounts(p, lines) {
   }
 }
 
-// ===== MAIN VERIFICATION (v4.4: 병렬 OCR) =====
+// ===== MAIN VERIFICATION =====
 let _verifying = false;
 async function runVerification(){
   if(_verifying) { log('warn', '이미 검증 진행 중 — 중복 실행 차단'); return; }
@@ -3686,6 +3792,48 @@ async function runVerification(){
           log('ocr', `P${job.globalPageNum}: 반전 이미지가 더 나음 → 채택`);
         }
       }
+
+      // Pass 3 (v9): 신뢰도 35% 이하 → 수기문서 가능성 → PSM 11(sparse) + PSM 13(raw line) 시도
+      // Tesseract의 기본 PSM 6은 균일한 블록 가정 — 수기는 배치가 불규칙해 PSM 11/13이 더 나음
+      if(ocrConf < 35) {
+        log('ocr', `P${job.globalPageNum}: 신뢰도 ${Math.round(ocrConf)}% → 수기문서 가능성, PSM 11/13 시도`);
+        const tryModes = ['11', '13'];
+        for(const psm of tryModes) {
+          try {
+            await worker.setParameters({ tessedit_pageseg_mode: psm, preserve_interword_spaces: '1' });
+            const imgDataHw = tmpCtx.createImageData(job.vpWidth, job.vpHeight);
+            imgDataHw.data.set(job.origPixels);
+            preprocessImage(imgDataHw);
+            tmpCtx.putImageData(imgDataHw, 0, 0);
+            const resultHw = await worker.recognize(tmpCanvas);
+            const confHw = resultHw.data.confidence || 0;
+            log('ocr', `P${job.globalPageNum}: PSM ${psm} 신뢰도 ${Math.round(confHw)}%`);
+            if(confHw > ocrConf) {
+              ocrText = resultHw.data.text;
+              ocrConf = confHw;
+              log('ocr', `P${job.globalPageNum}: PSM ${psm} 채택 (수기문서 모드)`);
+            }
+          } catch(hwErr) {
+            log('warn', `P${job.globalPageNum}: PSM ${psm} 실패: ${hwErr.message}`);
+            // 즉시 PSM 6 복구 시도 (워커 상태가 비정상 PSM에 머무는 것 방지)
+            try { await worker.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' }); } catch(_) {}
+          }
+        }
+        // PSM 6으로 최종 복구 (다른 페이지 영향 방지)
+        try { await worker.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' }); } catch(_) {}
+
+        // 여전히 낮으면 수기문서로 간주
+        if(ocrConf < 35) {
+          ocrResults[jobIdx] = { text: ocrText, conf: ocrConf, isHandwritten: true };
+          _ocrCacheSet(_ocrCacheKey(job), { text: ocrText, conf: ocrConf, isHandwritten: true });
+          ocrDone++;
+          setProgress(20 + Math.round((ocrDone / totalPages) * 65), `OCR: ${ocrDone}/${totalPages} (${OCR_PARALLEL}워커 병렬)`);
+          job.imageData = null;
+          job.origPixels = null;
+          log('warn', `P${job.globalPageNum}: OCR 신뢰도 ${Math.round(ocrConf)}% → 수기문서 추정. Vision API 필수.`);
+          return;
+        }
+      }
       log('ocr', `P${job.globalPageNum}: 최종 ${ocrText.length}자, 신뢰도 ${Math.round(ocrConf)}%`);
 
       ocrResults[jobIdx] = { text: ocrText, conf: ocrConf };
@@ -3738,6 +3886,7 @@ async function runVerification(){
         isScanned: job.isScanned,
         ocrText: ocr.text,
         ocrConf: ocr.conf,
+        isHandwritten: !!ocr.isHandwritten,  // v9: OCR이 수기문서로 추정 → Vision 필수
         type: 'unknown',
         month: null,
         names: [],
@@ -3795,11 +3944,15 @@ async function runVerification(){
       const modelLabel = _visionModel === 'gemini' ? VISION_MODELS.primary.label : VISION_MODELS.fallback.label;
       const fallbackInfo = (_visionModel === 'gemini' && hasClaudeFallback()) ? ` (503→${VISION_MODELS.fallback.label} 폴백 준비됨)` : '';
       // Excel 합성 페이지는 Vision 건너뜀 (이미지 없음, 이미 데이터 확보)
+      // v9: 'unknown' 페이지도 Vision으로 보내서 API가 재분류 (OCR 분류 최종 아님)
       const transferPages = S.pages.filter(p => p.type === 'transfer' && !p.isExcel);
+      const unknownPages = S.pages.filter(p => p.type === 'unknown' && !p.isExcel);
+      // unknown은 payroll 프롬프트로 시도 — doc_type이 transfer면 응답에서 재라우팅
+      unknownPages.forEach(p => { p._wasUnknown = true; p.type = 'payroll'; });
       const payrollPages = S.pages.filter(p => p.type === 'payroll' && !p.isExcel);
       const totalPages = transferPages.length + payrollPages.length;
 
-      log('info', `${modelLabel} Vision: 이체확인증 ${transferPages.length}p (병렬) + 급여대장 ${payrollPages.length}p (순차) 처리 시작...${fallbackInfo}`);
+      log('info', `${modelLabel} Vision: 이체확인증 ${transferPages.length}p + 급여대장/미분류 ${payrollPages.length}p (미분류 ${unknownPages.length}p 포함) — API-first${fallbackInfo}`);
       setProgress(82, `Vision API 금액 추출 (0/${totalPages})`);
 
       let visionSuccess = 0;
@@ -3868,6 +4021,14 @@ async function runVerification(){
       updateApiUsageBar();
     } else {
       log('info', 'Vision API 미설정 → OCR 기반 금액 사용 (정확도 제한적)');
+      // v9: 수기문서 감지 시 경고
+      const hwPages = S.pages.filter(p => p.isHandwritten);
+      if(hwPages.length > 0) {
+        log('warn', `⚠️ 수기문서 ${hwPages.length}p 감지 — OCR만으로는 한글 수기 인식 불가. API 키 설정 권장.`);
+        for(const hp of hwPages) {
+          addManualCheck('저신뢰', '', hp.month || '', `수기문서 + API 미설정 (OCR ${Math.round(hp.ocrConf)}%)`, `P${hp.pageNum} 수기확인 필수`, hp.pageNum);
+        }
+      }
     }
 
     // PHASE 3: Group by month
@@ -3903,7 +4064,7 @@ async function runVerification(){
     log('info', '┌──────────────────────┬──────────────────────────────────────┐');
     log('info', '│ 항목                 │ 내용                                 │');
     log('info', '├──────────────────────┼──────────────────────────────────────┤');
-    log('info', '│ 버전                 │ v8.7 (Gemini+Claude ì´ì¤í)              │');
+    log('info', '│ 버전                 │ v9 (Gemini+Claude 이중화)                │');
     log('info', `│ STEP 1 (503 재시도)  │ 적용 (최대 3회 + Claude 폴백 ${hasFallback})  │`);
     log('info', '│ STEP 2 (이미지 전처리)│ 적용 (CLAHE 8×8 + 샤프닝 + 조건부이진화)│');
     log('info', `│ STEP 3 (다수결)      │ 적용 (불일치 시 3회 다수결)           │`);
@@ -3941,7 +4102,7 @@ async function runVerification(){
 
 // ===== GROUP BY MONTH =====
 function groupByMonth() {
-  // ★ v4.3: 연도 오인식 보정 (2005→2025 등)
+  // ★ 연도 오인식 보정 (2005→2025 등)
   // 요청서 기간에서 유효 연도 범위를 추출
   const validYears = new Set();
   for(const w of S.workers) {
@@ -3969,7 +4130,7 @@ function groupByMonth() {
     }
   }
 
-  // ★ v4.6: 이체확인증/급여대장 분리 상속 전략
+  // ★ 이체확인증/급여대장 분리 상속 전략
   // 핵심 원리: 이체확인증 ↔ 인접 급여대장은 항상 같은 달
   //           이체확인증 ↔ 이체확인증 연속 시 상속 금지 (다른 달일 수 있음)
 
@@ -4082,36 +4243,67 @@ function groupByMonth() {
   }
 
   // ============================================================
-  // 추출 결과 기반 자기교정 (v8.6)
-  // 분류된 type과 실제 추출 데이터의 형태가 모순되면 type 재할당
-  //  - payroll로 분류됐는데 차인지급액 0건 + 본문에 강한 이체지표 → transfer로 교정
-  //  - transfer로 분류됐는데 amounts 0건 + 본문에 강한 급여지표 → payroll로 교정
-  // 단, classifyConfidence ≥ 5인 페이지는 신뢰 (교정 안 함)
+  // 추출 결과 기반 자기교정 — 정확도 우선 버전
+  // 핵심 원칙: "강한 양방향 증거"가 있을 때만 뒤집기. 아니면 'unknown'.
+  //  - 현재 타입 증거 없음 + 반대 타입 강한 증거(2건 이상) → 뒤집기
+  //  - 현재 타입 증거 없음 + 반대 타입 약한 증거(1건) → unknown (수기확인)
+  //  - 강한 분류 신뢰도(≥5) 페이지는 교정 안 함
+  // 과거엔 약한 증거만으로도 뒤집어 오히려 오분류가 생기기도 함.
   // ============================================================
+  const _trfDefRe = /거래\s*일\s*자|처리\s*건\s*수|모\s*계\s*좌|대량\s*입금|이체\s*영\s*수|자동\s*이체\s*영\s*수|의뢰\s*건\s*수|처리\s*금\s*액|미처리/g;
+  const _payDefRe = /차인\s*지급\s*액|차감\s*지급\s*액|공제\s*후\s*차감\s*지급\s*액|임금\s*지급\s*총\s*액|임금\s*산정\s*기간|급여\s*지급\s*및\s*공제\s*내역|공제\s*총\s*액|지급\s*총\s*액|지급\s*년\s*월\s*일|사업장\s*:\s*전체|사업장:전체|기본\s*급|연장\s*근로|국민\s*연금|건강\s*보험|고용\s*보험|과세\s*급여|비과세\s*급여|장기\s*요양/g;
   for(const p of S.pages) {
-    if(!p.type || (p.classifyConfidence || 0) >= 5) continue;
+    if(!p.type || p.type === 'unknown') continue;
+    if((p.classifyConfidence || 0) >= 5) continue;
     const t = p.ocrText || '';
-    const trfDefRe = /거래\s*일\s*자|처리\s*건\s*수|모\s*계\s*좌|대량\s*입금|이체\s*영\s*수|자동\s*이체\s*영\s*수|의뢰\s*건\s*수|처리\s*금\s*액|미처리/;
-    const payDefRe = /차인\s*지급\s*액|공제\s*총\s*액|지급\s*총\s*액|지급\s*년\s*월\s*일|사업장\s*:\s*전체|기본\s*급|연장\s*근로|국민\s*연금|건강\s*보험|고용\s*보험/;
+    const trfCnt = (t.match(_trfDefRe) || []).length;
+    const payCnt = (t.match(_payDefRe) || []).length;
     const hasAmounts = p.amounts && Object.keys(p.amounts).length > 0;
-    const payCount = (p.netPayAmounts && p.netPayAmounts.length) || 0;
+    const payAmtCount = (p.netPayAmounts && p.netPayAmounts.length) || 0;
 
-    if(p.type === 'payroll' && payCount === 0 && !hasAmounts && trfDefRe.test(t) && !payDefRe.test(t)) {
-      log('warn', `[자기교정] P${p.pageNum}: payroll→transfer (차인지급액 0건 + 이체지표 검출)`);
-      p.type = 'transfer';
-      p.classifyReason += ' | 자기교정→transfer';
-    } else if(p.type === 'transfer' && !hasAmounts && payDefRe.test(t) && !trfDefRe.test(t)) {
-      log('warn', `[자기교정] P${p.pageNum}: transfer→payroll (이체금액 0건 + 급여지표 검출)`);
-      p.type = 'payroll';
-      p.classifyReason += ' | 자기교정→payroll';
+    if(p.type === 'payroll' && payAmtCount === 0 && !hasAmounts && payCnt === 0) {
+      if(trfCnt >= 2) {
+        log('warn', `[자기교정] P${p.pageNum}: payroll→transfer (급여 증거 0, 이체 지표 ${trfCnt}건)`);
+        p.type = 'transfer';
+        p.classifyReason += ' | 자기교정→transfer';
+      } else if(trfCnt >= 1) {
+        log('warn', `[자기교정] P${p.pageNum}: payroll→unknown (급여 증거 0, 이체 지표 ${trfCnt}건 — 약함)`);
+        p.type = 'unknown';
+        p.classifyReason += ' | 자기교정→unknown';
+      }
+    } else if(p.type === 'transfer' && !hasAmounts && trfCnt === 0) {
+      if(payCnt >= 2) {
+        log('warn', `[자기교정] P${p.pageNum}: transfer→payroll (이체 증거 0, 급여 지표 ${payCnt}건)`);
+        p.type = 'payroll';
+        p.classifyReason += ' | 자기교정→payroll';
+      } else if(payCnt >= 1) {
+        log('warn', `[자기교정] P${p.pageNum}: transfer→unknown (이체 증거 0, 급여 지표 ${payCnt}건 — 약함)`);
+        p.type = 'unknown';
+        p.classifyReason += ' | 자기교정→unknown';
+      }
+    }
+  }
+
+  // ============================================================
+  // 요청 기간 경계 검증 — 요청서 기간 밖 월은 검증에서 제외
+  // 1월 급여대장에 다른 달 페이지가 섞여 들어가는 주요 원인 제거.
+  // ============================================================
+  const _validMonths = new Set(S.workers.flatMap(w => w.months));
+  for(const p of S.pages) {
+    if(!p.month) continue;
+    if(!_validMonths.has(p.month)) {
+      log('warn', `P${p.pageNum}: 요청 기간 밖의 월 ${p.month} 감지 → 검증 제외 (수기확인)`);
+      p.monthOutOfRange = true;
     }
   }
 
   // Build month groups
-  // v5.1: matchToWorkerName 전역 함수 사용 (normalizeToWorkerName 제거)
+  // 'unknown' 타입 및 요청 기간 밖 월 페이지는 집계에서 제외 (수기확인 큐로 넘김).
   for(const p of S.pages) {
     const m = p.month;
     if(!m) continue;
+    if(p.monthOutOfRange) continue;
+    if(p.type === 'unknown') continue;
 
     if(p.type === 'payroll') {
       if(!S.payroll[m]) S.payroll[m] = {pages:[], names:new Set(), netPayByName:{}, netPayAmounts:[], gradeByName:{}, conflicts:[]};
@@ -4163,6 +4355,27 @@ function groupByMonth() {
   const tm = Object.keys(S.transfer).sort();
   log('info', `급여대장 월: ${pm.join(', ')||'없음'} (${pm.length}개월)`);
   log('info', `이체확인증 월: ${tm.join(', ')||'없음'} (${tm.length}개월)`);
+
+  // ============================================================
+  // 분류/월 문제 페이지 수기확인 큐에 등록
+  // 'unknown': 급여대장/이체확인증 중 어느 것인지 애매한 페이지
+  // 'monthOutOfRange': 요청 기간 밖 월로 감지된 페이지
+  // 둘 다 검증 집계에서는 제외되었지만, 사용자가 직접 확인해야 함.
+  // ============================================================
+  const unknownPages = S.pages.filter(p => p.type === 'unknown');
+  const outOfRangePages = S.pages.filter(p => p.monthOutOfRange);
+  for(const p of unknownPages) {
+    addManualCheck('분류애매', '(페이지 분류)', p.month || '미상',
+      `P${p.pageNum}: 급여대장/이체확인증 구분 불명확 — ${p.classifyReason || ''}`,
+      '원본 확인 후 문서 종류 지정', p.pageNum);
+  }
+  for(const p of outOfRangePages) {
+    addManualCheck('월범위', '(월 범위)', p.month,
+      `P${p.pageNum}: 요청 기간 밖 월 ${p.month} 감지 (type=${p.type})`,
+      '요청서 기간과 서류 월 확인', p.pageNum);
+  }
+  if(unknownPages.length > 0) log('warn', `분류 애매 페이지 ${unknownPages.length}건 → 수기확인 큐`);
+  if(outOfRangePages.length > 0) log('warn', `요청 기간 밖 페이지 ${outOfRangePages.length}건 → 수기확인 큐`);
 }
 
 // ===== CROSS VERIFICATION (인원별 월별 금액 직접 비교 + 차액 산출) =====
@@ -4305,47 +4518,34 @@ async function crossVerify() {
     }
   }
 
-  // ========== 2단계 검증: Grade C 재검증 + 이상 탐지 ==========
-  log('info', '── [2단계 검증] Grade C 재검증 + 금액 이상 탐지 ──');
+  // ========== 2단계 검증: 금액 불일치 및 시계열 이상 감지 ==========
+  // 정확도 원칙: Grade 자동 승격 없음. 금액 불일치는 Grade와 무관하게 모두 수기확인.
+  log('info', '── [2단계 검증] 금액 불일치 및 이상 탐지 ──');
   for(const r of S.results) {
-    // Grade C 매칭 → 이체확인증 교차비교로 승격/수기확인 판단
-    if(r.grade === 'C') {
-      // 이체확인증에서 같은 사람이 A/B로 확정되었으면 자동 승격
-      const trfGrade = S.transfer[r.month]?.gradeByName?.[r.worker];
-      const confirmedByTransfer = _confirmedWorkers.has(`${r.worker}|${r.month}`) || (trfGrade === 'A' || trfGrade === 'B');
-
-      if(confirmedByTransfer && r.payAmount && r.trfAmount && isAmountMatch(r.payAmount, r.trfAmount)) {
-        r.grade = 'B';
-        log('info', `[검증2] ${r.worker} ${r.month}: Grade C → B 승격 (이체확인증 ${trfGrade||'A/B'} 확정 + 금액 일치)`);
-      } else if(r.payAmount && r.trfAmount && isAmountMatch(r.payAmount, r.trfAmount)) {
-        r.grade = 'B';
-        log('info', `[검증2] ${r.worker} ${r.month}: Grade C → B 승격 (금액 교차일치)`);
-      } else if(confirmedByTransfer && (!r.payAmount || !r.trfAmount)) {
-        // 이체에서 확정되었지만 금액 비교 불가 → 수기확인 유지하되 로그
-        log('info', `[검증2] ${r.worker} ${r.month}: Grade C (이체확인증 확정, 금액비교 불가 → 수기확인 유지)`);
-      } else if(r.payAmount && r.trfAmount) {
-        log('warn', `[검증2] ${r.worker} ${r.month}: Grade C 매칭 의심 → 이체=${formatNum(r.trfAmount)} 교차확인 → 급여값 신뢰 불가`);
-        addManualCheck('불일치', r.worker, r.month,
-          `급여=${formatNum(r.payAmount)} 이체=${formatNum(r.trfAmount)} 차액=${formatNum(Math.abs(r.amountDiff))}원`,
-          `급여대장 OCR 오인식 의심, 원본 확인`, null);
-        r.needsManual = true;
-      }
+    // 양쪽 금액 모두 있는데 정확 일치 아님 → 무조건 수기확인
+    if(r.payAmount && r.trfAmount && !r.amountMatch) {
+      const diff = Math.abs(r.amountDiff);
+      addManualCheck('불일치', r.worker, r.month,
+        `급여=${formatNum(r.payAmount)} 이체=${formatNum(r.trfAmount)} 차액=${formatNum(diff)}원`,
+        '원본 대조 필요', null);
+      r.needsManual = true;
     }
 
-    // 금액 이상 탐지 (이체확인증 기준)
+    // Grade C/D (OCR 신뢰도 낮음): 금액 일치 여부와 무관하게 원본 확인 권고
+    if((r.grade === 'C' || r.grade === 'D') && (r.payAmount || r.trfAmount)) {
+      addManualCheck('저신뢰', r.worker, r.month,
+        `Grade ${r.grade} — OCR/Vision 신뢰도 낮음`,
+        '원본 이미지 대조 권장', null);
+      r.needsManual = true;
+    }
+
+    // 시계열 이상치 (전월 대비 50% 이상 급증만 탐지)
     if(r.trfAmount) {
       const warns = validateAmount(r.trfAmount, r.worker, r.month);
       for(const aw of warns) {
         log('warn', `[검증2] ⚠️ ${r.worker} ${r.month}: ${aw.msg}`);
         addManualCheck(aw.type, r.worker, r.month, aw.msg, '원본 확인 필요', null);
       }
-    }
-
-    // 양쪽 다 있는데 차이 > 1,000원 (Grade A/B도)
-    if(r.payAmount && r.trfAmount && !r.amountMatch && r.grade !== 'C') {
-      addManualCheck('불일치', r.worker, r.month,
-        `급여=${formatNum(r.payAmount)} 이체=${formatNum(r.trfAmount)}`,
-        '금액 차이 확인', null);
     }
   }
   // ========== 3단계 검증: 숫자 의심 구간 다수결  ==========
@@ -4717,7 +4917,7 @@ function _findAmountForWorker(amounts, workerName) {
   return null;
 }
 
-// v8.7: 정규화된 정확일치만 — 부분일치/substring 금지
+// 정규화된 정확일치만 — 부분일치/substring 금지
 function _exactWorkerInPage(pg, workerName) {
   if(!pg || !pg.amounts) return false;
   // 1) 정확일치
@@ -4731,7 +4931,7 @@ function _exactWorkerInPage(pg, workerName) {
 }
 
 // type/month 강제 + 금액 일치 + 분류 신뢰도 기반으로 페이지 찾기
-// v8.7: 엄격화 — 부분일치 제거, month 무시 fallback 시 mismatchedMonth 플래그
+// 엄격화 — 부분일치 제거, month 무시 fallback 시 mismatchedMonth 플래그
 function _findPageFor(workerName, month, type, expectedAmount) {
   // 1순위 후보: type+month 일치, worker 정확일치 보유
   let candidates = S.pages.filter(pg =>
@@ -4747,7 +4947,7 @@ function _findPageFor(workerName, month, type, expectedAmount) {
   }
   if(candidates.length === 0) return null;
 
-  // v8.7: 1인 명세서(singleSubject) 우선 + 다른 사람 명세서 배제
+  // 1인 명세서(singleSubject) 우선 + 다른 사람 명세서 배제
   candidates = candidates.filter(pg => {
     if(pg.isPayslip && pg.singleSubject && pg.singleSubject !== workerName) return false;
     return true;
