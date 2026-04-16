@@ -380,11 +380,11 @@ tr:hover{background:var(--light)}
     <!-- STEP 2: PDF/Excel (복수 업로드) -->
     <div class="step-card">
       <h3><span class="step-num">2</span> 급여서류 업로드 (PDF · Excel 혼합 가능)</h3>
-      <p style="font-size:11px;color:var(--gray);margin-bottom:8px">급여대장/명세서 + 이체확인증이 하나의 PDF일 수도, 별도 파일일 수도 있습니다. 급여대장은 엑셀(.xlsx/.xls)도 지원합니다.</p>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:8px">급여대장/명세서 + 이체확인증이 하나의 PDF일 수도, 별도 파일일 수도 있습니다. 급여대장은 엑셀(.xlsx/.xlsm/.xlsb/.xls 다중시트 지원)도 지원합니다.</p>
       <label class="upload-zone" id="pdfZone">
         <div class="upload-icon">📄</div>
         <div class="upload-label">PDF 또는 Excel 드래그/클릭 (복수 선택 가능)</div>
-        <input type="file" accept=".pdf,.xlsx,.xls" multiple onchange="handlePdfUpload(this)">
+        <input type="file" accept=".pdf,.xlsx,.xlsm,.xlsb,.xls" multiple onchange="handlePdfUpload(this)">
       </label>
       <div class="file-list" id="pdfFileList"></div>
       <div id="pdfInfo" style="margin-top:6px;font-size:11px;color:var(--gray)"></div>
@@ -1338,7 +1338,7 @@ function showParsed(){
 // ===== 급여서류 업로드 (PDF/Excel 복수) =====
 // S.pdfFiles 는 PDF+Excel 혼합 저장 (레거시 이름 유지)
 function _isExcelFile(f) {
-  return /\.(xlsx|xls)$/i.test(f.name || '');
+  return /\.(xlsx|xlsm|xlsb|xls)$/i.test(f.name || '');
 }
 
 function handlePdfUpload(input){
@@ -1396,11 +1396,13 @@ async function _parseExcelPayrollFile(file, fileIdx) {
   const wb = XLSX.read(buf, { type: 'array' });
   const pages = [];
 
-  // 파일명 기반 월 후보
+  // 파일명 기반 월 후보 + 연도 단독 후보(시트명에 월만 있을 때 연도 보강용)
   const fmMatch = (file.name || '').match(/(20\d{2})[-_.\s]?(0[1-9]|1[0-2])(?!\d)/);
   const fileMonth = fmMatch ? `${fmMatch[1]}-${fmMatch[2]}` : null;
+  const fyMatch = (file.name || '').match(/(20\d{2})/);
+  const fileYear = fyMatch ? fyMatch[1] : null;
 
-  const nameHdrRe = /(성\s*명|이\s*름|근로자|직원명|대상자)/;
+  const nameHdrRe = /(성\s*명|이\s*름|근로자\s*명?|직원\s*명?|사원\s*명?|대상자|성\s*\s*명|姓\s*名|name)/i;
   // 차인지급액 계열 우선순위 — 정확도 우선(공제 후 실지급 금액만 인정)
   // ⚠️ "지급총액"은 공제 전 금액이라 차인지급액과 다름 → 제외
   const netPayHdrPriority = [
@@ -1415,6 +1417,10 @@ async function _parseExcelPayrollFile(file, fileIdx) {
     /실\s*수\s*령\s*액/,
     /세\s*후\s*지\s*급\s*액/,
     /지\s*급\s*액\s*계/,
+    /실\s*급\s*여/,
+    /실\s*수\s*령/,
+    /수\s*령\s*액/,
+    /net\s*pay/i,
   ];
 
   for(const sheetName of wb.SheetNames) {
@@ -1423,9 +1429,10 @@ async function _parseExcelPayrollFile(file, fileIdx) {
     const data = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
     if(!data || data.length < 2) continue;
 
-    // 헤더행 탐색 (상위 15행 내)
+    // 헤더행 탐색 (상위 30행 내) — PDF→Excel 변환물의 메타데이터 묻힘 대응
     let hRow = -1, nCol = -1, payCol = -1;
-    const scanLimit = Math.min(15, data.length);
+    const scanLimit = Math.min(30, data.length);
+    // Pass 1: 단일 행 헤더 탐색
     for(let r = 0; r < scanLimit; r++) {
       const row = data[r] || [];
       let foundName = -1;
@@ -1442,8 +1449,56 @@ async function _parseExcelPayrollFile(file, fileIdx) {
         break;
       }
     }
+    // Pass 2: 두 행 합쳐서 헤더 탐색 (병합셀 분리 / 두 줄 헤더 케이스)
+    // 예: row5="공제후" row6="지급액"  → 합치면 "공제후 지급액" 매칭됨
     if(hRow < 0) {
-      // 헤더 없음 — 시트 스킵
+      for(let r = 0; r < scanLimit - 1; r++) {
+        const rowA = data[r] || [];
+        const rowB = data[r+1] || [];
+        const wide = Math.max(rowA.length, rowB.length);
+        let foundName = -1;
+        const foundPayByPri = new Array(netPayHdrPriority.length).fill(-1);
+        for(let c = 0; c < wide; c++) {
+          const va = String(rowA[c] || '').trim();
+          const vb = String(rowB[c] || '').trim();
+          const v = (va + ' ' + vb).trim();
+          if(!v) continue;
+          if(foundName < 0 && nameHdrRe.test(v)) foundName = c;
+          netPayHdrPriority.forEach((re, pi) => { if(foundPayByPri[pi] < 0 && re.test(v)) foundPayByPri[pi] = c; });
+        }
+        const payIdx = foundPayByPri.find(c => c >= 0);
+        if(foundName >= 0 && typeof payIdx === 'number' && payIdx >= 0) {
+          // 데이터 행은 둘째 행 다음부터 시작
+          hRow = r + 1; nCol = foundName; payCol = payIdx;
+          break;
+        }
+      }
+    }
+    if(hRow < 0) {
+      // 헤더 없음 — 진단 정보 첨부 후 시트 스킵
+      const preview = [];
+      for(let r = 0; r < Math.min(8, data.length); r++) {
+        const cells = (data[r] || []).slice(0, 8).map(v => String(v || '').trim()).filter(Boolean);
+        if(cells.length) preview.push(`  R${r}: ${cells.join(' | ')}`);
+      }
+      // 어떤 키워드가 어디서 발견됐는지 별도 보고 (전체 30행 스캔)
+      const nameHits = [], payHits = [];
+      for(let r = 0; r < scanLimit; r++) {
+        const row = data[r] || [];
+        for(let c = 0; c < row.length; c++) {
+          const v = String(row[c] || '').trim();
+          if(!v) continue;
+          if(nameHdrRe.test(v)) nameHits.push(`R${r}C${c}="${v}"`);
+          if(netPayHdrPriority.some(re => re.test(v))) payHits.push(`R${r}C${c}="${v}"`);
+        }
+      }
+      pages.__skippedDiagnostics = pages.__skippedDiagnostics || [];
+      pages.__skippedDiagnostics.push({
+        sheetName,
+        preview: preview.join('\n') || '(빈 시트)',
+        nameHits: nameHits.slice(0, 5),
+        payHits: payHits.slice(0, 5),
+      });
       continue;
     }
 
@@ -1463,6 +1518,29 @@ async function _parseExcelPayrollFile(file, fileIdx) {
           const mm = String(parseInt(cm[2])).padStart(2, '0');
           sheetMonth = `${cm[1]}-${mm}`;
           break;
+        }
+      }
+    }
+    // 시트명이 "1월" "3월" 같이 월만 있는 경우 — 연도 보강 (파일명→요청월→null)
+    if(!sheetMonth) {
+      const monthOnly = sheetName.match(/(?<![0-9])(0?[1-9]|1[0-2])\s*월/);
+      if(monthOnly) {
+        // 요청 워커 메타에서 연도 추출 (단일 연도일 때만 사용 — 모호하면 보강 안 함)
+        let reqYear = null;
+        try {
+          const ys = new Set();
+          for(const w of (S?.workers || [])) {
+            for(const m of (w.months || [])) {
+              const y = String(m || '').slice(0, 4);
+              if(/^20\d{2}$/.test(y)) ys.add(y);
+            }
+          }
+          if(ys.size === 1) reqYear = [...ys][0];
+        } catch(_) {}
+        const yr = fileYear || reqYear;
+        if(yr) {
+          const mm = String(parseInt(monthOnly[1])).padStart(2, '0');
+          sheetMonth = `${yr}-${mm}`;
         }
       }
     }
@@ -3739,8 +3817,20 @@ async function runVerification(){
     for(const fi of excelFileIdx) {
       try {
         const pages = await _parseExcelPayrollFile(S.pdfFiles[fi], fi);
+        // 스킵된 시트 진단 정보 출력 (헤더 미발견)
+        const diagnostics = pages.__skippedDiagnostics || [];
+        if(diagnostics.length > 0) {
+          diagnostics.forEach(d => {
+            log('warn', `[Excel] ${S.pdfFiles[fi].name} / 시트"${d.sheetName}": 헤더(성명+차인지급액) 미발견 → 스킵`);
+            log('info', `  └ 상위 8행 미리보기:\n${d.preview}`);
+            if(d.nameHits.length) log('info', `  └ 성명류 키워드 발견 위치: ${d.nameHits.join(', ')}`);
+            else log('info', `  └ 성명류 키워드 미발견 (성명/이름/근로자/사원/직원/대상자/姓名/name)`);
+            if(d.payHits.length) log('info', `  └ 차인지급액류 키워드 발견 위치: ${d.payHits.join(', ')}`);
+            else log('info', `  └ 차인지급액류 키워드 미발견 (차인지급액/공제후지급액/실지급액/실수령액 등 15종)`);
+          });
+        }
         if(pages.length === 0) {
-          log('warn', `[Excel] ${S.pdfFiles[fi].name}: 급여대장 형식 헤더(성명/차인지급액 등)를 찾지 못함 — 스킵`);
+          log('warn', `[Excel] ${S.pdfFiles[fi].name}: 추출 가능한 시트 없음 — 파일 스킵`);
           continue;
         }
         pages.forEach(pg => {
