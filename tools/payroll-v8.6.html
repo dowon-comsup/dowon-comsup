@@ -1396,10 +1396,21 @@ async function _parseExcelPayrollFile(file, fileIdx) {
   const wb = XLSX.read(buf, { type: 'array' });
   const pages = [];
 
-  // 파일명 기반 월 후보 + 연도 단독 후보(시트명에 월만 있을 때 연도 보강용)
-  const fmMatch = (file.name || '').match(/(20\d{2})[-_.\s]?(0[1-9]|1[0-2])(?!\d)/);
-  const fileMonth = fmMatch ? `${fmMatch[1]}-${fmMatch[2]}` : null;
-  const fyMatch = (file.name || '').match(/(20\d{2})/);
+  // 파일명 기반 월 후보 — 영문 구분자/한글 "년 M월(분)" 둘 다 시도
+  // 우선순위: "X월분/X월급여/X월귀속" 같이 명시적 급여월이 있으면 그것을, 아니면 일반 YYYY-MM
+  const fname = file.name || '';
+  let fileMonth = null;
+  // 1) 한글 명시: "2025년 12월분" / "2025년 12월 급여" / "2025년 12월 귀속"
+  let fmm = fname.match(/(20\d{2})\s*년?\s*[-./\s]?\s*(0?[1-9]|1[0-2])\s*월\s*(?:분|급여|귀속|치)/);
+  // 2) 한글 일반: "2025년 12월"
+  if(!fmm) fmm = fname.match(/(20\d{2})\s*년\s*(0?[1-9]|1[0-2])\s*월/);
+  // 3) 영문/숫자 구분자: "2025-12" / "2025_12" / "2025.12" / "202512"
+  if(!fmm) fmm = fname.match(/(20\d{2})[-_.\s]?(0[1-9]|1[0-2])(?!\d)/);
+  if(fmm) {
+    const mm = String(parseInt(fmm[2])).padStart(2, '0');
+    fileMonth = `${fmm[1]}-${mm}`;
+  }
+  const fyMatch = fname.match(/(20\d{2})/);
   const fileYear = fyMatch ? fyMatch[1] : null;
 
   const nameHdrRe = /(성\s*명|이\s*름|근로자\s*명?|직원\s*명?|사원\s*명?|대상자|성\s*\s*명|姓\s*名|name)/i;
@@ -1509,11 +1520,17 @@ async function _parseExcelPayrollFile(file, fileIdx) {
       const mm = String(parseInt(smMatch[2])).padStart(2, '0');
       sheetMonth = `${smMatch[1]}-${mm}`;
     }
-    // 헤더 상단 셀 어디에든 YYYY-MM 있으면 사용
+    // 헤더 상단 셀에서 급여 관련 컨텍스트가 있는 YYYY-MM만 사용 (발급일/계좌번호 등 노이즈 거부)
     if(!sheetMonth) {
+      // 컨텍스트 키워드: 귀속/급여/임금/대장/명세/지급월/X월분/X월치
+      const ctxRe = /(귀속|급여|임금|대장|명세|지급\s*월|월\s*분|월\s*치)/;
       for(let r = 0; r <= hRow; r++) {
         const joined = (data[r] || []).map(v => String(v||'')).join(' ');
-        const cm = joined.match(/(20\d{2})\s*[-.년]?\s*(0?[1-9]|1[0-2])\s*월?/);
+        if(!ctxRe.test(joined)) continue; // 컨텍스트 없으면 스킵
+        // 한글 우선: "2025년 12월"
+        let cm = joined.match(/(20\d{2})\s*년\s*(0?[1-9]|1[0-2])\s*월/);
+        // 영문/숫자
+        if(!cm) cm = joined.match(/(20\d{2})[-_.\s]?(0?[1-9]|1[0-2])(?!\d)/);
         if(cm) {
           const mm = String(parseInt(cm[2])).padStart(2, '0');
           sheetMonth = `${cm[1]}-${mm}`;
