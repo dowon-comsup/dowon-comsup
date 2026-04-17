@@ -234,9 +234,12 @@ tr:hover{background:var(--light)}
 .preview-amount.match{background:var(--success-bg);color:#006100}
 .preview-amount.mismatch{background:var(--danger-bg);color:#9C0006}
 .preview-noref{font-size:12px;color:var(--gray);text-align:center;padding:30px 10px;line-height:1.6}
+.in-iframe .header{display:none}
+.in-iframe .container{padding-top:8px}
 </style>
 </head>
 <body>
+<script>if(window.self!==window.top)document.documentElement.classList.add('in-iframe');</script>
 <div class="tool-topbar">
   <a href="../index.html">&larr; 대시보드로 돌아가기</a>
 </div>

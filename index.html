@@ -5,13 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>업무 자동화 포털 | 노무법인 도원</title>
   <link rel="stylesheet" href="assets/style.css">
+  <style>
+    /* iframe tool view */
+    .tool-frame { display:none; width:100%; height:calc(100vh - var(--header-h)); border:none; background:var(--bg); }
+    .tool-frame.active { display:block; }
+    .main-content.frame-mode { padding:0; max-width:none; }
+  </style>
 </head>
 <body>
 
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <a href="index.html" class="sidebar-brand">
+      <a href="#" class="sidebar-brand" onclick="showDashboard();return false">
         <div class="sidebar-logo">DW</div>
         <span class="sidebar-brand-text">
           <span class="sidebar-brand-title">노무법인 도원</span>
@@ -25,7 +31,7 @@
 
     <nav class="sidebar-nav">
       <div class="sidebar-group-label">메뉴</div>
-      <a href="index.html" class="sidebar-link active" title="대시보드">
+      <a href="#" class="sidebar-link active" data-page="dashboard" title="대시보드" onclick="showDashboard();return false">
         <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
         <span class="sidebar-link-text">대시보드</span>
       </a>
@@ -33,29 +39,29 @@
       <div class="sidebar-divider"></div>
       <div class="sidebar-group-label">자동화 도구</div>
 
-      <a href="tools/businesses.html" class="sidebar-link" title="사업장 조회">
+      <a href="#" class="sidebar-link" data-page="tools/businesses.html" data-title="사업장 조회" title="사업장 조회" onclick="loadTool(this);return false">
         <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M9 8h1"/><path d="M9 12h1"/><path d="M9 16h1"/><path d="M14 8h1"/><path d="M14 12h1"/><path d="M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16"/></svg></span>
         <span class="sidebar-link-text">사업장 조회</span>
       </a>
-      <a href="tools/payroll-v8.6.html" class="sidebar-link" title="급여서류 검증">
+      <a href="#" class="sidebar-link" data-page="tools/payroll-v8.6.html" data-title="급여서류 검증" title="급여서류 검증" onclick="loadTool(this);return false">
         <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>
         <span class="sidebar-link-text">급여서류 검증</span>
         <span class="sidebar-version">v8.6</span>
       </a>
-      <a href="tools/director-insurance-v2.html" class="sidebar-link" title="등기임원 판정">
+      <a href="#" class="sidebar-link" data-page="tools/director-insurance-v2.html" data-title="등기임원 판정" title="등기임원 판정" onclick="loadTool(this);return false">
         <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M3 12l3-3 3 3"/><path d="M15 12l3 3 3-3"/><line x1="6" y1="12" x2="18" y2="12"/></svg></span>
         <span class="sidebar-link-text">등기임원 판정</span>
         <span class="sidebar-version">v2.0</span>
       </a>
-      <a href="tools/ocr-extract.html" class="sidebar-link" title="수기서류 OCR">
+      <a href="#" class="sidebar-link" data-page="tools/ocr-extract.html" data-title="수기서류 OCR" title="수기서류 OCR" onclick="loadTool(this);return false">
         <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg></span>
         <span class="sidebar-link-text">수기서류 OCR</span>
       </a>
-      <a href="tools/contract-review.html" class="sidebar-link" title="청년도약 서류판독">
+      <a href="#" class="sidebar-link" data-page="tools/contract-review.html" data-title="청년도약 서류판독" title="청년도약 서류판독" onclick="loadTool(this);return false">
         <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>
         <span class="sidebar-link-text">청년도약 서류판독</span>
       </a>
-      <a href="tools/elderly-employment.html" class="sidebar-link" title="고령자 계속고용">
+      <a href="#" class="sidebar-link" data-page="tools/elderly-employment.html" data-title="고령자 계속고용" title="고령자 계속고용" onclick="loadTool(this);return false">
         <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span>
         <span class="sidebar-link-text">고령자 계속고용</span>
       </a>
@@ -91,10 +97,10 @@
         <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="메뉴 열기">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
-        <a href="index.html" class="header-logo-mobile">
+        <a href="#" class="header-logo-mobile" onclick="showDashboard();return false">
           <div class="sidebar-logo">DW</div>
         </a>
-        <h2 class="header-title">대시보드</h2>
+        <h2 class="header-title" id="headerTitle">대시보드</h2>
       </div>
       <div class="header-right">
         <span class="phase-badge">운영중</span>
@@ -105,286 +111,161 @@
       </div>
     </header>
 
-    <main class="main-content">
+    <main class="main-content" id="mainContent">
 
-      <!-- Page Header -->
-      <div class="page-header">
-        <div class="page-header-top">
-          <h1 class="page-title">업무 자동화 포털</h1>
+      <!-- ===== Dashboard View ===== -->
+      <div id="dashboardView">
+        <div class="page-header">
+          <div class="page-header-top">
+            <h1 class="page-title">업무 자동화 포털</h1>
+          </div>
+          <p class="page-desc">최초자료 처리부터 지원금 검증까지, 노무법인 도원 기업지원팀의 업무 자동화 도구를 한곳에서 사용합니다.</p>
         </div>
-        <p class="page-desc">최초자료 처리부터 지원금 검증까지, 노무법인 도원 기업지원팀의 업무 자동화 도구를 한곳에서 사용합니다.</p>
-      </div>
 
-      <!-- Stats -->
-      <div class="dash-stats">
-        <div class="dash-stat">
-          <div class="dash-stat-icon indigo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <div class="dash-stats">
+          <div class="dash-stat">
+            <div class="dash-stat-icon indigo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            </div>
+            <div>
+              <div class="dash-stat-value">6</div>
+              <div class="dash-stat-label">���동화 도구</div>
+            </div>
           </div>
-          <div>
-            <div class="dash-stat-value">6</div>
-            <div class="dash-stat-label">자동화 도구</div>
+          <div class="dash-stat">
+            <div class="dash-stat-icon emerald">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div>
+              <div class="dash-stat-value">7</div>
+              <div class="dash-stat-label">지원금 종류</div>
+            </div>
+          </div>
+          <div class="dash-stat">
+            <div class="dash-stat-icon amber">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div>
+              <div class="dash-stat-value">4</div>
+              <div class="dash-stat-label">4대보험 환급</div>
+            </div>
           </div>
         </div>
-        <div class="dash-stat">
-          <div class="dash-stat-icon emerald">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+
+        <h2 class="content-section-title">자동화 도구 <span>클릭하여 도구를 실행합니다</span></h2>
+        <div class="tools-grid">
+          <div class="tool-card" onclick="loadToolByPage('tools/businesses.html','사업장 조회')">
+            <div class="tool-card-body">
+              <div class="tool-card-header">
+                <div class="tool-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M9 8h1"/><path d="M9 12h1"/><path d="M9 16h1"/><path d="M14 8h1"/><path d="M14 12h1"/><path d="M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16"/></svg></div>
+                <div class="tool-card-badges"><span class="badge badge-active">운영중</span><span class="badge badge-version">v1.0</span></div>
+              </div>
+              <div class="tool-card-title">사업장 조회</div>
+              <div class="tool-card-subtitle">Business Lookup</div>
+              <div class="tool-card-desc">노션 기업지원팀DB와 연동하여 사업장 목록을 조회하고, 고용지원금 검토 금액 확인 및 0원 안내 메일을 발송합니다.</div>
+              <div class="tool-card-features"><span class="feature-tag">노션 연동</span><span class="feature-tag">지원금 검토현황</span><span class="feature-tag">0원 안내</span></div>
+              <div class="tool-card-action"><span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span><span style="font-size:11px;color:var(--ink-400)">n8n webhook 연동</span></div>
+            </div>
           </div>
-          <div>
-            <div class="dash-stat-value">7</div>
-            <div class="dash-stat-label">지원금 종류</div>
+          <div class="tool-card" onclick="loadToolByPage('tools/payroll-v8.6.html','급여서류 검증')">
+            <div class="tool-card-body">
+              <div class="tool-card-header">
+                <div class="tool-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+                <div class="tool-card-badges"><span class="badge badge-active">운영중</span><span class="badge badge-version">v8.6</span></div>
+              </div>
+              <div class="tool-card-title">급여서류 검증 도구</div>
+              <div class="tool-card-subtitle">Payroll Document Verifier</div>
+              <div class="tool-card-desc">고용지원금 신청을 위한 급여대장·이체확인증·급여명세서의 기간 완전성, 금액 일치성을 자동으로 교차 검증합니다.</div>
+              <div class="tool-card-features"><span class="feature-tag">급여대장 검증</span><span class="feature-tag">이체확인증 대조</span><span class="feature-tag">PDF 파싱</span></div>
+              <div class="tool-card-action"><span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span><span style="font-size:11px;color:var(--ink-400)">청년일자리도약 · 출산육아기</span></div>
+            </div>
+          </div>
+          <div class="tool-card" onclick="loadToolByPage('tools/director-insurance-v2.html','등기임원 판정')">
+            <div class="tool-card-body">
+              <div class="tool-card-header">
+                <div class="tool-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M3 12l3-3 3 3"/><path d="M15 12l3 3 3-3"/><line x1="6" y1="12" x2="18" y2="12"/></svg></div>
+                <div class="tool-card-badges"><span class="badge badge-active">운영중</span><span class="badge badge-version">v2.0</span></div>
+              </div>
+              <div class="tool-card-title">등기임원 4대보험 판정</div>
+              <div class="tool-card-subtitle">Director Insurance Eligibility</div>
+              <div class="tool-card-desc">등기임원의 근로자성 여부를 판단하여 4대보험 적용 대상인지 자동으로 판정합니다.</div>
+              <div class="tool-card-features"><span class="feature-tag">근로자성 판단</span><span class="feature-tag">보험 적용 여부</span><span class="feature-tag">체크리스트</span></div>
+              <div class="tool-card-action"><span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span><span style="font-size:11px;color:var(--ink-400)">4대보험 적용제외 검토</span></div>
+            </div>
+          </div>
+          <div class="tool-card" onclick="loadToolByPage('tools/ocr-extract.html','수기서류 OCR')">
+            <div class="tool-card-body">
+              <div class="tool-card-header">
+                <div class="tool-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg></div>
+                <div class="tool-card-badges"><span class="badge badge-active">운영중</span><span class="badge badge-version">v1.0</span></div>
+              </div>
+              <div class="tool-card-title">수기서류 OCR 추출</div>
+              <div class="tool-card-subtitle">Handwritten Document OCR</div>
+              <div class="tool-card-desc">수기로 작성된 스캔 서류에서 Gemini / Claude AI를 활용해 텍스트를 자동 추출합니다.</div>
+              <div class="tool-card-features"><span class="feature-tag">AI OCR</span><span class="feature-tag">Gemini / Claude</span><span class="feature-tag">스캔 서류</span></div>
+              <div class="tool-card-action"><span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span><span style="font-size:11px;color:var(--ink-400)">API 키 필요</span></div>
+            </div>
+          </div>
+          <div class="tool-card" onclick="loadToolByPage('tools/contract-review.html','청년도약 서류판독')">
+            <div class="tool-card-body">
+              <div class="tool-card-header">
+                <div class="tool-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></div>
+                <div class="tool-card-badges"><span class="badge badge-active">운영중</span><span class="badge badge-version">V1</span></div>
+              </div>
+              <div class="tool-card-title">청년일자리도약장려금 서류 판독</div>
+              <div class="tool-card-subtitle">Youth Job Leap Subsidy Document Review</div>
+              <div class="tool-card-desc">청년일자리도약장려금 신청 서류를 Claude AI로 종합 판독하여 적격성을 자동 검토합니다.</div>
+              <div class="tool-card-features"><span class="feature-tag">6종 서류 판별</span><span class="feature-tag">정규직 판단</span><span class="feature-tag">학력확인 검증</span></div>
+              <div class="tool-card-action"><span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span><span style="font-size:11px;color:var(--ink-400)">Anthropic API 키 필요</span></div>
+            </div>
+          </div>
+          <div class="tool-card" onclick="loadToolByPage('tools/elderly-employment.html','고령자 계속고용')">
+            <div class="tool-card-body">
+              <div class="tool-card-header">
+                <div class="tool-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+                <div class="tool-card-badges"><span class="badge badge-active">운영중</span><span class="badge badge-version">v1.0</span></div>
+              </div>
+              <div class="tool-card-title">고령자 계속고용 지원금 판독</div>
+              <div class="tool-card-subtitle">Elderly Continued Employment Subsidy</div>
+              <div class="tool-card-desc">취업규칙에서 정년을 AI로 판독하고, 정년 도달 근로자를 전수 추출하여 대상자를 자동 검토합니다.</div>
+              <div class="tool-card-features"><span class="feature-tag">정년 판독</span><span class="feature-tag">대상자 추출</span><span class="feature-tag">지원금 산출</span></div>
+              <div class="tool-card-action"><span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span><span style="font-size:11px;color:var(--ink-400)">Anthropic API 키 필요</span></div>
+            </div>
           </div>
         </div>
-        <div class="dash-stat">
-          <div class="dash-stat-icon amber">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <div>
-            <div class="dash-stat-value">4</div>
-            <div class="dash-stat-label">4대보험 환급</div>
-          </div>
+
+        <h2 class="content-section-title">빠른 링크 <span>자주 사용하는 외부 시스템</span></h2>
+        <div class="quick-links">
+          <a href="https://www.ei.go.kr" target="_blank" class="quick-link"><div class="quick-link-icon">&#127963;</div><div><div class="quick-link-text">고용24</div><div class="quick-link-sub">지원금 신청 · 조회</div></div></a>
+          <a href="https://total.comwel.or.kr" target="_blank" class="quick-link"><div class="quick-link-icon">&#127973;</div><div><div class="quick-link-text">고산토탈서비스</div><div class="quick-link-sub">고용산재보험 토탈</div></div></a>
+          <a href="https://www.nhis.or.kr" target="_blank" class="quick-link"><div class="quick-link-icon">&#128138;</div><div><div class="quick-link-text">건강보험공단</div><div class="quick-link-sub">건강 · 장기요양보험</div></div></a>
+          <a href="https://www.nps.or.kr" target="_blank" class="quick-link"><div class="quick-link-icon">&#128272;</div><div><div class="quick-link-text">국민연금공단</div><div class="quick-link-sub">국민연금 업무</div></div></a>
+          <a href="https://admin.dowonbiz.com/scrape-data/overview" target="_blank" class="quick-link"><div class="quick-link-icon">&#128736;</div><div><div class="quick-link-text">도원어드민</div><div class="quick-link-sub">스크래핑 데이터 관리</div></div></a>
+          <a href="https://dowonbiz.com/submit/agent" target="_blank" class="quick-link"><div class="quick-link-icon">&#128238;</div><div><div class="quick-link-text">찾아드림</div><div class="quick-link-sub">에이전트 제출</div></div></a>
         </div>
+
+        <div class="alert alert-info">이 포털은 노무법인 도원 기업지원팀 내부용입니다. 도구 사용 중 문의사항은 팀 채널로 연락하세요.</div>
+        <footer class="footer">&copy; 2026 노무법인 도원 기업지원팀 &mdash; 업무 자동화 포털 &mdash; <a href="https://github.com/dowon-comsup">GitHub</a></footer>
       </div>
 
-      <!-- Tool Cards -->
-      <h2 class="content-section-title">자동화 도구 <span>클릭하여 도구를 실행합니다</span></h2>
-      <div class="tools-grid">
-
-        <!-- 사업장 조회 -->
-        <a href="tools/businesses.html" class="tool-card">
-          <div class="tool-card-body">
-            <div class="tool-card-header">
-              <div class="tool-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M9 8h1"/><path d="M9 12h1"/><path d="M9 16h1"/><path d="M14 8h1"/><path d="M14 12h1"/><path d="M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16"/></svg>
-              </div>
-              <div class="tool-card-badges">
-                <span class="badge badge-active">운영중</span>
-                <span class="badge badge-version">v1.0</span>
-              </div>
-            </div>
-            <div class="tool-card-title">사업장 조회</div>
-            <div class="tool-card-subtitle">Business Lookup</div>
-            <div class="tool-card-desc">노션 기업지원팀DB와 연동하여 사업장 목록을 조회하고, 고용지원금 검토 금액 확인 및 0원 안내 메일을 발송합니다.</div>
-            <div class="tool-card-features">
-              <span class="feature-tag">노션 연동</span>
-              <span class="feature-tag">지원금 검토현황</span>
-              <span class="feature-tag">0원 안내</span>
-              <span class="feature-tag">사업장 검색</span>
-            </div>
-            <div class="tool-card-action">
-              <span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span>
-              <span style="font-size:11px;color:var(--ink-400);">n8n webhook 연동</span>
-            </div>
-          </div>
-        </a>
-
-        <!-- 급여서류 검증 -->
-        <a href="tools/payroll-v8.6.html" class="tool-card">
-          <div class="tool-card-body">
-            <div class="tool-card-header">
-              <div class="tool-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-              </div>
-              <div class="tool-card-badges">
-                <span class="badge badge-active">운영중</span>
-                <span class="badge badge-version">v8.6</span>
-              </div>
-            </div>
-            <div class="tool-card-title">급여서류 검증 도구</div>
-            <div class="tool-card-subtitle">Payroll Document Verifier</div>
-            <div class="tool-card-desc">고용지원금 신청을 위한 급여대장·이체확인증·급여명세서의 기간 완전성, 금액 일치성, 대상자 포함 여부를 자동으로 교차 검증합니다.</div>
-            <div class="tool-card-features">
-              <span class="feature-tag">급여대장 검증</span>
-              <span class="feature-tag">이체확인증 대조</span>
-              <span class="feature-tag">PDF 파싱</span>
-              <span class="feature-tag">누락 서류 확인</span>
-            </div>
-            <div class="tool-card-action">
-              <span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span>
-              <span style="font-size:11px;color:var(--ink-400);">청년일자리도약 · 출산육아기</span>
-            </div>
-          </div>
-        </a>
-
-        <!-- 등기임원 4대보험 판정 -->
-        <a href="tools/director-insurance-v2.html" class="tool-card">
-          <div class="tool-card-body">
-            <div class="tool-card-header">
-              <div class="tool-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M3 12l3-3 3 3"/><path d="M15 12l3 3 3-3"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
-              </div>
-              <div class="tool-card-badges">
-                <span class="badge badge-active">운영중</span>
-                <span class="badge badge-version">v2.0</span>
-              </div>
-            </div>
-            <div class="tool-card-title">등기임원 4대보험 판정</div>
-            <div class="tool-card-subtitle">Director Insurance Eligibility</div>
-            <div class="tool-card-desc">등기임원의 근로자성 여부를 판단하여 4대보험 적용 대상인지 자동으로 판정합니다. 보수 유무, 상근 여부, 업무 집행권 등 주요 기준을 체크합니다.</div>
-            <div class="tool-card-features">
-              <span class="feature-tag">근로자성 판단</span>
-              <span class="feature-tag">보험 적용 여부</span>
-              <span class="feature-tag">체크리스트</span>
-            </div>
-            <div class="tool-card-action">
-              <span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span>
-              <span style="font-size:11px;color:var(--ink-400);">4대보험 적용제외 검토</span>
-            </div>
-          </div>
-        </a>
-
-        <!-- 수기서류 OCR -->
-        <a href="tools/ocr-extract.html" class="tool-card">
-          <div class="tool-card-body">
-            <div class="tool-card-header">
-              <div class="tool-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg>
-              </div>
-              <div class="tool-card-badges">
-                <span class="badge badge-active">운영중</span>
-                <span class="badge badge-version">v1.0</span>
-              </div>
-            </div>
-            <div class="tool-card-title">수기서류 OCR 추출</div>
-            <div class="tool-card-subtitle">Handwritten Document OCR</div>
-            <div class="tool-card-desc">수기로 작성된 스캔 서류에서 Gemini / Claude AI를 활용해 텍스트를 자동 추출합니다. 위임장, 설문지, 확인서 등 다양한 서류를 지원합니다.</div>
-            <div class="tool-card-features">
-              <span class="feature-tag">AI OCR</span>
-              <span class="feature-tag">Gemini / Claude</span>
-              <span class="feature-tag">스캔 서류</span>
-            </div>
-            <div class="tool-card-action">
-              <span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span>
-              <span style="font-size:11px;color:var(--ink-400);">API 키 필요</span>
-            </div>
-          </div>
-        </a>
-
-        <!-- 청년일자리도약장려금 서류 판독 -->
-        <a href="tools/contract-review.html" class="tool-card">
-          <div class="tool-card-body">
-            <div class="tool-card-header">
-              <div class="tool-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-              </div>
-              <div class="tool-card-badges">
-                <span class="badge badge-active">운영중</span>
-                <span class="badge badge-version">V1</span>
-              </div>
-            </div>
-            <div class="tool-card-title">청년일자리도약장려금 서류 판독</div>
-            <div class="tool-card-subtitle">Youth Job Leap Subsidy Document Review</div>
-            <div class="tool-card-desc">청년일자리도약장려금 신청 서류(근로계약서·졸업증명서·사업자등록증명·학력확인서·동의서 등)를 Claude AI로 종합 판독하여 적격성을 자동 검토합니다.</div>
-            <div class="tool-card-features">
-              <span class="feature-tag">6종 서류 판별</span>
-              <span class="feature-tag">정규직 판단</span>
-              <span class="feature-tag">학력확인 검증</span>
-              <span class="feature-tag">동의서 완비 확인</span>
-            </div>
-            <div class="tool-card-action">
-              <span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span>
-              <span style="font-size:11px;color:var(--ink-400);">Anthropic API 키 필요</span>
-            </div>
-          </div>
-        </a>
-
-        <!-- 고령자 계속고용 지원금 -->
-        <a href="tools/elderly-employment.html" class="tool-card">
-          <div class="tool-card-body">
-            <div class="tool-card-header">
-              <div class="tool-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-              </div>
-              <div class="tool-card-badges">
-                <span class="badge badge-active">운영중</span>
-                <span class="badge badge-version">v1.0</span>
-              </div>
-            </div>
-            <div class="tool-card-title">고령자 계속고용 지원금 판독</div>
-            <div class="tool-card-subtitle">Elderly Continued Employment Subsidy</div>
-            <div class="tool-card-desc">취업규칙에서 정년을 AI로 판독하고, 고용현황에서 정년 도달 근로자를 전수 추출하여 계속고용 지원금 대상자를 자동 검토합니다.</div>
-            <div class="tool-card-features">
-              <span class="feature-tag">정년 판독</span>
-              <span class="feature-tag">대상자 추출</span>
-              <span class="feature-tag">지원금 산출</span>
-              <span class="feature-tag">중복검토</span>
-            </div>
-            <div class="tool-card-action">
-              <span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span>
-              <span style="font-size:11px;color:var(--ink-400);">Anthropic API 키 필요</span>
-            </div>
-          </div>
-        </a>
-
-      </div>
-
-      <!-- Quick Links -->
-      <h2 class="content-section-title">빠른 링크 <span>자주 사용하는 외부 시스템</span></h2>
-      <div class="quick-links">
-        <a href="https://www.ei.go.kr" target="_blank" class="quick-link">
-          <div class="quick-link-icon">&#127963;</div>
-          <div>
-            <div class="quick-link-text">고용24</div>
-            <div class="quick-link-sub">지원금 신청 · 조회</div>
-          </div>
-        </a>
-        <a href="https://total.comwel.or.kr" target="_blank" class="quick-link">
-          <div class="quick-link-icon">&#127973;</div>
-          <div>
-            <div class="quick-link-text">고산토탈서비스</div>
-            <div class="quick-link-sub">고용산재보험 토탈</div>
-          </div>
-        </a>
-        <a href="https://www.nhis.or.kr" target="_blank" class="quick-link">
-          <div class="quick-link-icon">&#128138;</div>
-          <div>
-            <div class="quick-link-text">건강보험공단</div>
-            <div class="quick-link-sub">건강 · 장기요양보험</div>
-          </div>
-        </a>
-        <a href="https://www.nps.or.kr" target="_blank" class="quick-link">
-          <div class="quick-link-icon">&#128272;</div>
-          <div>
-            <div class="quick-link-text">국민연금공단</div>
-            <div class="quick-link-sub">국민연금 업무</div>
-          </div>
-        </a>
-        <a href="https://admin.dowonbiz.com/scrape-data/overview" target="_blank" class="quick-link">
-          <div class="quick-link-icon">&#128736;</div>
-          <div>
-            <div class="quick-link-text">도원어드민</div>
-            <div class="quick-link-sub">스크래핑 데이터 관리</div>
-          </div>
-        </a>
-        <a href="https://dowonbiz.com/submit/agent" target="_blank" class="quick-link">
-          <div class="quick-link-icon">&#128238;</div>
-          <div>
-            <div class="quick-link-text">찾아드림</div>
-            <div class="quick-link-sub">에이전트 제출</div>
-          </div>
-        </a>
-      </div>
-
-      <!-- Notice -->
-      <div class="alert alert-info">
-        이 포털은 노무법인 도원 기업지원팀 내부용입니다. 도구 사용 중 문의사항은 팀 채널로 연락하세요.
-      </div>
-
-      <!-- Footer -->
-      <footer class="footer">
-        &copy; 2026 노무법인 도원 기업지원팀 &mdash; 업무 자동화 포털 &mdash; <a href="https://github.com/dowon-comsup">GitHub</a>
-      </footer>
+      <!-- ===== Tool iframe ===== -->
+      <iframe id="toolFrame" class="tool-frame"></iframe>
 
     </main>
   </div>
 
   <script>
   (function() {
-    var sidebar  = document.getElementById('sidebar');
-    var overlay  = document.getElementById('sidebarOverlay');
     var body     = document.body;
+    var overlay  = document.getElementById('sidebarOverlay');
+    var frame    = document.getElementById('toolFrame');
+    var dashboard= document.getElementById('dashboardView');
+    var mainEl   = document.getElementById('mainContent');
+    var titleEl  = document.getElementById('headerTitle');
+    var links    = document.querySelectorAll('.sidebar-link[data-page]');
+    var currentPage = 'dashboard';
 
-    /* Desktop: collapse / expand */
+    /* ── Sidebar collapse (desktop) ── */
     var collapseBtn = document.getElementById('collapseBtn');
     if (collapseBtn) {
       collapseBtn.addEventListener('click', function() {
@@ -392,21 +273,55 @@
         localStorage.setItem('dw-sidebar', body.classList.contains('sidebar-collapsed') ? 'c' : 'e');
       });
     }
-    if (localStorage.getItem('dw-sidebar') === 'c') {
-      body.classList.add('sidebar-collapsed');
+    if (localStorage.getItem('dw-sidebar') === 'c') body.classList.add('sidebar-collapsed');
+
+    /* ── Mobile menu ── */
+    document.getElementById('mobileMenuBtn').addEventListener('click', function() { body.classList.toggle('sidebar-open'); });
+    if (overlay) overlay.addEventListener('click', function() { body.classList.remove('sidebar-open'); });
+
+    /* ── Set active link ── */
+    function setActive(page) {
+      links.forEach(function(l) { l.classList.toggle('active', l.getAttribute('data-page') === page); });
     }
 
-    /* Mobile: open / close */
-    var mobileBtn = document.getElementById('mobileMenuBtn');
-    if (mobileBtn) {
-      mobileBtn.addEventListener('click', function() {
-        body.classList.toggle('sidebar-open');
-      });
-    }
-    if (overlay) {
-      overlay.addEventListener('click', function() {
-        body.classList.remove('sidebar-open');
-      });
+    /* ── Show dashboard ── */
+    window.showDashboard = function() {
+      dashboard.style.display = '';
+      frame.classList.remove('active');
+      frame.src = 'about:blank';
+      mainEl.classList.remove('frame-mode');
+      titleEl.textContent = '대시보드';
+      setActive('dashboard');
+      currentPage = 'dashboard';
+      history.replaceState(null, '', '#');
+      body.classList.remove('sidebar-open');
+    };
+
+    /* ── Load tool in iframe ── */
+    window.loadTool = function(el) {
+      var page  = el.getAttribute('data-page');
+      var title = el.getAttribute('data-title') || el.title;
+      loadToolByPage(page, title);
+    };
+
+    window.loadToolByPage = function(page, title) {
+      if (currentPage === page) return;
+      dashboard.style.display = 'none';
+      frame.src = page;
+      frame.classList.add('active');
+      mainEl.classList.add('frame-mode');
+      titleEl.textContent = title;
+      setActive(page);
+      currentPage = page;
+      history.replaceState(null, '', '#' + page);
+      body.classList.remove('sidebar-open');
+    };
+
+    /* ── Restore from hash ── */
+    var hash = location.hash.replace('#', '');
+    if (hash && hash !== '') {
+      var target = document.querySelector('.sidebar-link[data-page="' + hash + '"]');
+      if (target) loadTool(target);
     }
   })();
   </script>

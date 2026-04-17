@@ -125,9 +125,11 @@ pre.debug{background:var(--bg-sub);padding:10px;font-size:11px;overflow:auto;max
 .cb-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent)}
 .cb-row label{font-size:12px;font-weight:600;cursor:pointer}
 @media(max-width:768px){body{padding:0 12px 40px}.form-row{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}}
+.in-iframe .topbar{display:none}
 </style>
 </head>
 <body>
+<script>if(window.self!==window.top)document.documentElement.classList.add('in-iframe');</script>
 
 <div class="tool-topbar">
   <a href="../index.html">&larr; 대시보드로 돌아가기</a>
