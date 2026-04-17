@@ -1,16 +1,13 @@
 /**
  * 도원 포털 - 노션 연동 API
  * n8n webhook을 통해 기업지원팀DB 데이터를 가져옵니다.
+ * 웹훅 URL, 캐시 TTL 등은 js/config.js (DW_CONFIG)에서 관리합니다.
  */
 
-const DOWON_API = {
-  businesses:    'https://n8n-docker.dowonbiz.com/webhook/businesses',
-  businessDetail:'https://n8n-docker.dowonbiz.com/webhook/business-detail',
-  logZeroMail:   'https://n8n-docker.dowonbiz.com/webhook/log-zero-mail',
-};
+const DOWON_API = DW_CONFIG.WEBHOOK;
 
 const CACHE_KEY = 'dowon_businesses_cache';
-const CACHE_TTL = 10 * 60 * 1000; // 10분
+const CACHE_TTL = DW_CONFIG.CACHE_TTL;
 
 const DowonAPI = {
 

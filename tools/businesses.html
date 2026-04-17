@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
 <title>사업장 조회 | 노무법인 도원</title>
+<script src="../js/config.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
   :root {
@@ -255,12 +257,12 @@ const API = {
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
       const { ts, data } = JSON.parse(cached);
-      if (Date.now() - ts < 5 * 60 * 1000) return data;
+      if (Date.now() - ts < DW_CONFIG.CACHE_TTL) return data;
     }
     const params = new URLSearchParams();
     if (filter && filter !== 'all') params.set('filter', filter);
     if (search) params.set('search', search);
-    const url = 'https://n8n-docker.dowonbiz.com/webhook/businesses' + (params.toString() ? '?' + params.toString() : '');
+    const url = DW_CONFIG.WEBHOOK.businesses + (params.toString() ? '?' + params.toString() : '');
     const res = await fetch(url);
     if (!res.ok) throw new Error(res.status);
     const json = await res.json();
@@ -275,7 +277,7 @@ const API = {
     Object.keys(sessionStorage).filter(k => k.startsWith('dowon_biz_')).forEach(k => sessionStorage.removeItem(k));
   },
   async logZeroMail(pageId) {
-    fetch('https://n8n-docker.dowonbiz.com/webhook/log-zero-mail', {
+    fetch(DW_CONFIG.WEBHOOK.logZeroMail, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ page_id: pageId }),
@@ -443,7 +445,7 @@ function openPanel(biz, tr) {
 
     <!-- 노션 링크 -->
     <div class="panel-section">
-      <a href="${biz.notion_url}" target="_blank" style="display:block; text-align:center;
+      <a href="${biz.notion_url}" target="_blank" rel="noopener noreferrer" style="display:block; text-align:center;
         color: var(--text3); font-size: 12px; text-decoration: none; padding: 8px;">
         노션에서 열기 →
       </a>

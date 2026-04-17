@@ -2,9 +2,12 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
 <title>고령자 계속고용 지원금 대상자 판독 | 노무법인 도원</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/shared.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <link rel="stylesheet" href="../assets/style.css">
 <style>
@@ -317,7 +320,7 @@ let empFiles = [];
 
 // ============ INIT ============
 (function init(){
-  const k = localStorage.getItem('ANTHROPIC_API_KEY');
+  const k = localStorage.getItem(DW_CONFIG.STORAGE_KEYS.anthropic);
   if(k){ document.getElementById('apiKey').value = k; document.getElementById('apiKeySaved').textContent = '저장됨'; }
   document.getElementById('reviewDate').value = new Date().toISOString().slice(0,10);
   setupDragDrop('rulesUpload','rulesFile', f=>{ rulesFiles=[f]; renderFileList('rulesFileList',rulesFiles,i=>{rulesFiles.splice(i,1);renderFileList('rulesFileList',rulesFiles);}); document.getElementById('btnParseRules').disabled=false; });
@@ -335,7 +338,7 @@ let empFiles = [];
 
 function saveApiKey(){
   const k=document.getElementById('apiKey').value.trim();
-  if(k){localStorage.setItem('ANTHROPIC_API_KEY',k);if(k.startsWith('sk-ant-'))localStorage.setItem('CLAUDE_API_KEY',k);document.getElementById('apiKeySaved').textContent='저장됨';}
+  if(k){localStorage.setItem(DW_CONFIG.STORAGE_KEYS.anthropic,k);if(k.startsWith('sk-ant-'))localStorage.setItem(DW_CONFIG.STORAGE_KEYS.claude,k);document.getElementById('apiKeySaved').textContent='저장됨';}
 }
 
 function toggleStep(id){document.getElementById(id).classList.toggle('collapsed');}
@@ -359,18 +362,7 @@ function checkAnalyzeReady(){
 function setStatus(msg){document.getElementById('statusText').textContent=msg;}
 function setProgress(pct){const b=document.getElementById('progressBar');b.style.display='block';document.getElementById('progressFill').style.width=pct+'%';}
 
-// 스캔 PDF 감지 (payroll v8.6 동일 기준: 한글 비율 + 깨진 문자 + 유효문자)
-function detectScannedPage(nativeText){
-  const t=(nativeText||'').replace(/[\s\u00A0\u3000]+/g,'');
-  if(t.length<20)return true;
-  const broken=(t.match(/[\uFFFD\u0000-\u001F]/g)||[]).length;
-  if(broken/t.length>0.1)return true;
-  const meaningful=t.match(/[가-힣A-Za-z0-9]/g)||[];
-  if(meaningful.length<15)return true;
-  const hangul=t.match(/[가-힣]/g)||[];
-  if(hangul.length<5&&t.length<80)return true;
-  return false;
-}
+// detectScannedPage: js/shared.js로 이동
 
 // ============ STEP 2: Parse Rules ============
 // PDF → 페이지별 텍스트 (PDF.js 텍스트 레이어)
@@ -408,7 +400,7 @@ async function pdfPageToImage(file, pageNum, scale=1.5){
 }
 
 async function parseRules(){
-  const apiKey=document.getElementById('apiKey').value.trim()||localStorage.getItem('ANTHROPIC_API_KEY');
+  const apiKey=document.getElementById('apiKey').value.trim()||localStorage.getItem(DW_CONFIG.STORAGE_KEYS.anthropic);
   if(!apiKey){alert('Anthropic API 키를 입력해주세요.');return;}
   if(!rulesFiles.length){alert('취업규칙 파일을 업로드해주세요.');return;}
 
@@ -587,9 +579,7 @@ function displayRetirementResult(result){
   checkAnalyzeReady();
 }
 
-function escHtml(s){
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+// escHtml: js/shared.js로 이동
 
 // PDF 원문에서 "정년" 키워드가 포함된 줄 + 전후 맥락 추출
 function extractRetirementLines(text){
@@ -1260,46 +1250,6 @@ function buildTableHtml(workers, mode){
 
   html+='</tbody></table>';
   return html;
-}
-
-function renderTable(containerId, workers, mode){
-  if(!workers.length){
-    document.getElementById(containerId).innerHTML='<div class="alert alert-info">해당하는 근로자가 없습니다.</div>';
-    return;
-  }
-
-  const showAmount = analysisResult && analysisResult.hasHistory;
-
-  let html='<table class="data-table"><thead><tr>';
-  html+='<th>No.</th><th>성명</th><th>생년월일</th><th>만 나이</th><th>입사일</th><th>상실일</th><th>재직</th>';
-  html+='<th>정년도달일</th><th>판정</th>';
-  if(showAmount) html+='<th>추정금액</th>';
-  html+='<th>비고</th>';
-  html+='</tr></thead><tbody>';
-
-  workers.forEach((w,i)=>{
-    let rowClass='';
-    if(w.eligibilityStatus.startsWith('eligible')) rowClass='eligible';
-    else if(w.eligibilityStatus==='excluded') rowClass='excluded';
-    else if(w.eligibilityStatus==='not_eligible') rowClass='';
-
-    html+=`<tr class="${rowClass}">`;
-    html+=`<td>${i+1}</td>`;
-    html+=`<td><b>${w.name}</b></td>`;
-    html+=`<td>${w.birthDate?formatDate(w.birthDate):'—'}</td>`;
-    html+=`<td>${w.age!==null?w.age:'—'}</td>`;
-    html+=`<td>${w.hireDate?formatDate(w.hireDate):'—'}</td>`;
-    html+=`<td>${w.lossDate?formatDate(w.lossDate):'—'}</td>`;
-    html+=`<td>${w.isCurrentlyEmployed?'<span class="badge badge-ok">재직</span>':'<span class="badge badge-neutral">퇴사</span>'}</td>`;
-    html+=`<td>${w.retirementReachDate?formatDate(w.retirementReachDate):'—'}</td>`;
-    html+=`<td>${getStatusBadge(w.eligibilityStatus)}</td>`;
-    if(showAmount) html+=`<td>${w.totalEstimate?(w.totalEstimate/10000).toFixed(0)+'만':'—'}</td>`;
-    html+=`<td style="font-size:11px">${w.notes.join('; ')}${w.exclusionReason?' [제외: '+w.exclusionReason+']':''}${w.supportDetail?' | '+w.supportDetail:''}</td>`;
-    html+=`</tr>`;
-  });
-
-  html+='</tbody></table>';
-  document.getElementById(containerId).innerHTML=html;
 }
 
 function getStatusBadge(status){

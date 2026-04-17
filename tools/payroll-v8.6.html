@@ -3,13 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
 <title>급여서류 검증도구 v9 (Gemini+Claude 이중화) | 노무법인 도원</title>
+<script src="../js/config.js"></script>
+<script src="../js/shared.js"></script>
 <script src="../js/dowon-api.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" integrity="sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" integrity="sha384-MhvFknC0AhqKZXwSCyPeIirpE1IhTafmLXTvTCai5pxjAqFcqEAAqKH/2lXrFVPn" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" integrity="sha384-VQePqH/QE94Buf4g/4MI5NrqDYjdqT7JW6KzhieQUlw6w7U7VD59fPqCAunpXEu6" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="../assets/style.css">
 <style>
 :root {
@@ -574,8 +577,8 @@ let _retryCount = 0;
 function initVisionSettings() {
   // standalone: localStorage에서 API 키 복원 (영구 저장)
   const savedModel = localStorage.getItem('vision_model');
-  const savedKey = localStorage.getItem('GEMINI_API_KEY');
-  const savedClaudeKey = localStorage.getItem('CLAUDE_API_KEY') || localStorage.getItem('ANTHROPIC_API_KEY');
+  const savedKey = localStorage.getItem(DW_CONFIG.STORAGE_KEYS.gemini);
+  const savedClaudeKey = localStorage.getItem(DW_CONFIG.STORAGE_KEYS.claude) || localStorage.getItem(DW_CONFIG.STORAGE_KEYS.anthropic);
 
   if(savedModel) {
     _visionModel = savedModel;
@@ -632,7 +635,7 @@ function _safeLSset(k, v) {
 function confirmApiKeyModal() {
   const key = document.getElementById('modalApiKeyInput').value.trim();
   if(key.length < 10) return;
-  _safeLSset('GEMINI_API_KEY', key);
+  _safeLSset(DW_CONFIG.STORAGE_KEYS.gemini, key);
   _visionApiKey = key;
   document.getElementById('visionApiKey').value = key;
   document.getElementById('apiKeyModal').style.display = 'none';
@@ -684,14 +687,14 @@ function onVisionModelChange() {
 function onApiKeyChange() {
   _visionApiKey = document.getElementById('visionApiKey').value.trim();
   // standalone: localStorage에 저장 (영구)
-  _safeLSset('GEMINI_API_KEY', _visionApiKey);
+  _safeLSset(DW_CONFIG.STORAGE_KEYS.gemini, _visionApiKey);
   updateApiKeyStatus();
 }
 
 function onClaudeFallbackKeyChange() {
   _claudeFallbackKey = document.getElementById('claudeFallbackKey').value.trim();
-  _safeLSset('CLAUDE_API_KEY', _claudeFallbackKey);
-  if(_claudeFallbackKey.startsWith('sk-ant-')) _safeLSset('ANTHROPIC_API_KEY', _claudeFallbackKey);
+  _safeLSset(DW_CONFIG.STORAGE_KEYS.claude, _claudeFallbackKey);
+  if(_claudeFallbackKey.startsWith('sk-ant-')) _safeLSset(DW_CONFIG.STORAGE_KEYS.anthropic, _claudeFallbackKey);
   updateClaudeFallbackStatus();
 }
 
@@ -863,6 +866,10 @@ let tesseractWorkers = [];
 let tesseractWorkerForTest = null;
 let _cachedWorkerBlobUrl = null;  // 워커 스크립트 Blob URL 캐시
 
+window.addEventListener('pagehide', () => {
+  tesseractWorkers.forEach(w => { try { w.terminate(); } catch(e){} });
+});
+
 async function fetchWorkerAsBlobUrl() {
   if(_cachedWorkerBlobUrl) return _cachedWorkerBlobUrl;
   const WORKER_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js';
@@ -940,22 +947,7 @@ initOCR();
 initVisionSettings();
 updateApiUsageDisplay();
 
-// 스캔 PDF 감지 강화. 단순 문자수가 아닌 한글 비율/유효문자 기준으로 판단.
-// CID 깨짐(\u0000~\u001F, replacement char), 의미 없는 공백/기호만 있는 경우도 스캔으로 간주.
-function detectScannedPage(nativeText) {
-  const t = (nativeText || '').replace(/[\s\u00A0\u3000]+/g, '');
-  if(t.length < 20) return true;
-  // 깨진 문자(replacement / 제어문자) 비율 체크
-  const broken = (t.match(/[\uFFFD\u0000-\u001F]/g) || []).length;
-  if(broken / t.length > 0.1) return true;
-  // 의미있는 글자(한글/영문/숫자) 추출
-  const meaningful = t.match(/[가-힣A-Za-z0-9]/g) || [];
-  if(meaningful.length < 15) return true;
-  // 한글이 거의 없는데 페이지 길이가 짧으면 스캔 가능성
-  const hangul = t.match(/[가-힣]/g) || [];
-  if(hangul.length < 5 && t.length < 80) return true;
-  return false;
-}
+// detectScannedPage: js/shared.js로 이동
 
 // ===== OCR TEST =====
 function toggleOcrTest() {
@@ -5711,7 +5703,7 @@ function setProgress(pct, label) {
   if(label) document.getElementById('progressLabel').textContent = label;
 }
 function formatNum(n) { return n ? n.toLocaleString('ko-KR') : '-'; }
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// escHtml: js/shared.js로 이동
 
 // pdf.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';

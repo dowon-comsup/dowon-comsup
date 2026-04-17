@@ -2,9 +2,12 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
 <title>청년일자리도약장려금 서류 판독 & 지원금 검토 | 노무법인 도원</title>
+<script src="../js/config.js"></script>
+<script src="../js/shared.js"></script>
 <link rel="stylesheet" href="../assets/style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
 :root{--primary:var(--ink-800,#171717);--primary-light:var(--ink-50,#f5f5f5);--primary-dark:var(--ink-700,#262626);--danger:#dc2626;--warn:#d97706;--gray:var(--ink-400,#737373);--card-shadow:0 1px 3px rgba(0,0,0,.08);--blue:var(--ink-700,#262626);--blue-light:var(--ink-50,#f5f5f5)}
@@ -329,7 +332,7 @@ pre.log{background:var(--ink-50);padding:10px;font-size:11px;overflow:auto;max-h
    COMMON UTILITIES
    ========================================================= */
 const $=id=>document.getElementById(id);
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+// esc: js/shared.js로 이동
 function num(n){return n!=null?Number(n).toLocaleString('ko-KR'):'-'}
 function formatMoney(n){return num(n)+'원'}
 function formatDate(d){if(!d)return '-';const dt=new Date(d);return `${dt.getFullYear()}.${String(dt.getMonth()+1).padStart(2,'0')}.${String(dt.getDate()).padStart(2,'0')}`}
@@ -354,12 +357,12 @@ let applicants=[];
 
 // API Key persistence
 (function(){
-  const s=localStorage.getItem('ANTHROPIC_API_KEY');
+  const s=localStorage.getItem(DW_CONFIG.STORAGE_KEYS.anthropic);
   if(s)$('apiKey').value=s;
   $('apiKey').addEventListener('input',()=>{
     const k=$('apiKey').value.trim();
-    localStorage.setItem('ANTHROPIC_API_KEY',k);
-    if(k.startsWith('sk-ant-'))localStorage.setItem('CLAUDE_API_KEY',k);
+    localStorage.setItem(DW_CONFIG.STORAGE_KEYS.anthropic,k);
+    if(k.startsWith('sk-ant-'))localStorage.setItem(DW_CONFIG.STORAGE_KEYS.claude,k);
     $('apiKeyStatus').textContent=k?'Key 저장됨':'';
     updateBtn();
   });

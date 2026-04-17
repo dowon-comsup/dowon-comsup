@@ -2,9 +2,12 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
 <title>수기 스캔서류 OCR 추출 (Gemini / Claude)</title>
+<script src="../js/config.js"></script>
+<script src="../js/shared.js"></script>
 <link rel="stylesheet" href="../assets/style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
 body{font-family:'Malgun Gothic',sans-serif;max-width:1200px;margin:20px auto;padding:0 16px;color:var(--ink-800)}
@@ -84,10 +87,10 @@ const MODELS={gemini:['gemini-2.5-pro','gemini-2.5-flash'],claude:['claude-sonne
 const provEl=document.getElementById('provider'),modEl=document.getElementById('model');
 function refreshModels(){modEl.innerHTML='';MODELS[provEl.value].forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;modEl.appendChild(o)})}
 provEl.onchange=refreshModels;refreshModels();
-function _getKeyName(prov){return prov==='claude'?'ANTHROPIC_API_KEY':'ocr_key_gemini';}
+function _getKeyName(prov){return prov==='claude'?DW_CONFIG.STORAGE_KEYS.anthropic:DW_CONFIG.STORAGE_KEYS.gemini;}
 document.getElementById('apikey').value=localStorage.getItem(_getKeyName(provEl.value))||'';
 provEl.addEventListener('change',()=>{document.getElementById('apikey').value=localStorage.getItem(_getKeyName(provEl.value))||''});
-function saveKey(){var _k=document.getElementById('apikey').value;localStorage.setItem(_getKeyName(provEl.value),_k);if(provEl.value==='claude'&&_k.startsWith('sk-ant-'))localStorage.setItem('CLAUDE_API_KEY',_k);log('키 저장됨')}
+function saveKey(){var _k=document.getElementById('apikey').value;localStorage.setItem(_getKeyName(provEl.value),_k);if(provEl.value==='claude'&&_k.startsWith('sk-ant-'))localStorage.setItem(DW_CONFIG.STORAGE_KEYS.claude,_k);log('키 저장됨')}
 function log(m){const l=document.getElementById('log');l.textContent+='['+new Date().toLocaleTimeString()+'] '+m+'\n';l.scrollTop=l.scrollHeight}
 function copy(id){navigator.clipboard.writeText(document.getElementById(id).textContent);log(id+' 복사됨')}
 
@@ -290,7 +293,7 @@ async function callClaude(key,model,imgs,info){
 // ============ 카드 UI 렌더 ============
 function v(x){return isEmpty(x)?'<span class="empty">-</span>':escapeHtml(String(x))}
 function b(x){return x===true?'<span class="bool-y">✓ 예</span>':x===false?'<span class="bool-n">✗ 아니오</span>':'<span class="empty">-</span>'}
-function escapeHtml(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+// escapeHtml: js/shared.js로 이동
 function kvTable(obj,labels){
   let h='<table class="kv">';
   for(const k of Object.keys(labels)){h+=`<tr><td class="k">${labels[k]}</td><td class="v">${v(obj?.[k])}</td></tr>`}
