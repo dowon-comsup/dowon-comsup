@@ -136,7 +136,7 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
       <label class="drop-zone" id="dropZone">
         <div class="ico">🎧</div>
         <div><b>클릭 또는 드래그</b>하여 녹음 파일 선택</div>
-        <div class="hint">mp3 · m4a · wav · mp4 · webm · ogg · flac · 최대 25MB</div>
+        <div class="hint">mp3 · m4a · wav · mp4 · webm · ogg · flac · 25MB 초과 시 자동 재인코딩·청크 분할</div>
         <input type="file" id="audioFile" accept=".mp3,.m4a,.wav,.mp4,.webm,.ogg,.flac,.mpeg,.mpga">
       </label>
 
@@ -167,7 +167,7 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
 
       <div class="progress" id="progress">
         <div class="st" id="step1">⏳ 파일 준비</div>
-        <div class="st" id="step2">⏳ Whisper 전사 (1~3분 소요)</div>
+        <div class="st" id="step2">⏳ Whisper 전사 (25MB 초과 시 자동 재인코딩·청크 분할)</div>
         <div class="st" id="step3">⏳ Claude 요약 생성</div>
         <div class="st" id="step4">⏳ IndexedDB 저장</div>
       </div>
@@ -265,12 +265,15 @@ function log(m) {
 
 function showError(msg) {
   const b = document.getElementById('errorBox');
+  b.className = 'alert alert-err';
   b.textContent = '❌ ' + msg;
   b.style.display = 'block';
 }
 
 function clearError() {
-  document.getElementById('errorBox').style.display = 'none';
+  const b = document.getElementById('errorBox');
+  b.className = 'alert alert-err';
+  b.style.display = 'none';
 }
 
 /* ═══════════════════════════════════════════
@@ -369,9 +372,15 @@ function onFileChange() {
   fileInfo.style.display = 'flex';
   runBtn.disabled = false;
   if (f.size > 25 * 1024 * 1024) {
-    showError('파일 크기가 25MB를 초과합니다. 녹음을 분할하거나 비트레이트를 낮춰 재인코딩 후 다시 시도하세요.');
-    runBtn.disabled = true;
+    showInfo('25MB 초과 파일입니다. 자동으로 16kHz 모노 WAV로 재인코딩 후, 필요 시 10분 단위로 분할 전사합니다 (시간이 더 걸릴 수 있음).');
   }
+}
+
+function showInfo(msg) {
+  const b = document.getElementById('errorBox');
+  b.className = 'alert alert-warn';
+  b.textContent = 'ℹ️ ' + msg;
+  b.style.display = 'block';
 }
 
 /* ═══════════════════════════════════════════
@@ -403,11 +412,87 @@ function getISOWeek(d) {
 }
 
 /* ═══════════════════════════════════════════
-   Whisper transcription
+   Audio decoding · resampling · WAV encoding · chunking
+   (25MB 초과 시 16kHz 모노 WAV로 재인코딩, 필요 시 10분 단위 분할)
    ═══════════════════════════════════════════ */
-async function transcribeAudio(file, apiKey) {
+const WHISPER_LIMIT = 25 * 1024 * 1024;      // Whisper API 하드 제한
+const SAFE_LIMIT = 22 * 1024 * 1024;         // multipart overhead 여유
+const TARGET_SR = 16000;                      // Whisper native sample rate
+const CHUNK_SEC = 600;                        // 10분 → ~19.2MB WAV
+
+async function decodeAudioFile(file) {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    return audioBuffer;
+  } finally {
+    ctx.close();
+  }
+}
+
+async function resampleToMono16k(audioBuffer) {
+  const targetLength = Math.ceil(audioBuffer.duration * TARGET_SR);
+  const offline = new OfflineAudioContext(1, targetLength, TARGET_SR);
+  const src = offline.createBufferSource();
+  src.buffer = audioBuffer;
+
+  if (audioBuffer.numberOfChannels > 1) {
+    // Mix all channels → mono via ChannelMergerNode into mono destination
+    const merger = offline.createGain();
+    merger.gain.value = 1 / audioBuffer.numberOfChannels;
+    src.connect(merger);
+    merger.connect(offline.destination);
+  } else {
+    src.connect(offline.destination);
+  }
+
+  src.start(0);
+  const rendered = await offline.startRendering();
+  return rendered.getChannelData(0);  // Float32Array
+}
+
+function encodeWAV(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);                  // fmt chunk size
+  view.setUint16(20, 1, true);                   // PCM
+  view.setUint16(22, 1, true);                   // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);      // byte rate
+  view.setUint16(32, 2, true);                   // block align
+  view.setUint16(34, 16, true);                  // bits per sample
+  writeStr(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    offset += 2;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function chunkSamples(samples, sampleRate, chunkSeconds) {
+  const chunkSize = sampleRate * chunkSeconds;
+  const chunks = [];
+  for (let i = 0; i < samples.length; i += chunkSize) {
+    chunks.push(samples.subarray(i, Math.min(i + chunkSize, samples.length)));
+  }
+  return chunks;
+}
+
+async function whisperCall(blob, apiKey, filename) {
   const fd = new FormData();
-  fd.append('file', file);
+  fd.append('file', blob, filename || 'audio.wav');
   fd.append('model', 'whisper-1');
   fd.append('language', 'ko');
   fd.append('response_format', 'verbose_json');
@@ -427,6 +512,58 @@ async function transcribeAudio(file, apiKey) {
     throw new Error(errMsg);
   }
   return await resp.json();
+}
+
+/**
+ * 3-path 전사:
+ *   A) 파일이 25MB 이하 → 원본 그대로 단일 호출 (가장 빠름)
+ *   B) 재인코딩 후 SAFE_LIMIT 이하 → 16kHz 모노 WAV 단일 호출
+ *   C) 그 외 → 10분 단위 청크 분할 순차 호출 후 결과 이어붙임
+ */
+async function transcribeAudio(file, apiKey) {
+  // Path A: 원본 직접 전송
+  if (file.size <= WHISPER_LIMIT) {
+    log('직접 전송 경로 (원본 ' + (file.size / 1024 / 1024).toFixed(1) + 'MB)');
+    const r = await whisperCall(file, apiKey, file.name);
+    return { text: (r.text || '').trim(), duration: r.duration || null, chunks: 1, path: 'direct' };
+  }
+
+  // Path B/C: 디코딩 + 재샘플링 필요
+  log('25MB 초과 — 오디오 디코딩 중 (시간이 걸릴 수 있음)...');
+  const audioBuffer = await decodeAudioFile(file);
+  const duration = audioBuffer.duration;
+  log('디코딩 완료: ' + Math.round(duration) + '초, ' + audioBuffer.numberOfChannels + 'ch, ' + audioBuffer.sampleRate + 'Hz');
+
+  log('16kHz 모노 재샘플링 중...');
+  const samples = await resampleToMono16k(audioBuffer);
+  const estBytes = samples.length * 2 + 44;
+  log('재인코딩 크기: ' + (estBytes / 1024 / 1024).toFixed(1) + 'MB');
+
+  // Path B: 단일 WAV가 제한 이하
+  if (estBytes <= SAFE_LIMIT) {
+    log('단일 WAV 전송 경로');
+    const wav = encodeWAV(samples, TARGET_SR);
+    const r = await whisperCall(wav, apiKey, 'audio.wav');
+    return { text: (r.text || '').trim(), duration: r.duration || duration, chunks: 1, path: 're-encoded' };
+  }
+
+  // Path C: 청크 분할
+  const chunks = chunkSamples(samples, TARGET_SR, CHUNK_SEC);
+  log('청크 ' + chunks.length + '개 (각 ' + (CHUNK_SEC / 60) + '분) 분할 전사 시작');
+  const parts = [];
+  for (let i = 0; i < chunks.length; i++) {
+    log('청크 ' + (i + 1) + '/' + chunks.length + ' 전사 중...');
+    const wav = encodeWAV(chunks[i], TARGET_SR);
+    const r = await whisperCall(wav, apiKey, 'chunk_' + (i + 1) + '.wav');
+    parts.push((r.text || '').trim());
+    log('청크 ' + (i + 1) + '/' + chunks.length + ' 완료 (' + (r.text || '').trim().length + '자)');
+  }
+  return {
+    text: parts.filter(x => x).join('\n\n'),
+    duration: duration,
+    chunks: chunks.length,
+    path: 'chunked',
+  };
 }
 
 /* ═══════════════════════════════════════════
@@ -528,11 +665,12 @@ async function runPipeline() {
     log('파일 준비: ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + 'MB)');
 
     setStep(1);
-    log('Whisper 전사 요청 중... (1~3분 소요)');
+    log('Whisper 전사 시작 (파일 크기에 따라 1~10분 소요)');
     const tr = await transcribeAudio(file, openaiKey);
     const transcript = (tr.text || '').trim();
     if (!transcript) throw new Error('전사 결과가 비어 있습니다.');
-    log('전사 완료 — ' + transcript.length + '자 / ' + (tr.duration ? Math.round(tr.duration) + '초' : '?'));
+    const pathLabel = { direct: '직접', 're-encoded': '재인코딩', chunked: '청크' + tr.chunks + '개' }[tr.path] || tr.path;
+    log('전사 완료 [' + pathLabel + '] — ' + transcript.length + '자 / ' + (tr.duration ? Math.round(tr.duration) + '초' : '?'));
 
     setStep(2);
     log('Claude 요약 생성 중 (' + model + ')...');
