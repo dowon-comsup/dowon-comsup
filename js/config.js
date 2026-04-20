@@ -18,6 +18,7 @@ const DW_CONFIG = {
     anthropic: 'ANTHROPIC_API_KEY',
     claude:    'CLAUDE_API_KEY',
     gemini:    'GEMINI_API_KEY',
+    openai:    'OPENAI_API_KEY',
   },
 
   /** 사업장 목록 캐시 TTL (ms) */

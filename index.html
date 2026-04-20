@@ -66,6 +66,11 @@
         <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span>
         <span class="sidebar-link-text">고령자 계속고용</span>
       </a>
+      <a href="#" class="sidebar-link" data-page="tools/meeting-minutes.html" data-title="회의록 자동화" title="회의록 자동화" onclick="loadTool(this);return false">
+        <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+        <span class="sidebar-link-text">회의록 자동화</span>
+        <span class="sidebar-version">v1.0</span>
+      </a>
 
       <div class="sidebar-divider"></div>
       <div class="sidebar-group-label">외부 시스템</div>
@@ -129,8 +134,8 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             </div>
             <div>
-              <div class="dash-stat-value">6</div>
-              <div class="dash-stat-label">���동화 도구</div>
+              <div class="dash-stat-value">7</div>
+              <div class="dash-stat-label">자동화 도구</div>
             </div>
           </div>
           <div class="dash-stat">
@@ -231,6 +236,19 @@
               <div class="tool-card-desc">취업규칙에서 정년을 AI로 판독하고, 정년 도달 근로자를 전수 추출하여 대상자를 자동 검토합니다.</div>
               <div class="tool-card-features"><span class="feature-tag">정년 판독</span><span class="feature-tag">대상자 추출</span><span class="feature-tag">지원금 산출</span></div>
               <div class="tool-card-action"><span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span><span style="font-size:11px;color:var(--ink-400)">Anthropic API 키 필요</span></div>
+            </div>
+          </div>
+          <div class="tool-card" onclick="loadToolByPage('tools/meeting-minutes.html','회의록 자동화')">
+            <div class="tool-card-body">
+              <div class="tool-card-header">
+                <div class="tool-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></div>
+                <div class="tool-card-badges"><span class="badge badge-active">운영중</span><span class="badge badge-version">v1.0</span></div>
+              </div>
+              <div class="tool-card-title">회의록 자동화</div>
+              <div class="tool-card-subtitle">Meeting Minutes (Whisper + Claude)</div>
+              <div class="tool-card-desc">회의 녹음을 업로드하면 Whisper가 텍스트로 전사하고 Claude가 요약 · 결정사항 · 액션아이템을 추출합니다. 주차별 아카이브 지원.</div>
+              <div class="tool-card-features"><span class="feature-tag">Whisper 전사</span><span class="feature-tag">자동 요약</span><span class="feature-tag">주차 아카이브</span></div>
+              <div class="tool-card-action"><span class="tool-card-btn">도구 실행 <span class="arrow">&rarr;</span></span><span style="font-size:11px;color:var(--ink-400)">OpenAI + Anthropic API 키 필요</span></div>
             </div>
           </div>
         </div>

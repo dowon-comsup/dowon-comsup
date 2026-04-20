@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
+<title>회의록 자동화 (Whisper + Claude)</title>
+<script src="../js/config.js"></script>
+<script src="../js/shared.js"></script>
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+body{font-family:'Noto Sans KR','Malgun Gothic',sans-serif;max-width:1280px;margin:16px auto;padding:0 16px;color:var(--ink-800)}
+h1{font-size:20px;border-bottom:2px solid var(--ink-700);padding-bottom:8px;margin-bottom:8px}
+.desc{font-size:13px;color:var(--ink-500);margin-bottom:16px;line-height:1.6}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
+label{font-weight:600;font-size:13px;color:var(--ink-700)}
+input,select,button,textarea{font-size:13px;padding:6px 8px;border:1px solid var(--ink-200);border-radius:4px;font-family:inherit}
+input[type=text],input[type=password],input[type=date]{min-height:32px}
+button{background:var(--ink-800);color:#fff;border:none;cursor:pointer;font-weight:600;padding:8px 14px}
+button:disabled{background:var(--ink-300);cursor:not-allowed}
+button.sec{background:var(--ink-500)}
+button.primary{background:var(--primary-dark)}
+button.danger{background:var(--err);padding:4px 10px;font-size:12px}
+button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200);padding:4px 10px;font-size:12px}
+
+.grid{display:grid;grid-template-columns:1fr 1.15fr;gap:16px;margin-top:12px}
+@media (max-width:980px){.grid{grid-template-columns:1fr}}
+
+.panel{border:1px solid var(--border);border-radius:8px;background:#fff;padding:16px;box-shadow:var(--shadow-xs)}
+.panel h3{margin:0 0 12px 0;font-size:14px;color:var(--ink-900);border-bottom:1px solid var(--border);padding-bottom:8px;display:flex;align-items:center;gap:6px}
+
+.drop-zone{border:2px dashed var(--primary);border-radius:8px;padding:24px;text-align:center;background:var(--primary-light);cursor:pointer;transition:all .15s}
+.drop-zone:hover{background:#e0e7ff}
+.drop-zone.drag{background:#c7d2fe;border-color:var(--primary-dark)}
+.drop-zone .ico{font-size:36px;margin-bottom:4px}
+.drop-zone .hint{color:var(--ink-500);font-size:12px;margin-top:4px}
+.drop-zone input[type=file]{display:none}
+
+.file-info{margin-top:10px;padding:10px;background:var(--ink-50);border-radius:6px;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+.file-info .fname{font-weight:600;color:var(--ink-800);word-break:break-all}
+.file-info .fsize{color:var(--ink-500);white-space:nowrap;margin-left:8px}
+
+.form-grid{display:grid;grid-template-columns:1fr 160px;gap:10px;margin-top:12px}
+.form-grid .fld label{display:block;margin-bottom:4px;font-size:12px}
+.form-grid .fld input{width:100%}
+
+#log{background:var(--ink-50);padding:8px;font-size:12px;height:100px;overflow:auto;white-space:pre-wrap;border-radius:4px;border:1px solid var(--border);margin-top:12px;font-family:'Consolas',monospace;line-height:1.5}
+
+.progress{display:none;margin-top:12px;padding:12px;background:var(--info-bg);color:var(--info-text);border:1px solid #bae6fd;border-radius:6px;font-size:13px}
+.progress.on{display:block}
+.progress .st{padding:3px 0}
+.progress .st.done{color:var(--ok-text);font-weight:600}
+.progress .st.now{font-weight:700}
+
+.alert{padding:10px 12px;border-radius:6px;font-size:13px;margin-top:10px}
+.alert-err{background:var(--err-bg);color:var(--err-text);border:1px solid #fecaca}
+.alert-warn{background:var(--warn-bg);color:var(--warn-text);border:1px solid #fde68a}
+.alert-ok{background:var(--ok-bg);color:var(--ok-text);border:1px solid #bbf7d0}
+
+.summary-box{background:var(--ink-50);border-left:3px solid var(--primary);padding:12px;border-radius:4px;line-height:1.7;white-space:pre-wrap;font-size:13px;margin-bottom:10px}
+.section{margin-bottom:12px}
+.section h4{font-size:13px;color:var(--ink-700);margin:8px 0;display:flex;align-items:center;gap:4px}
+.section ul{margin:0;padding-left:20px}
+.section li{margin:3px 0;font-size:13px;line-height:1.6}
+
+.action-item{padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:4px;margin:4px 0;display:grid;grid-template-columns:1fr auto auto;gap:10px;font-size:13px;align-items:center}
+.action-item .meta{font-size:11px;color:var(--ink-500);white-space:nowrap}
+
+.week-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--ink-600)}
+.week-bar select{flex:1;max-width:180px}
+
+.history{max-height:720px;overflow-y:auto}
+.history-item{border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:all .12s}
+.history-item:hover{border-color:var(--primary);background:var(--primary-light)}
+.history-item .tt{font-weight:700;color:var(--ink-900);font-size:13px;display:flex;justify-content:space-between;align-items:start;gap:8px}
+.history-item .meta{font-size:11px;color:var(--ink-500);display:flex;gap:10px;margin-top:4px;flex-wrap:wrap}
+.history-item .ex{font-size:12px;color:var(--ink-600);margin-top:6px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.history-empty{text-align:center;padding:32px 16px;color:var(--ink-400);font-size:13px}
+
+/* Modal */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:20px}
+.modal.on{display:flex}
+.modal-body{background:#fff;border-radius:10px;width:100%;max-width:960px;max-height:90vh;overflow-y:auto;padding:20px}
+.modal-head{display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.modal-head h2{margin:0;font-size:17px;color:var(--ink-900)}
+.modal-head .close{background:none;color:var(--ink-500);font-size:22px;padding:0 8px;border:none;cursor:pointer}
+.modal-meta{font-size:11px;color:var(--ink-500);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap}
+
+.tabs{display:flex;gap:2px;margin:12px 0;border-bottom:2px solid var(--ink-200)}
+.tab{padding:6px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-size:13px;color:var(--ink-500);margin-bottom:-2px;font-weight:600}
+.tab.on{color:var(--primary-text);border-bottom-color:var(--primary-dark)}
+.tabpane{display:none}
+.tabpane.on{display:block}
+
+.transcript-box{background:var(--ink-50);padding:12px;border-radius:6px;font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:440px;overflow-y:auto;border:1px solid var(--border)}
+
+.in-iframe .tool-topbar{display:none}
+</style>
+</head>
+<body>
+<script>if(window.self!==window.top)document.documentElement.classList.add('in-iframe');</script>
+
+<div class="tool-topbar" style="margin-bottom:10px">
+  <a href="../index.html">&larr; 대시보드로 돌아가기</a>
+</div>
+
+<h1>🎙️ 회의록 자동화</h1>
+<p class="desc">회의 녹음을 업로드하면 <b>Whisper</b>가 텍스트로 전사하고, <b>Claude</b>가 요약 · 결정사항 · 액션아이템을 추출합니다. 모든 저장은 브라우저 <b>IndexedDB</b>에 이루어져 외부 서버로 전송되지 않습니다. 주차별 아카이브를 지원합니다.</p>
+
+<!-- API Keys -->
+<div class="panel" style="margin-bottom:12px">
+  <h3>🔑 API 키 (최초 1회 입력)</h3>
+  <div class="row">
+    <label style="width:120px">OpenAI (Whisper):</label>
+    <input id="keyOpenAI" type="password" style="flex:1;max-width:420px" placeholder="sk-...">
+    <button class="sec" onclick="saveKey('openai')">저장</button>
+    <span style="font-size:11px;color:var(--ink-400)">platform.openai.com/api-keys</span>
+  </div>
+  <div class="row">
+    <label style="width:120px">Anthropic (Claude):</label>
+    <input id="keyAnthropic" type="password" style="flex:1;max-width:420px" placeholder="sk-ant-...">
+    <button class="sec" onclick="saveKey('anthropic')">저장</button>
+    <span style="font-size:11px;color:var(--ink-400)">console.anthropic.com</span>
+  </div>
+  <div class="row" style="font-size:11px;color:var(--ink-500);margin-top:4px">
+    키는 이 브라우저의 localStorage에만 저장되며 외부로 전송되지 않습니다. 다른 도구(급여검증·OCR 등)와 공유됩니다.
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- LEFT: Upload & Result -->
+  <div>
+    <div class="panel">
+      <h3>📤 녹음 업로드</h3>
+
+      <label class="drop-zone" id="dropZone">
+        <div class="ico">🎧</div>
+        <div><b>클릭 또는 드래그</b>하여 녹음 파일 선택</div>
+        <div class="hint">mp3 · m4a · wav · mp4 · webm · ogg · flac · 최대 25MB</div>
+        <input type="file" id="audioFile" accept=".mp3,.m4a,.wav,.mp4,.webm,.ogg,.flac,.mpeg,.mpga">
+      </label>
+
+      <div class="file-info" id="fileInfo" style="display:none">
+        <span class="fname" id="fname">-</span>
+        <span class="fsize" id="fsize">-</span>
+      </div>
+
+      <div class="form-grid">
+        <div class="fld">
+          <label>회의 제목</label>
+          <input type="text" id="meetingTitle" placeholder="예: 주간 업무회의 (26.04.20)">
+        </div>
+        <div class="fld">
+          <label>회의 날짜</label>
+          <input type="date" id="meetingDate">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <label>요약 모델:</label>
+        <select id="summaryModel">
+          <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (권장)</option>
+          <option value="claude-opus-4-5">Claude Opus 4.5 (고품질)</option>
+        </select>
+        <button class="primary" id="runBtn" onclick="runPipeline()" disabled style="margin-left:auto">전사 시작</button>
+      </div>
+
+      <div class="progress" id="progress">
+        <div class="st" id="step1">⏳ 파일 준비</div>
+        <div class="st" id="step2">⏳ Whisper 전사 (1~3분 소요)</div>
+        <div class="st" id="step3">⏳ Claude 요약 생성</div>
+        <div class="st" id="step4">⏳ IndexedDB 저장</div>
+      </div>
+
+      <div id="errorBox" class="alert alert-err" style="display:none"></div>
+      <div id="log"></div>
+    </div>
+
+    <!-- Result -->
+    <div class="panel" id="resultPanel" style="display:none;margin-top:12px">
+      <h3>✅ 처리 결과</h3>
+      <div id="resultContent"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: History -->
+  <div>
+    <div class="panel">
+      <h3>📚 회의록 아카이브 <span id="totalCount" style="font-size:11px;color:var(--ink-400);margin-left:auto">-</span></h3>
+
+      <div class="week-bar">
+        <label>주차 필터:</label>
+        <select id="weekFilter"><option value="">전체 주차</option></select>
+        <button class="ghost" onclick="loadHistory()">🔄 새로고침</button>
+        <button class="ghost" onclick="exportAll()">📥 전체 내보내기</button>
+      </div>
+
+      <div class="history" id="historyList">
+        <div class="history-empty">회의록을 불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Detail Modal -->
+<div class="modal" id="detailModal">
+  <div class="modal-body">
+    <div class="modal-head">
+      <div>
+        <h2 id="detailTitle">-</h2>
+        <div class="modal-meta" id="detailMeta"></div>
+      </div>
+      <button class="close" onclick="closeDetail()">✕</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab on" data-pane="summaryPane">📝 요약</button>
+      <button class="tab" data-pane="transcriptPane">📄 전사 원문</button>
+    </div>
+
+    <div id="summaryPane" class="tabpane on"></div>
+    <div id="transcriptPane" class="tabpane">
+      <div class="transcript-box" id="transcriptBox"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="sec" onclick="copyTranscript()">📋 복사</button>
+        <button class="sec" onclick="downloadTranscript()">💾 TXT 다운로드</button>
+        <button class="danger" onclick="deleteCurrent()" style="margin-left:auto">🗑 이 회의록 삭제</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   API Keys
+   ═══════════════════════════════════════════ */
+const KEY_OPENAI = DW_CONFIG.STORAGE_KEYS.openai;
+const KEY_ANTHROPIC = DW_CONFIG.STORAGE_KEYS.anthropic;
+
+document.getElementById('keyOpenAI').value = localStorage.getItem(KEY_OPENAI) || '';
+document.getElementById('keyAnthropic').value = localStorage.getItem(KEY_ANTHROPIC) || '';
+
+function saveKey(which) {
+  if (which === 'openai') {
+    const v = document.getElementById('keyOpenAI').value.trim();
+    localStorage.setItem(KEY_OPENAI, v);
+    log('OpenAI 키 저장됨');
+  } else {
+    const v = document.getElementById('keyAnthropic').value.trim();
+    localStorage.setItem(KEY_ANTHROPIC, v);
+    if (v.startsWith('sk-ant-')) localStorage.setItem(DW_CONFIG.STORAGE_KEYS.claude, v);
+    log('Anthropic 키 저장됨');
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Logging
+   ═══════════════════════════════════════════ */
+function log(m) {
+  const l = document.getElementById('log');
+  l.textContent += '[' + new Date().toLocaleTimeString() + '] ' + m + '\n';
+  l.scrollTop = l.scrollHeight;
+}
+
+function showError(msg) {
+  const b = document.getElementById('errorBox');
+  b.textContent = '❌ ' + msg;
+  b.style.display = 'block';
+}
+
+function clearError() {
+  document.getElementById('errorBox').style.display = 'none';
+}
+
+/* ═══════════════════════════════════════════
+   IndexedDB
+   ═══════════════════════════════════════════ */
+const DB_NAME = 'dowon_meeting_minutes';
+const DB_VERSION = 1;
+const STORE = 'meetings';
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        const s = db.createObjectStore(STORE, { keyPath: 'id' });
+        s.createIndex('week', 'week', { unique: false });
+        s.createIndex('created_at', 'created_at', { unique: false });
+      }
+    };
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function dbPut(record) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(record);
+    tx.oncomplete = () => res(record);
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+async function dbGetAll() {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => res(req.result || []);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function dbGet(id) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).get(id);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function dbDelete(id) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+/* ═══════════════════════════════════════════
+   Upload UI
+   ═══════════════════════════════════════════ */
+const dropZone = document.getElementById('dropZone');
+const audioFile = document.getElementById('audioFile');
+const fileInfo = document.getElementById('fileInfo');
+const runBtn = document.getElementById('runBtn');
+
+document.getElementById('meetingDate').valueAsDate = new Date();
+
+['dragenter', 'dragover'].forEach(ev => {
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('drag'); });
+});
+['dragleave', 'drop'].forEach(ev => {
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('drag'); });
+});
+dropZone.addEventListener('drop', e => {
+  if (e.dataTransfer.files.length) {
+    audioFile.files = e.dataTransfer.files;
+    onFileChange();
+  }
+});
+audioFile.addEventListener('change', onFileChange);
+
+function onFileChange() {
+  clearError();
+  if (!audioFile.files.length) { runBtn.disabled = true; fileInfo.style.display = 'none'; return; }
+  const f = audioFile.files[0];
+  document.getElementById('fname').textContent = f.name;
+  document.getElementById('fsize').textContent = (f.size / 1024 / 1024).toFixed(2) + ' MB';
+  fileInfo.style.display = 'flex';
+  runBtn.disabled = false;
+  if (f.size > 25 * 1024 * 1024) {
+    showError('파일 크기가 25MB를 초과합니다. 녹음을 분할하거나 비트레이트를 낮춰 재인코딩 후 다시 시도하세요.');
+    runBtn.disabled = true;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Progress
+   ═══════════════════════════════════════════ */
+function setStep(n) {
+  ['step1', 'step2', 'step3', 'step4'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('done', 'now');
+    if (i < n) el.classList.add('done');
+    if (i === n) el.classList.add('now');
+  });
+}
+
+function showProgress(on) {
+  document.getElementById('progress').classList.toggle('on', !!on);
+}
+
+/* ═══════════════════════════════════════════
+   Week key
+   ═══════════════════════════════════════════ */
+function getISOWeek(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - dayNum + 3);
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return date.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
+}
+
+/* ═══════════════════════════════════════════
+   Whisper transcription
+   ═══════════════════════════════════════════ */
+async function transcribeAudio(file, apiKey) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('model', 'whisper-1');
+  fd.append('language', 'ko');
+  fd.append('response_format', 'verbose_json');
+
+  const resp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + apiKey },
+    body: fd,
+  });
+
+  if (!resp.ok) {
+    let errMsg = 'Whisper API 오류: ' + resp.status;
+    try {
+      const err = await resp.json();
+      if (err.error && err.error.message) errMsg += ' - ' + err.error.message;
+    } catch(e) {}
+    throw new Error(errMsg);
+  }
+  return await resp.json();
+}
+
+/* ═══════════════════════════════════════════
+   Claude summarization
+   ═══════════════════════════════════════════ */
+async function summarizeWithClaude(transcript, title, apiKey, model) {
+  const titleLine = title ? `회의 제목: ${title}\n\n` : '';
+  const prompt = `${titleLine}아래는 회의 녹음을 Whisper로 전사한 원문입니다. 한국어로 다음 형식의 JSON만 출력하세요.
+
+{
+  "summary": "회의 전체 내용을 7~12문장으로 정리한 요약",
+  "key_decisions": ["결정된 사항 1", "결정된 사항 2"],
+  "action_items": [
+    {"task": "해야 할 일", "owner": "담당자(명시된 경우, 없으면 '미지정')", "due": "기한(명시된 경우, 없으면 '미정')"}
+  ],
+  "topics": ["논의 주제 1", "논의 주제 2"]
+}
+
+규칙:
+- JSON 외의 텍스트는 절대 출력하지 말 것
+- 전사 원문에 없는 사실은 추가하지 말 것
+- action_items의 담당자/기한은 원문에 명시된 경우에만 채우고, 없으면 '미지정'/'미정'으로 표기
+- 회의 진행과 무관한 잡담은 요약에서 제외
+
+전사 원문:
+---
+${transcript}
+---`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: model,
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  if (!resp.ok) {
+    let errMsg = 'Claude API 오류: ' + resp.status;
+    try {
+      const err = await resp.json();
+      if (err.error && err.error.message) errMsg += ' - ' + err.error.message;
+    } catch(e) {}
+    throw new Error(errMsg);
+  }
+
+  const data = await resp.json();
+  const rawText = data.content[0].text.trim();
+  return { parsed: parseSummaryJSON(rawText), raw: rawText };
+}
+
+function parseSummaryJSON(text) {
+  let t = text.trim();
+  if (t.startsWith('```')) {
+    const lines = t.split('\n');
+    if (lines.length >= 3) t = lines.slice(1, -1).join('\n');
+    if (t.startsWith('json')) t = t.slice(4).trim();
+  }
+  try { return JSON.parse(t); } catch(e) {}
+
+  const s = t.indexOf('{'), eIdx = t.lastIndexOf('}');
+  if (s >= 0 && eIdx > s) {
+    try { return JSON.parse(t.substring(s, eIdx + 1)); } catch(e) {}
+  }
+  return { summary: text, key_decisions: [], action_items: [], topics: [] };
+}
+
+/* ═══════════════════════════════════════════
+   Main pipeline
+   ═══════════════════════════════════════════ */
+async function runPipeline() {
+  clearError();
+  if (!audioFile.files.length) return;
+
+  const openaiKey = localStorage.getItem(KEY_OPENAI);
+  const anthropicKey = localStorage.getItem(KEY_ANTHROPIC);
+  if (!openaiKey) { showError('OpenAI API 키를 먼저 입력·저장하세요.'); return; }
+  if (!anthropicKey) { showError('Anthropic API 키를 먼저 입력·저장하세요.'); return; }
+
+  const file = audioFile.files[0];
+  const title = document.getElementById('meetingTitle').value.trim() || file.name;
+  const dateStr = document.getElementById('meetingDate').value || new Date().toISOString().slice(0, 10);
+  const model = document.getElementById('summaryModel').value;
+  const meetingDate = new Date(dateStr + 'T00:00:00');
+
+  runBtn.disabled = true;
+  showProgress(true);
+  document.getElementById('resultPanel').style.display = 'none';
+
+  try {
+    setStep(0);
+    log('파일 준비: ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + 'MB)');
+
+    setStep(1);
+    log('Whisper 전사 요청 중... (1~3분 소요)');
+    const tr = await transcribeAudio(file, openaiKey);
+    const transcript = (tr.text || '').trim();
+    if (!transcript) throw new Error('전사 결과가 비어 있습니다.');
+    log('전사 완료 — ' + transcript.length + '자 / ' + (tr.duration ? Math.round(tr.duration) + '초' : '?'));
+
+    setStep(2);
+    log('Claude 요약 생성 중 (' + model + ')...');
+    const sum = await summarizeWithClaude(transcript, title, anthropicKey, model);
+    log('요약 완료 — 결정 ' + (sum.parsed.key_decisions || []).length + '건, 액션 ' + (sum.parsed.action_items || []).length + '건');
+
+    setStep(3);
+    const now = new Date();
+    const id = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+    const record = {
+      id: id,
+      title: title,
+      audio_filename: file.name,
+      audio_size: file.size,
+      duration: tr.duration || null,
+      meeting_date: dateStr,
+      week: getISOWeek(meetingDate),
+      transcript: transcript,
+      summary: sum.parsed.summary || '',
+      key_decisions: sum.parsed.key_decisions || [],
+      action_items: sum.parsed.action_items || [],
+      topics: sum.parsed.topics || [],
+      model: model,
+      created_at: now.toISOString(),
+    };
+    await dbPut(record);
+    log('저장 완료 (id: ' + id + ')');
+
+    setStep(4);
+    renderResult(record);
+    document.getElementById('resultPanel').style.display = 'block';
+    audioFile.value = '';
+    fileInfo.style.display = 'none';
+    document.getElementById('meetingTitle').value = '';
+    loadHistory();
+  } catch (e) {
+    showError(e.message || String(e));
+    log('오류: ' + (e.message || e));
+  } finally {
+    runBtn.disabled = false;
+    setTimeout(() => showProgress(false), 1200);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Rendering
+   ═══════════════════════════════════════════ */
+function renderResult(m) {
+  document.getElementById('resultContent').innerHTML = `
+    <div style="margin-bottom:10px;font-size:13px;color:var(--ink-600)">
+      <b>${escHtml(m.title)}</b> · ${m.meeting_date} · ${m.week}
+      ${m.duration ? ' · ' + Math.round(m.duration / 60) + '분' : ''}
+    </div>
+    ${renderSummaryBlock(m)}
+  `;
+}
+
+function renderSummaryBlock(m) {
+  return `
+    <div class="summary-box">${escHtml(m.summary || '(요약 없음)')}</div>
+    ${renderList('📌 주요 결정사항', m.key_decisions)}
+    ${renderActions(m.action_items)}
+    ${renderList('🗂 논의 주제', m.topics)}
+  `;
+}
+
+function renderList(title, items) {
+  if (!items || !items.length) return '';
+  return `<div class="section"><h4>${title}</h4><ul>${items.map(x => `<li>${escHtml(x)}</li>`).join('')}</ul></div>`;
+}
+
+function renderActions(items) {
+  if (!items || !items.length) return '';
+  const html = items.map(a => `
+    <div class="action-item">
+      <div>${escHtml(a.task || '')}</div>
+      <div class="meta">👤 ${escHtml(a.owner || '미지정')}</div>
+      <div class="meta">📅 ${escHtml(a.due || '미정')}</div>
+    </div>
+  `).join('');
+  return `<div class="section"><h4>✅ 액션 아이템</h4>${html}</div>`;
+}
+
+/* ═══════════════════════════════════════════
+   History
+   ═══════════════════════════════════════════ */
+let _allMeetings = [];
+
+async function loadHistory() {
+  const listEl = document.getElementById('historyList');
+  listEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+  try {
+    const all = await dbGetAll();
+    all.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    _allMeetings = all;
+    document.getElementById('totalCount').textContent = all.length + '건';
+    updateWeekFilter(all);
+    renderHistory();
+  } catch (e) {
+    listEl.innerHTML = `<div class="history-empty">로딩 오류: ${escHtml(e.message || e)}</div>`;
+  }
+}
+
+function renderHistory() {
+  const week = document.getElementById('weekFilter').value;
+  const list = week ? _allMeetings.filter(m => m.week === week) : _allMeetings;
+  const el = document.getElementById('historyList');
+
+  if (!list.length) {
+    el.innerHTML = '<div class="history-empty">저장된 회의록이 없습니다.</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(m => {
+    const excerpt = (m.summary || '').slice(0, 160);
+    const dur = m.duration ? '⏱ ' + Math.round(m.duration / 60) + '분' : '';
+    const act = (m.action_items && m.action_items.length) ? '✅ ' + m.action_items.length + '건' : '';
+    return `
+      <div class="history-item" data-id="${m.id}" onclick="openDetail('${m.id}')">
+        <div class="tt">
+          <span>${escHtml(m.title)}</span>
+          <button class="danger" onclick="event.stopPropagation();deleteById('${m.id}')">삭제</button>
+        </div>
+        <div class="meta">
+          <span>📅 ${m.meeting_date}</span>
+          <span>📆 ${m.week}</span>
+          ${dur ? `<span>${dur}</span>` : ''}
+          ${act ? `<span>${act}</span>` : ''}
+        </div>
+        <div class="ex">${escHtml(excerpt)}${excerpt.length >= 160 ? '...' : ''}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateWeekFilter(all) {
+  const sel = document.getElementById('weekFilter');
+  const current = sel.value;
+  const weeks = [...new Set(all.map(m => m.week).filter(Boolean))].sort().reverse();
+  sel.innerHTML = '<option value="">전체 주차</option>' +
+    weeks.map(w => `<option value="${w}" ${w === current ? 'selected' : ''}>${w}</option>`).join('');
+}
+
+document.getElementById('weekFilter').addEventListener('change', renderHistory);
+
+async function deleteById(id) {
+  if (!confirm('이 회의록을 삭제하시겠습니까?')) return;
+  await dbDelete(id);
+  loadHistory();
+}
+
+/* ═══════════════════════════════════════════
+   Detail modal
+   ═══════════════════════════════════════════ */
+let _currentId = null;
+
+async function openDetail(id) {
+  const m = await dbGet(id);
+  if (!m) { alert('회의록을 찾을 수 없습니다.'); return; }
+  _currentId = id;
+  document.getElementById('detailTitle').textContent = m.title;
+  document.getElementById('detailMeta').innerHTML = `
+    <span>📅 ${m.meeting_date}</span>
+    <span>📆 ${m.week}</span>
+    ${m.duration ? `<span>⏱ ${Math.round(m.duration / 60)}분</span>` : ''}
+    <span>🎧 ${escHtml(m.audio_filename)}</span>
+    <span>🤖 ${escHtml(m.model || '')}</span>
+  `;
+  document.getElementById('summaryPane').innerHTML = renderSummaryBlock(m);
+  document.getElementById('transcriptBox').textContent = m.transcript || '(전사 없음)';
+  document.getElementById('detailModal').classList.add('on');
+  // reset tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.pane === 'summaryPane'));
+  document.querySelectorAll('.tabpane').forEach(p => p.classList.toggle('on', p.id === 'summaryPane'));
+}
+
+function closeDetail() {
+  document.getElementById('detailModal').classList.remove('on');
+  _currentId = null;
+}
+
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pane = btn.dataset.pane;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t === btn));
+    document.querySelectorAll('.tabpane').forEach(p => p.classList.toggle('on', p.id === pane));
+  });
+});
+
+document.getElementById('detailModal').addEventListener('click', e => {
+  if (e.target.id === 'detailModal') closeDetail();
+});
+
+function copyTranscript() {
+  const text = document.getElementById('transcriptBox').textContent;
+  navigator.clipboard.writeText(text).then(() => alert('전사 원문이 클립보드에 복사되었습니다.'));
+}
+
+async function downloadTranscript() {
+  if (!_currentId) return;
+  const m = await dbGet(_currentId);
+  if (!m) return;
+  const text =
+    `[회의록] ${m.title}\n날짜: ${m.meeting_date} (${m.week})\n` +
+    (m.duration ? `길이: ${Math.round(m.duration / 60)}분\n` : '') +
+    `\n=== 요약 ===\n${m.summary || ''}\n\n` +
+    (m.key_decisions && m.key_decisions.length ? `=== 주요 결정사항 ===\n${m.key_decisions.map((x, i) => (i + 1) + '. ' + x).join('\n')}\n\n` : '') +
+    (m.action_items && m.action_items.length ? `=== 액션 아이템 ===\n${m.action_items.map((a, i) => (i + 1) + '. ' + a.task + ' (담당: ' + (a.owner || '미지정') + ', 기한: ' + (a.due || '미정') + ')').join('\n')}\n\n` : '') +
+    `=== 전사 원문 ===\n${m.transcript || ''}`;
+
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (m.title.replace(/[\\/:*?"<>|]/g, '_') || 'meeting') + '_' + m.meeting_date + '.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function deleteCurrent() {
+  if (!_currentId) return;
+  if (!confirm('이 회의록을 삭제하시겠습니까?')) return;
+  await dbDelete(_currentId);
+  closeDetail();
+  loadHistory();
+}
+
+/* ═══════════════════════════════════════════
+   Export all
+   ═══════════════════════════════════════════ */
+async function exportAll() {
+  const all = await dbGetAll();
+  if (!all.length) { alert('저장된 회의록이 없습니다.'); return; }
+  const blob = new Blob([JSON.stringify(all, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'meeting_minutes_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ═══════════════════════════════════════════
+   Init
+   ═══════════════════════════════════════════ */
+loadHistory();
+</script>
+
+</body>
+</html>
