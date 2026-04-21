@@ -93,6 +93,18 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
 
 .transcript-box{background:var(--ink-50);padding:12px;border-radius:6px;font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:440px;overflow-y:auto;border:1px solid var(--border)}
 
+.dialogue-box{max-height:500px;overflow-y:auto;padding:4px}
+.turn{margin-bottom:10px;padding:10px 12px;border-radius:8px;background:var(--ink-50);border-left:3px solid var(--ink-300)}
+.turn.sp-0{border-left-color:#f59e0b;background:#fffbeb}
+.turn.sp-1{border-left-color:#3b82f6;background:#eff6ff}
+.turn.sp-2{border-left-color:#10b981;background:#ecfdf5}
+.turn.sp-3{border-left-color:#a855f7;background:#faf5ff}
+.turn.sp-4{border-left-color:#ef4444;background:#fef2f2}
+.turn-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--ink-500);margin-bottom:4px;font-weight:600}
+.turn-speaker{color:var(--ink-900);font-size:12px}
+.turn-text{font-size:13px;line-height:1.65;color:var(--ink-800);white-space:pre-wrap}
+.dialogue-empty{text-align:center;color:var(--ink-400);padding:24px;font-size:13px}
+
 .in-iframe .tool-topbar{display:none}
 </style>
 </head>
@@ -104,7 +116,7 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
 </div>
 
 <h1>🎙️ 회의록 자동화</h1>
-<p class="desc">회의 녹음을 업로드하면 <b>Whisper</b>가 텍스트로 전사하고, <b>Claude</b>가 요약 · 결정사항 · 액션아이템을 추출합니다. 모든 저장은 브라우저 <b>IndexedDB</b>에 이루어져 외부 서버로 전송되지 않습니다. 주차별 아카이브를 지원합니다.</p>
+<p class="desc">회의 녹음을 업로드하면 <b>Whisper</b>가 도메인 용어 힌트로 정확히 전사하고, <b>Claude</b>가 발화자 분리 · 요약 · 결정사항 · 액션아이템을 추출합니다. 모든 저장은 브라우저 <b>IndexedDB</b>에 이루어져 외부 서버로 전송되지 않습니다. 주차별 아카이브를 지원합니다.</p>
 
 <!-- API Keys -->
 <div class="panel" style="margin-bottom:12px">
@@ -168,7 +180,7 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
       <div class="progress" id="progress">
         <div class="st" id="step1">⏳ 파일 준비</div>
         <div class="st" id="step2">⏳ Whisper 전사 (25MB 초과 시 자동 재인코딩·청크 분할)</div>
-        <div class="st" id="step3">⏳ Claude 요약 생성</div>
+        <div class="st" id="step3">⏳ 발화자 분리 & Claude 요약</div>
         <div class="st" id="step4">⏳ IndexedDB 저장</div>
       </div>
 
@@ -216,10 +228,17 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
 
     <div class="tabs">
       <button class="tab on" data-pane="summaryPane">📝 요약</button>
+      <button class="tab" data-pane="dialoguePane">💬 발화자별</button>
       <button class="tab" data-pane="transcriptPane">📄 전사 원문</button>
     </div>
 
     <div id="summaryPane" class="tabpane on"></div>
+    <div id="dialoguePane" class="tabpane">
+      <div class="dialogue-box" id="dialogueBox"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="sec" onclick="copyDialogue()">📋 발화자 대화 복사</button>
+      </div>
+    </div>
     <div id="transcriptPane" class="tabpane">
       <div class="transcript-box" id="transcriptBox"></div>
       <div class="row" style="margin-top:8px">
@@ -490,12 +509,23 @@ function chunkSamples(samples, sampleRate, chunkSeconds) {
   return chunks;
 }
 
+// 노무/고용지원금 도메인 용어 — Whisper가 고유명사·전문용어를 정확히 받아적도록 힌트로 주입
+const DOMAIN_PROMPT =
+  '노무법인 도원 회의. 주요 용어: 고용지원금, 고용유지지원금, 청년내일채움공제, ' +
+  '두루누리, 사회보험료, 4대보험, 국민연금, 건강보험, 고용보험, 산재보험, ' +
+  '근로계약서, 최저임금, 연차수당, 주휴수당, 퇴직금, 중간정산, 육아휴직, ' +
+  '근로기준법, 고용노동부, 근로복지공단, 건강보험공단, 국민연금공단, ' +
+  '4대보험 취득·상실, 이직확인서, 자격취득신고, 대리인, 사업주, 피보험자, ' +
+  '원청, 하도급, 건설업 환급, 직장복귀. 김동우 노무사, 임태주 대표.';
+
 async function whisperCall(blob, apiKey, filename) {
   const fd = new FormData();
   fd.append('file', blob, filename || 'audio.wav');
   fd.append('model', 'whisper-1');
   fd.append('language', 'ko');
   fd.append('response_format', 'verbose_json');
+  fd.append('prompt', DOMAIN_PROMPT);
+  fd.append('temperature', '0');
 
   const resp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
@@ -520,12 +550,28 @@ async function whisperCall(blob, apiKey, filename) {
  *   B) 재인코딩 후 SAFE_LIMIT 이하 → 16kHz 모노 WAV 단일 호출
  *   C) 그 외 → 10분 단위 청크 분할 순차 호출 후 결과 이어붙임
  */
+function extractSegments(resp, timeOffset) {
+  const raw = resp.segments || [];
+  const off = timeOffset || 0;
+  return raw.map(s => ({
+    start: (s.start != null) ? s.start + off : null,
+    end: (s.end != null) ? s.end + off : null,
+    text: (s.text || '').trim(),
+  })).filter(s => s.text);
+}
+
 async function transcribeAudio(file, apiKey) {
   // Path A: 원본 직접 전송
   if (file.size <= WHISPER_LIMIT) {
     log('직접 전송 경로 (원본 ' + (file.size / 1024 / 1024).toFixed(1) + 'MB)');
     const r = await whisperCall(file, apiKey, file.name);
-    return { text: (r.text || '').trim(), duration: r.duration || null, chunks: 1, path: 'direct' };
+    return {
+      text: (r.text || '').trim(),
+      duration: r.duration || null,
+      chunks: 1,
+      path: 'direct',
+      segments: extractSegments(r, 0),
+    };
   }
 
   // Path B/C: 디코딩 + 재샘플링 필요
@@ -544,18 +590,26 @@ async function transcribeAudio(file, apiKey) {
     log('단일 WAV 전송 경로');
     const wav = encodeWAV(samples, TARGET_SR);
     const r = await whisperCall(wav, apiKey, 'audio.wav');
-    return { text: (r.text || '').trim(), duration: r.duration || duration, chunks: 1, path: 're-encoded' };
+    return {
+      text: (r.text || '').trim(),
+      duration: r.duration || duration,
+      chunks: 1,
+      path: 're-encoded',
+      segments: extractSegments(r, 0),
+    };
   }
 
-  // Path C: 청크 분할
+  // Path C: 청크 분할 — 각 청크 segment 타임스탬프를 전체 기준으로 오프셋
   const chunks = chunkSamples(samples, TARGET_SR, CHUNK_SEC);
   log('청크 ' + chunks.length + '개 (각 ' + (CHUNK_SEC / 60) + '분) 분할 전사 시작');
   const parts = [];
+  const allSegments = [];
   for (let i = 0; i < chunks.length; i++) {
     log('청크 ' + (i + 1) + '/' + chunks.length + ' 전사 중...');
     const wav = encodeWAV(chunks[i], TARGET_SR);
     const r = await whisperCall(wav, apiKey, 'chunk_' + (i + 1) + '.wav');
     parts.push((r.text || '').trim());
+    allSegments.push(...extractSegments(r, i * CHUNK_SEC));
     log('청크 ' + (i + 1) + '/' + chunks.length + ' 완료 (' + (r.text || '').trim().length + '자)');
   }
   return {
@@ -563,6 +617,7 @@ async function transcribeAudio(file, apiKey) {
     duration: duration,
     chunks: chunks.length,
     path: 'chunked',
+    segments: allSegments,
   };
 }
 
@@ -622,6 +677,111 @@ ${transcript}
   return { parsed: parseSummaryJSON(rawText), raw: rawText };
 }
 
+/* ═══════════════════════════════════════════
+   Speaker diarization via Claude
+   Whisper API는 화자 분리를 지원하지 않으므로, segment 타임스탬프 + 문맥을 Claude에게 넘겨
+   같은 화자의 연속 segment를 하나의 발화로 병합하도록 한다.
+   ═══════════════════════════════════════════ */
+function fmtSecMMSS(sec) {
+  if (sec == null || isNaN(sec)) return '--:--';
+  const s = Math.floor(Number(sec));
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+async function diarizeSegments(segments, title, apiKey, model) {
+  if (!segments || !segments.length) return [];
+
+  const numbered = segments.map((s, i) =>
+    `[${i}] (${fmtSecMMSS(s.start)}~${fmtSecMMSS(s.end)}) ${s.text}`
+  ).join('\n');
+  const titleLine = title ? `회의 제목: ${title}\n\n` : '';
+  const prompt = `${titleLine}아래는 한국어 회의 녹음을 Whisper로 전사한 segment 목록입니다. 각 줄은 \`[번호] (시작~끝) 문장\` 형식입니다.
+
+연속된 segment들을 같은 발화자끼리 묶어 발화 단위(turn)로 재구성하세요. 화자 구분 기준:
+- 말투/어미 변화 (존댓말↔반말, 질문↔답변)
+- 호칭·자기소개 ("노무사님", "대표님", "제가..." 등)
+- 주제 전환 지점
+- 원문에 이름이 명시되면 그 이름을 speaker로 사용, 그렇지 않으면 "화자1", "화자2"… 순으로 부여
+
+출력은 JSON 배열만. 다른 텍스트 금지:
+[
+  {"speaker": "화자1", "text": "합쳐진 발화 내용", "start": 0.0, "end": 4.2, "segment_ids": [0, 1]},
+  ...
+]
+
+규칙:
+- 전사 원문에 없는 단어를 만들지 말 것 (오타는 자연스럽게 교정 가능하나 내용 추가 금지)
+- 같은 화자의 짧은 추임새("네", "아", "맞아요")는 바로 앞/뒤 발화에 병합
+- start는 묶인 첫 segment의 시작, end는 마지막 segment의 끝
+- segment_ids는 병합한 원본 segment 인덱스 목록
+
+Segment 목록:
+---
+${numbered}
+---`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: model,
+      max_tokens: 8192,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  if (!resp.ok) {
+    let errMsg = 'Claude diarization 오류: ' + resp.status;
+    try {
+      const err = await resp.json();
+      if (err.error && err.error.message) errMsg += ' - ' + err.error.message;
+    } catch(e) {}
+    throw new Error(errMsg);
+  }
+
+  const data = await resp.json();
+  const raw = data.content[0].text.trim();
+  return parseDialogueJSON(raw, segments);
+}
+
+function parseDialogueJSON(text, fallbackSegments) {
+  let t = text.trim();
+  if (t.startsWith('```')) {
+    const lines = t.split('\n');
+    if (lines.length >= 3) t = lines.slice(1, -1).join('\n');
+    if (t.startsWith('json')) t = t.slice(4).trim();
+  }
+
+  let arr = null;
+  try { arr = JSON.parse(t); } catch(e) {}
+  if (!Array.isArray(arr)) {
+    const s = t.indexOf('['), e = t.lastIndexOf(']');
+    if (s >= 0 && e > s) {
+      try { arr = JSON.parse(t.substring(s, e + 1)); } catch(err) {}
+    }
+  }
+
+  if (!Array.isArray(arr) || !arr.length) {
+    return (fallbackSegments || []).map(s => ({
+      speaker: '화자?', text: s.text, start: s.start, end: s.end,
+    }));
+  }
+
+  return arr
+    .filter(x => x && typeof x === 'object' && (x.text || '').trim())
+    .map(x => ({
+      speaker: (x.speaker || '화자?').toString().trim(),
+      text: (x.text || '').trim(),
+      start: (x.start != null) ? Number(x.start) : null,
+      end: (x.end != null) ? Number(x.end) : null,
+    }));
+}
+
 function parseSummaryJSON(text) {
   let t = text.trim();
   if (t.startsWith('```')) {
@@ -670,11 +830,17 @@ async function runPipeline() {
     const transcript = (tr.text || '').trim();
     if (!transcript) throw new Error('전사 결과가 비어 있습니다.');
     const pathLabel = { direct: '직접', 're-encoded': '재인코딩', chunked: '청크' + tr.chunks + '개' }[tr.path] || tr.path;
-    log('전사 완료 [' + pathLabel + '] — ' + transcript.length + '자 / ' + (tr.duration ? Math.round(tr.duration) + '초' : '?'));
+    log('전사 완료 [' + pathLabel + '] — ' + transcript.length + '자 / ' + (tr.duration ? Math.round(tr.duration) + '초' : '?') + ' / ' + (tr.segments || []).length + ' segments');
 
     setStep(2);
-    log('Claude 요약 생성 중 (' + model + ')...');
-    const sum = await summarizeWithClaude(transcript, title, anthropicKey, model);
+    // diarize + summarize 병렬 실행 — 두 호출은 서로 독립
+    log('발화자 분리 & 요약 생성 중 (' + model + ')...');
+    const [dialogue, sum] = await Promise.all([
+      diarizeSegments(tr.segments || [], title, anthropicKey, model)
+        .catch(err => { log('발화자 분리 실패: ' + (err.message || err) + ' — 원본 segment로 폴백'); return (tr.segments || []).map(s => ({ speaker: '화자?', text: s.text, start: s.start, end: s.end })); }),
+      summarizeWithClaude(transcript, title, anthropicKey, model),
+    ]);
+    log('발화자 분리 완료 — ' + dialogue.length + '개 turn');
     log('요약 완료 — 결정 ' + (sum.parsed.key_decisions || []).length + '건, 액션 ' + (sum.parsed.action_items || []).length + '건');
 
     setStep(3);
@@ -689,6 +855,7 @@ async function runPipeline() {
       meeting_date: dateStr,
       week: getISOWeek(meetingDate),
       transcript: transcript,
+      dialogue: dialogue,
       summary: sum.parsed.summary || '',
       key_decisions: sum.parsed.key_decisions || [],
       action_items: sum.parsed.action_items || [],
@@ -840,11 +1007,44 @@ async function openDetail(id) {
     <span>🤖 ${escHtml(m.model || '')}</span>
   `;
   document.getElementById('summaryPane').innerHTML = renderSummaryBlock(m);
+  renderDialogue(m.dialogue);
   document.getElementById('transcriptBox').textContent = m.transcript || '(전사 없음)';
   document.getElementById('detailModal').classList.add('on');
   // reset tab
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.pane === 'summaryPane'));
   document.querySelectorAll('.tabpane').forEach(p => p.classList.toggle('on', p.id === 'summaryPane'));
+}
+
+function renderDialogue(dialogue) {
+  const box = document.getElementById('dialogueBox');
+  if (!dialogue || !dialogue.length) {
+    box.innerHTML = '<div class="dialogue-empty">발화자 분리 결과가 없습니다. (구버전 회의록이거나 분리 실패)</div>';
+    return;
+  }
+  const speakers = [...new Set(dialogue.map(t => t.speaker || '화자?'))];
+  box.innerHTML = dialogue.map(t => {
+    const idx = speakers.indexOf(t.speaker || '화자?');
+    const cls = idx >= 0 && idx < 5 ? 'sp-' + idx : '';
+    const time = fmtSecMMSS(t.start) + '~' + fmtSecMMSS(t.end);
+    return `
+      <div class="turn ${cls}">
+        <div class="turn-head">
+          <span class="turn-speaker">👤 ${escHtml(t.speaker || '화자?')}</span>
+          <span>${time}</span>
+        </div>
+        <div class="turn-text">${escHtml(t.text || '')}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function copyDialogue() {
+  if (!_currentId) return;
+  const m = await dbGet(_currentId);
+  const list = (m && m.dialogue) || [];
+  if (!list.length) { alert('발화자 분리 결과가 없습니다.'); return; }
+  const text = list.map(t => `[${t.speaker || '화자?'}] ${t.text || ''}`).join('\n\n');
+  navigator.clipboard.writeText(text).then(() => alert('발화자 대화가 클립보드에 복사되었습니다.'));
 }
 
 function closeDetail() {
@@ -873,12 +1073,16 @@ async function downloadTranscript() {
   if (!_currentId) return;
   const m = await dbGet(_currentId);
   if (!m) return;
+  const dialogueBlock = (m.dialogue && m.dialogue.length)
+    ? `=== 발화자별 대화 ===\n${m.dialogue.map(t => `[${t.speaker || '화자?'}] (${fmtSecMMSS(t.start)}~${fmtSecMMSS(t.end)})\n${t.text || ''}`).join('\n\n')}\n\n`
+    : '';
   const text =
     `[회의록] ${m.title}\n날짜: ${m.meeting_date} (${m.week})\n` +
     (m.duration ? `길이: ${Math.round(m.duration / 60)}분\n` : '') +
     `\n=== 요약 ===\n${m.summary || ''}\n\n` +
     (m.key_decisions && m.key_decisions.length ? `=== 주요 결정사항 ===\n${m.key_decisions.map((x, i) => (i + 1) + '. ' + x).join('\n')}\n\n` : '') +
     (m.action_items && m.action_items.length ? `=== 액션 아이템 ===\n${m.action_items.map((a, i) => (i + 1) + '. ' + a.task + ' (담당: ' + (a.owner || '미지정') + ', 기한: ' + (a.due || '미정') + ')').join('\n')}\n\n` : '') +
+    dialogueBlock +
     `=== 전사 원문 ===\n${m.transcript || ''}`;
 
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
