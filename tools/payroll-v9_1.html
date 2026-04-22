@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-v9.1 changelog (2026-04-22)
+v9.0 changelog (2026-04-22)
 - 신뢰 구간 매칭: 5원 이하 단수차이 자동 PASS
 - 월합계 선순위 검증: 월합계 일치 시 개인 차이는 매핑 오류 태깅
 - 액션 카드 4개: 즉시신청/재요청/수기확인/심사위험
@@ -11,7 +11,7 @@ v9.1 changelog (2026-04-22)
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="referrer" content="no-referrer">
-<title>급여서류 검증도구 v9.1 (Gemini+Claude 이중화) | 노무법인 도원</title>
+<title>급여서류 검증도구 v9.0 (Gemini+Claude 이중화) | 노무법인 도원</title>
 <script src="../js/config.js"></script>
 <script src="../js/shared.js"></script>
 <script src="../js/dowon-api.js"></script>
@@ -246,7 +246,7 @@ tr:hover{background:var(--light)}
 .preview-noref{font-size:12px;color:var(--gray);text-align:center;padding:30px 10px;line-height:1.6}
 .in-iframe .header{display:none}
 .in-iframe .container{padding-top:8px}
-/* v9.1 action cards */
+/* v9.0 action cards */
 .action-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
 .action-card{background:#fff;border-radius:12px;padding:16px 14px;box-shadow:0 1px 4px rgba(0,0,0,.08);cursor:pointer;transition:.15s;border-left:5px solid var(--gray);text-align:left}
 .action-card:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.12)}
@@ -264,7 +264,7 @@ tr:hover{background:var(--light)}
 .action-card .ac-desc{font-size:11px;color:var(--gray);margin-top:2px}
 .action-card.active{outline:2px solid var(--primary);outline-offset:2px}
 .amount-table tr.action-dim{opacity:.35}
-/* v9.1 matchLevel micro-labels */
+/* v9.0 matchLevel micro-labels */
 .match-note{font-size:9px;color:var(--gray);margin-top:1px}
 .match-minor-badge{display:inline-block;margin-left:4px;background:#f59e0b;color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600}
 </style>
@@ -311,7 +311,7 @@ tr:hover{background:var(--light)}
 
 <div class="header">
   <h1>급여서류 검증도구</h1>
-  <span class="badge v4">v9.1</span>
+  <span class="badge v4">v9.0</span>
   <span class="badge ocr" id="headerModelBadge">Gemini 2.5 Flash</span>
   <span class="badge">노무법인 도원</span>
   <div class="api-usage" id="apiUsageArea">
@@ -505,7 +505,7 @@ tr:hover{background:var(--light)}
   <!-- React Result Mount (서류 검증 결과 — 최상단 위치) -->
   <div id="reactResultRoot" style="max-width:1200px;margin:0 auto 14px"></div>
 
-  <!-- v9.1 액션 카드 (사용자가 "다음에 뭘 해야 할지" 안내) -->
+  <!-- v9.0 액션 카드 (사용자가 "다음에 뭘 해야 할지" 안내) -->
   <div class="action-cards hidden" id="actionCardsSection">
     <div class="action-card ok" data-action="auto" onclick="filterByAction('auto')">
       <div class="ac-icon">✅</div>
@@ -620,7 +620,7 @@ function isAmountMatch(a, b) {
   return typeof a === 'number' && typeof b === 'number' && a > 0 && a === b;
 }
 
-// v9.1 신뢰 구간 매칭: exact / rounding(단수) / minor(경미) / mismatch
+// v9.0 신뢰 구간 매칭: exact / rounding(단수) / minor(경미) / mismatch
 // 5원 이하는 단수처리로 자동 PASS, 1만원·0.5% 이하는 경미(PASS+경고), 나머지는 불일치.
 function matchConfidence(pay, trf) {
   if(typeof pay !== 'number' || typeof trf !== 'number' || pay <= 0 || trf <= 0) {
@@ -634,7 +634,7 @@ function matchConfidence(pay, trf) {
   return { level: 'mismatch', pass: false, note: `차액 ${formatNum(diff)}원` };
 }
 
-// v9.1 Grade 실무 라벨: 내부 A/B/C/D는 유지, UI 표시만 전환
+// v9.0 Grade 실무 라벨: 내부 A/B/C/D는 유지, UI 표시만 전환
 const GRADE_LABELS = {
   A: { text: '확인완료', color: '#16a34a' },
   B: { text: '정상',     color: '#16a34a' },
@@ -4383,7 +4383,7 @@ async function runVerification(){
     log('info', '┌──────────────────────┬──────────────────────────────────────┐');
     log('info', '│ 항목                 │ 내용                                 │');
     log('info', '├──────────────────────┼──────────────────────────────────────┤');
-    log('info', '│ 버전                 │ v9.1 (Gemini+Claude 이중화)              │');
+    log('info', '│ 버전                 │ v9.0 (Gemini+Claude 이중화)              │');
     log('info', `│ STEP 1 (503 재시도)  │ 적용 (최대 3회 + Claude 폴백 ${hasFallback})  │`);
     log('info', '│ STEP 2 (이미지 전처리)│ 적용 (CLAHE 8×8 + 샤프닝 + 조건부이진화)│');
     log('info', `│ STEP 3 (다수결)      │ 적용 (불일치 시 3회 다수결)           │`);
@@ -4741,7 +4741,7 @@ function _majorityOf3(a, b, c, transferAmount) {
   return { value: sorted[1], unanimous: false, majority: false, source: 'median' };
 }
 
-// v9.1 월합계 선순위 검증 — crossVerify 개인별 비교 직전 수행.
+// v9.0 월합계 선순위 검증 — crossVerify 개인별 비교 직전 수행.
 // S.monthTotalWarnings(기존 호환)와 S.monthTotalMatch를 채운다.
 function _verifyMonthlyTotals() {
   S.monthTotalWarnings = []; // {month, payTotal, trfTotal, diffPct}
@@ -4780,7 +4780,7 @@ function _verifyMonthlyTotals() {
 }
 
 async function crossVerify() {
-  // ========== 0단계(v9.1): 월합계 선순위 검증 ==========
+  // ========== 0단계(v9.0): 월합계 선순위 검증 ==========
   // 월합계가 맞으면 개인별 차이는 "매핑 오류 의심"으로 태깅(이름/금액 혼동 가능성).
   log('info', '── [0단계 검증] 월합계 선순위 ──');
   _verifyMonthlyTotals();
@@ -4836,7 +4836,7 @@ async function crossVerify() {
         transferStatus = 'fail';
       }
 
-      // 금액 비교 (v9.1 matchConfidence — 5원 이하 단수/1만원+0.5% 경미 PASS)
+      // 금액 비교 (v9.0 matchConfidence — 5원 이하 단수/1만원+0.5% 경미 PASS)
       let matchLevel = null, matchNote = '';
       if(payAmount && trfAmount) {
         const conf = matchConfidence(payAmount, trfAmount);
@@ -4875,7 +4875,7 @@ async function crossVerify() {
         status = 'fail';
       }
 
-      // 1단계 로그 (v9.1: matchLevel 반영)
+      // 1단계 로그 (v9.0: matchLevel 반영)
       if(payAmount && trfAmount) {
         const sym = amountMatch ? (matchLevel === 'minor' ? '⚠️' : '✅') : '❌';
         const verdict = amountMatch
@@ -4891,7 +4891,7 @@ async function crossVerify() {
         log('info', `[검증1] ${w.name} ${month}: 급여=${formatNum(payAmount)} 이체=없음`);
       }
 
-      // v9.1 월합계 선제 결과 반영
+      // v9.0 월합계 선제 결과 반영
       const mt = S.monthTotalMatch && S.monthTotalMatch[month];
       const monthTotalOk = mt ? mt.match : null;
       const suspectMappingError = !!(mt && mt.match && amountMatch === false);
@@ -4910,7 +4910,7 @@ async function crossVerify() {
 
   // ========== 2단계 검증: 금액 불일치 및 시계열 이상 감지 ==========
   // 정확도 원칙: Grade 자동 승격 없음. 금액 불일치는 Grade와 무관하게 모두 수기확인.
-  // v9.1: matchLevel==='minor'는 수기확인 제외(경고만), mismatch는 매핑의심/불일치로 카테고리 분리.
+  // v9.0: matchLevel==='minor'는 수기확인 제외(경고만), mismatch는 매핑의심/불일치로 카테고리 분리.
   log('info', '── [2단계 검증] 금액 불일치 및 이상 탐지 ──');
   for(const r of S.results) {
     // minor(경미 오차) — 수기확인 목록에 올리지 않고 hasMinorWarning만 표시
@@ -5068,7 +5068,7 @@ async function crossVerify() {
     // 다수결로 변경된 결과의 detail 갱신
     if(majorityCount > 0) {
       for(const r of S.results) {
-        // v9.1: 다수결로 바뀐 값 기준으로 matchLevel/매핑의심 재계산
+        // v9.0: 다수결로 바뀐 값 기준으로 matchLevel/매핑의심 재계산
         if(r.payAmount && r.trfAmount) {
           const conf = matchConfidence(r.payAmount, r.trfAmount);
           r.amountMatch = conf.pass;
@@ -5090,7 +5090,7 @@ async function crossVerify() {
     }
   }
 
-  // v9.1: 월별 합계 검증은 [검증0]에서 선제 수행 완료 — S.monthTotalWarnings / S.monthTotalMatch 채움.
+  // v9.0: 월별 합계 검증은 [검증0]에서 선제 수행 완료 — S.monthTotalWarnings / S.monthTotalMatch 채움.
   log('info', `교차검증 완료: ${S.results.length}건, 수기확인 ${S.manualChecks.length}건`);
 }
 
@@ -5228,7 +5228,7 @@ function generateFindings() {
 // ===== RENDER =====
 function renderAll() { renderManualTop(); renderMatrix(); renderAmounts(); renderManualChecks(); renderMonthTotal(); renderFindings(); renderPages(); renderOcr(); renderLog(); renderActionCards(); }
 
-// v9.1 액션 카드: 결과 집계 + 사용자 다음 액션 가이드
+// v9.0 액션 카드: 결과 집계 + 사용자 다음 액션 가이드
 function _matchesAction(r, t) {
   if(t === 'auto')     return (r.matchLevel === 'exact' || r.matchLevel === 'rounding') && r.hasPayroll && r.hasTransfer;
   if(t === 'request')  return (r.payrollStatus === 'fail' && !r.hasPayroll) || (r.transferStatus === 'fail' && !r.hasTransfer);
@@ -5254,7 +5254,7 @@ function renderActionCards() {
   if(S.results.length > 0) sec.classList.remove('hidden');
 }
 
-// v9.1 액션 카드 클릭 필터 — 매트릭스 행 강조(비해당 dim)
+// v9.0 액션 카드 클릭 필터 — 매트릭스 행 강조(비해당 dim)
 let _actionFilter = null;
 function filterByAction(type) {
   _actionFilter = (_actionFilter === type) ? null : type;
@@ -5521,7 +5521,7 @@ function renderAmounts() {
         const grade = r.grade || 'A';
 
         if(r.payAmount && r.trfAmount) {
-          // v9.1 Grade 실무 라벨: A/B 숨김, C/D만 라벨 표시
+          // v9.0 Grade 실무 라벨: A/B 숨김, C/D만 라벨 표시
           let gradeTag = '';
           if(grade === 'C' || grade === 'D') {
             const lbl = gradeLabel(grade);
@@ -5530,7 +5530,7 @@ function renderAmounts() {
           if(r.amountMatch) {
             // Grade별 셀 색상 유지
             cellCls = grade === 'A' ? 'cell-grade-a' : grade === 'B' ? 'cell-grade-b' : 'cell-grade-c';
-            // v9.1 matchLevel별 보조 표시
+            // v9.0 matchLevel별 보조 표시
             let subLabel = '';
             let checkColor = 'var(--success)';
             if(r.matchLevel === 'rounding') {
@@ -5827,7 +5827,7 @@ function exportResults() {
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(totData), '월별총합계검증');
 
-  // Sheet 4: 금액 상세 대조 (v9.1: 등급 실무 라벨 + 매칭레벨 컬럼 추가)
+  // Sheet 4: 금액 상세 대조 (v9.0: 등급 실무 라벨 + 매칭레벨 컬럼 추가)
   const aData = [['성명','월','급여대장(차인지급액)','이체확인증(이체금액)','차이','판정','등급','매칭레벨','비고']];
   const LEVEL_KR = { exact: '정확일치', rounding: '단수일치', minor: '경미', mismatch: '불일치' };
   S.results.forEach(r => {
