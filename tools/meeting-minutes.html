@@ -35,9 +35,15 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
 .drop-zone .hint{color:var(--ink-500);font-size:12px;margin-top:4px}
 .drop-zone input[type=file]{display:none}
 
-.file-info{margin-top:10px;padding:10px;background:var(--ink-50);border-radius:6px;font-size:13px;display:flex;justify-content:space-between;align-items:center}
-.file-info .fname{font-weight:600;color:var(--ink-800);word-break:break-all}
-.file-info .fsize{color:var(--ink-500);white-space:nowrap;margin-left:8px}
+.file-info{margin-top:10px;padding:10px;background:var(--ink-50);border-radius:6px;font-size:13px}
+.file-info .file-header{font-weight:700;color:var(--ink-800);padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.file-info .file-item{display:flex;justify-content:space-between;align-items:center;padding:3px 0;gap:8px}
+.file-info .fname{font-weight:500;color:var(--ink-800);word-break:break-all;flex:1;min-width:0}
+.file-info .fsize{color:var(--ink-500);white-space:nowrap}
+.file-info .badge{font-size:11px;padding:1px 6px;border-radius:3px;margin-left:4px;white-space:nowrap;font-weight:500}
+.file-info .badge.warn{background:#fef3c7;color:#92400e}
+.file-info .badge.info{background:#dbeafe;color:#1e40af}
+#fileCounter{display:none;font-weight:700;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #bae6fd;font-size:13px}
 
 .form-grid{display:grid;grid-template-columns:1fr 160px;gap:10px;margin-top:12px}
 .form-grid .fld label{display:block;margin-bottom:4px;font-size:12px}
@@ -147,14 +153,13 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
 
       <label class="drop-zone" id="dropZone">
         <div class="ico">🎧</div>
-        <div><b>클릭 또는 드래그</b>하여 녹음 파일 선택</div>
-        <div class="hint">mp3 · m4a · wav · mp4 · webm · ogg · flac · 25MB 초과 시 자동 재인코딩·청크 분할</div>
-        <input type="file" id="audioFile" accept=".mp3,.m4a,.wav,.mp4,.webm,.ogg,.flac,.mpeg,.mpga">
+        <div><b>클릭 또는 드래그</b>하여 녹음 파일 선택 <span style="color:var(--primary-dark)">(복수 선택 가능)</span></div>
+        <div class="hint">mp3 · m4a · wav · mp4 · webm · ogg · flac · opus/aac/amr 등 미지원 포맷은 자동 재인코딩 · 25MB 초과 시 청크 분할</div>
+        <input type="file" id="audioFile" accept=".mp3,.m4a,.wav,.mp4,.webm,.ogg,.oga,.flac,.mpeg,.mpga,.opus,.aac,.amr,.3gp,.3gpp,.wma,.aiff,audio/*" multiple>
       </label>
 
       <div class="file-info" id="fileInfo" style="display:none">
-        <span class="fname" id="fname">-</span>
-        <span class="fsize" id="fsize">-</span>
+        <div id="fileList"></div>
       </div>
 
       <div class="form-grid">
@@ -178,8 +183,9 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
       </div>
 
       <div class="progress" id="progress">
+        <div id="fileCounter"></div>
         <div class="st" id="step1">⏳ 파일 준비</div>
-        <div class="st" id="step2">⏳ Whisper 전사 (25MB 초과 시 자동 재인코딩·청크 분할)</div>
+        <div class="st" id="step2">⏳ Whisper 전사 (25MB 초과 또는 미지원 포맷은 자동 재인코딩·청크 분할)</div>
         <div class="st" id="step3">⏳ 발화자 분리 & Claude 요약</div>
         <div class="st" id="step4">⏳ IndexedDB 저장</div>
       </div>
@@ -382,17 +388,42 @@ dropZone.addEventListener('drop', e => {
 });
 audioFile.addEventListener('change', onFileChange);
 
+// Whisper 지원 확장자 (OpenAI API 기준)
+const WHISPER_FORMATS = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm'];
+
+function getFileExt(filename) {
+  const m = (filename || '').match(/\.([a-zA-Z0-9]+)$/);
+  return m ? m[1].toLowerCase() : '';
+}
+
 function onFileChange() {
   clearError();
-  if (!audioFile.files.length) { runBtn.disabled = true; fileInfo.style.display = 'none'; return; }
-  const f = audioFile.files[0];
-  document.getElementById('fname').textContent = f.name;
-  document.getElementById('fsize').textContent = (f.size / 1024 / 1024).toFixed(2) + ' MB';
-  fileInfo.style.display = 'flex';
+  const files = Array.from(audioFile.files || []);
+  if (!files.length) { runBtn.disabled = true; fileInfo.style.display = 'none'; return; }
+
+  const totalSize = files.reduce((s, f) => s + f.size, 0);
+  const header = `<div class="file-header"><span>📎 ${files.length}개 파일</span><span>총 ${(totalSize / 1024 / 1024).toFixed(2)} MB</span></div>`;
+  const items = files.map(f => {
+    const ext = getFileExt(f.name);
+    const unsupported = !WHISPER_FORMATS.includes(ext);
+    const large = f.size > 25 * 1024 * 1024;
+    const badges = [
+      unsupported ? '<span class="badge warn">재인코딩</span>' : '',
+      large ? '<span class="badge info">25MB↑</span>' : '',
+    ].join('');
+    return `<div class="file-item"><span class="fname">${escHtml(f.name)}${badges}</span><span class="fsize">${(f.size / 1024 / 1024).toFixed(2)} MB</span></div>`;
+  }).join('');
+
+  document.getElementById('fileList').innerHTML = header + items;
+  fileInfo.style.display = 'block';
   runBtn.disabled = false;
-  if (f.size > 25 * 1024 * 1024) {
-    showInfo('25MB 초과 파일입니다. 자동으로 16kHz 모노 WAV로 재인코딩 후, 필요 시 10분 단위로 분할 전사합니다 (시간이 더 걸릴 수 있음).');
-  }
+
+  const hasLarge = files.some(f => f.size > 25 * 1024 * 1024);
+  const hasUnsupported = files.some(f => !WHISPER_FORMATS.includes(getFileExt(f.name)));
+  const msgs = [];
+  if (hasLarge) msgs.push('25MB 초과 파일은 16kHz 모노 WAV로 재인코딩·10분 단위 분할');
+  if (hasUnsupported) msgs.push('Whisper 미지원 확장자는 자동 WAV 재인코딩');
+  if (msgs.length) showInfo(msgs.join(' · ') + ' (시간이 더 걸릴 수 있음)');
 }
 
 function showInfo(msg) {
@@ -561,21 +592,37 @@ function extractSegments(resp, timeOffset) {
 }
 
 async function transcribeAudio(file, apiKey) {
-  // Path A: 원본 직접 전송
-  if (file.size <= WHISPER_LIMIT) {
-    log('직접 전송 경로 (원본 ' + (file.size / 1024 / 1024).toFixed(1) + 'MB)');
-    const r = await whisperCall(file, apiKey, file.name);
-    return {
-      text: (r.text || '').trim(),
-      duration: r.duration || null,
-      chunks: 1,
-      path: 'direct',
-      segments: extractSegments(r, 0),
-    };
+  const ext = getFileExt(file.name);
+  const supported = WHISPER_FORMATS.includes(ext);
+
+  // Path A: 지원 포맷 + 25MB 이하 — ASCII 파일명으로 재명명하여 직접 전송
+  // (한글/특수문자 파일명이 OpenAI multipart 파서의 확장자 추출을 실패시켜 "Invalid file format" 400이 나는 이슈 방어)
+  if (supported && file.size <= WHISPER_LIMIT) {
+    const safeName = 'audio.' + ext;
+    log('직접 전송 경로 (원본 ' + (file.size / 1024 / 1024).toFixed(1) + 'MB → ' + safeName + ')');
+    try {
+      const r = await whisperCall(file, apiKey, safeName);
+      return {
+        text: (r.text || '').trim(),
+        duration: r.duration || null,
+        chunks: 1,
+        path: 'direct',
+        segments: extractSegments(r, 0),
+      };
+    } catch (e) {
+      if (/Invalid file format/i.test(e.message) || /Unsupported file/i.test(e.message)) {
+        log('Whisper가 포맷 거부 — WAV 재인코딩 경로로 재시도합니다');
+        // Path B/C로 폴백
+      } else {
+        throw e;
+      }
+    }
+  } else if (!supported) {
+    log('Whisper 미지원 확장자 "' + (ext || '없음') + '" — WAV로 재인코딩합니다');
   }
 
   // Path B/C: 디코딩 + 재샘플링 필요
-  log('25MB 초과 — 오디오 디코딩 중 (시간이 걸릴 수 있음)...');
+  log('오디오 디코딩 중 (시간이 걸릴 수 있음)...');
   const audioBuffer = await decodeAudioFile(file);
   const duration = audioBuffer.duration;
   log('디코딩 완료: ' + Math.round(duration) + '초, ' + audioBuffer.numberOfChannels + 'ch, ' + audioBuffer.sampleRate + 'Hz');
@@ -803,15 +850,15 @@ function parseSummaryJSON(text) {
    ═══════════════════════════════════════════ */
 async function runPipeline() {
   clearError();
-  if (!audioFile.files.length) return;
+  const files = Array.from(audioFile.files || []);
+  if (!files.length) return;
 
   const openaiKey = localStorage.getItem(KEY_OPENAI);
   const anthropicKey = localStorage.getItem(KEY_ANTHROPIC);
   if (!openaiKey) { showError('OpenAI API 키를 먼저 입력·저장하세요.'); return; }
   if (!anthropicKey) { showError('Anthropic API 키를 먼저 입력·저장하세요.'); return; }
 
-  const file = audioFile.files[0];
-  const title = document.getElementById('meetingTitle').value.trim() || file.name;
+  const baseTitle = document.getElementById('meetingTitle').value.trim();
   const dateStr = document.getElementById('meetingDate').value || new Date().toISOString().slice(0, 10);
   const model = document.getElementById('summaryModel').value;
   const meetingDate = new Date(dateStr + 'T00:00:00');
@@ -820,63 +867,97 @@ async function runPipeline() {
   showProgress(true);
   document.getElementById('resultPanel').style.display = 'none';
 
+  const counter = document.getElementById('fileCounter');
+  const processed = [];
+  let failCount = 0;
+
   try {
-    setStep(0);
-    log('파일 준비: ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + 'MB)');
+    for (let fi = 0; fi < files.length; fi++) {
+      const file = files[fi];
+      const prefix = files.length > 1 ? `[${fi+1}/${files.length}] ` : '';
+      const fileTitle = baseTitle
+        ? (files.length > 1 ? `${baseTitle} (${fi+1})` : baseTitle)
+        : (file.name.replace(/\.[^.]+$/, '') || `회의 ${fi+1}`);
 
-    setStep(1);
-    log('Whisper 전사 시작 (파일 크기에 따라 1~10분 소요)');
-    const tr = await transcribeAudio(file, openaiKey);
-    const transcript = (tr.text || '').trim();
-    if (!transcript) throw new Error('전사 결과가 비어 있습니다.');
-    const pathLabel = { direct: '직접', 're-encoded': '재인코딩', chunked: '청크' + tr.chunks + '개' }[tr.path] || tr.path;
-    log('전사 완료 [' + pathLabel + '] — ' + transcript.length + '자 / ' + (tr.duration ? Math.round(tr.duration) + '초' : '?') + ' / ' + (tr.segments || []).length + ' segments');
+      if (files.length > 1) {
+        counter.style.display = 'block';
+        counter.textContent = `📂 파일 ${fi+1}/${files.length}: ${file.name}`;
+      } else {
+        counter.style.display = 'none';
+      }
 
-    setStep(2);
-    // diarize + summarize 병렬 실행 — 두 호출은 서로 독립
-    log('발화자 분리 & 요약 생성 중 (' + model + ')...');
-    const [dialogue, sum] = await Promise.all([
-      diarizeSegments(tr.segments || [], title, anthropicKey, model)
-        .catch(err => { log('발화자 분리 실패: ' + (err.message || err) + ' — 원본 segment로 폴백'); return (tr.segments || []).map(s => ({ speaker: '화자?', text: s.text, start: s.start, end: s.end })); }),
-      summarizeWithClaude(transcript, title, anthropicKey, model),
-    ]);
-    log('발화자 분리 완료 — ' + dialogue.length + '개 turn');
-    log('요약 완료 — 결정 ' + (sum.parsed.key_decisions || []).length + '건, 액션 ' + (sum.parsed.action_items || []).length + '건');
+      try {
+        setStep(0);
+        log(prefix + '파일 준비: ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + 'MB)');
 
-    setStep(3);
-    const now = new Date();
-    const id = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-    const record = {
-      id: id,
-      title: title,
-      audio_filename: file.name,
-      audio_size: file.size,
-      duration: tr.duration || null,
-      meeting_date: dateStr,
-      week: getISOWeek(meetingDate),
-      transcript: transcript,
-      dialogue: dialogue,
-      summary: sum.parsed.summary || '',
-      key_decisions: sum.parsed.key_decisions || [],
-      action_items: sum.parsed.action_items || [],
-      topics: sum.parsed.topics || [],
-      model: model,
-      created_at: now.toISOString(),
-    };
-    await dbPut(record);
-    log('저장 완료 (id: ' + id + ')');
+        setStep(1);
+        log(prefix + 'Whisper 전사 시작 (파일 크기/포맷에 따라 시간 소요)');
+        const tr = await transcribeAudio(file, openaiKey);
+        const transcript = (tr.text || '').trim();
+        if (!transcript) throw new Error('전사 결과가 비어 있습니다.');
+        const pathLabel = { direct: '직접', 're-encoded': '재인코딩', chunked: '청크' + tr.chunks + '개' }[tr.path] || tr.path;
+        log(prefix + '전사 완료 [' + pathLabel + '] — ' + transcript.length + '자 / ' + (tr.duration ? Math.round(tr.duration) + '초' : '?') + ' / ' + (tr.segments || []).length + ' segments');
 
-    setStep(4);
-    renderResult(record);
-    document.getElementById('resultPanel').style.display = 'block';
-    audioFile.value = '';
-    fileInfo.style.display = 'none';
-    document.getElementById('meetingTitle').value = '';
+        setStep(2);
+        log(prefix + '발화자 분리 & 요약 생성 중 (' + model + ')...');
+        const [dialogue, sum] = await Promise.all([
+          diarizeSegments(tr.segments || [], fileTitle, anthropicKey, model)
+            .catch(err => { log(prefix + '발화자 분리 실패: ' + (err.message || err) + ' — 원본 segment로 폴백'); return (tr.segments || []).map(s => ({ speaker: '화자?', text: s.text, start: s.start, end: s.end })); }),
+          summarizeWithClaude(transcript, fileTitle, anthropicKey, model),
+        ]);
+        log(prefix + '발화자 분리 ' + dialogue.length + '개 turn / 결정 ' + (sum.parsed.key_decisions || []).length + '건, 액션 ' + (sum.parsed.action_items || []).length + '건');
+
+        setStep(3);
+        const now = new Date();
+        const baseId = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+        const id = files.length > 1 ? `${baseId}-${String(fi).padStart(2, '0')}` : baseId;
+        const record = {
+          id: id,
+          title: fileTitle,
+          audio_filename: file.name,
+          audio_size: file.size,
+          duration: tr.duration || null,
+          meeting_date: dateStr,
+          week: getISOWeek(meetingDate),
+          transcript: transcript,
+          dialogue: dialogue,
+          summary: sum.parsed.summary || '',
+          key_decisions: sum.parsed.key_decisions || [],
+          action_items: sum.parsed.action_items || [],
+          topics: sum.parsed.topics || [],
+          model: model,
+          created_at: now.toISOString(),
+        };
+        await dbPut(record);
+        processed.push(record);
+        log(prefix + '저장 완료 (id: ' + id + ')');
+        setStep(4);
+      } catch (e) {
+        failCount++;
+        log(prefix + '❌ 실패: ' + (e.message || e));
+      }
+    }
+
+    if (processed.length > 0) {
+      renderResult(processed[processed.length - 1]);
+      if (files.length > 1) {
+        const banner = document.createElement('div');
+        banner.className = failCount > 0 ? 'alert alert-warn' : 'alert alert-ok';
+        banner.style.marginBottom = '12px';
+        banner.textContent = `${failCount > 0 ? '⚠️' : '✅'} ${processed.length}개 파일 처리 완료${failCount > 0 ? ` · ${failCount}개 실패` : ''} · 아래는 마지막 파일 결과 (전체는 우측 히스토리)`;
+        const content = document.getElementById('resultContent');
+        content.insertBefore(banner, content.firstChild);
+      }
+      document.getElementById('resultPanel').style.display = 'block';
+      audioFile.value = '';
+      fileInfo.style.display = 'none';
+      document.getElementById('meetingTitle').value = '';
+    } else if (failCount > 0) {
+      showError(`모든 파일(${failCount}개) 처리 실패 — 로그에서 세부 원인을 확인하세요.`);
+    }
     loadHistory();
-  } catch (e) {
-    showError(e.message || String(e));
-    log('오류: ' + (e.message || e));
   } finally {
+    counter.style.display = 'none';
     runBtn.disabled = false;
     setTimeout(() => showProgress(false), 1200);
   }
