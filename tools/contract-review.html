@@ -549,6 +549,9 @@ async function runAnalysis(){
           continue;
         }
         postProcessResult(result);
+        // 보정 후 핵심 판정 결과를 디버그 로그에 추가 (raw AI 응답과 구분)
+        const _et=result.contract_analysis?.employment_type;
+        if(_et) debugLogs[debugLogs.length-1]+=`\n\n[보정 후] employment_type: "${_et.result}" | ${(_et.evidence||'').slice(-120)}`;
         allResults.push({targetName:name,result:result});
       }catch(e){
         allResults.push({targetName:name,error:e.message});
@@ -1029,7 +1032,7 @@ function renderEmploymentType(et){
     <div class="row"><span class="lbl">판정 결과</span><span class="val">${esc(label)}</span></div>
     ${et.contract_period?`<div class="row"><span class="lbl">계약기간</span><span class="val">${esc(et.contract_period)}</span></div>`:''}
     <div class="row"><span class="lbl">근거 문구</span><span class="val">${esc(et.evidence||'-')}</span></div>
-    ${et.result!=='정규직'?'<div style="margin-top:8px;padding:10px;background:var(--err-bg,#fef2f2);border-radius:6px;font-size:12px;color:var(--err-text,#991b1b);font-weight:600">⚠️ 청년일자리도약장려금은 정규직 채용이 필수 요건입니다. 기간제 계약인 경우 지원 부적격입니다.</div>':''}
+    ${et.result==='기간제'?'<div style="margin-top:8px;padding:10px;background:var(--err-bg,#fef2f2);border-radius:6px;font-size:12px;color:var(--err-text,#991b1b);font-weight:600">⚠️ 기간제 계약 — 청년일자리도약장려금 지원 부적격입니다.</div>':et.result==='정규직_추정'?'<div style="margin-top:8px;padding:10px;background:#fefce8;border-radius:6px;font-size:12px;color:#854d0e;font-weight:600">⚠️ 계약형태를 정규직으로 추정하나 확인이 필요합니다. 계약서 원본을 직접 확인하세요.</div>':et.result==='판단불가'?'<div style="margin-top:8px;padding:10px;background:#fefce8;border-radius:6px;font-size:12px;color:#854d0e;font-weight:600">⚠️ 계약형태를 판단할 수 없습니다. 계약서 원본을 직접 확인하세요.</div>':''}
   </div>`;
 }
 
@@ -1145,10 +1148,13 @@ function monthsBetween(startStr, endStr){
   return Math.max(0, months);
 }
 
-/** 날짜에 N개월 더하기 */
+/** 날짜에 N개월 더하기 (월말일 오버플로우 방지: 1월31일+1개월→2월28일) */
 function addMonths(dateStr, n){
   const d=new Date(dateStr);
+  const day=d.getDate();
+  d.setDate(1);
   d.setMonth(d.getMonth()+n);
+  d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));
   return d;
 }
 
