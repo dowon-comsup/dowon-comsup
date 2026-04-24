@@ -173,8 +173,37 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
         </div>
       </div>
 
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--ink-600);font-weight:600">
+          ⚙️ 회의 고급 설정 (정확도 향상용, 선택)
+        </summary>
+        <div style="padding:10px;background:var(--ink-50);border-radius:6px;margin-top:6px">
+          <div class="fld" style="margin-bottom:8px">
+            <label style="display:block;margin-bottom:4px;font-size:12px">참석자 (쉼표 구분, 직함 포함 권장)</label>
+            <input type="text" id="attendees" style="width:100%"
+                   placeholder="예: 임태주 대표, 김동우 주임, 박OO 노무사">
+          </div>
+          <div class="fld" style="margin-bottom:8px">
+            <label style="display:block;margin-bottom:4px;font-size:12px">회의 주제/맥락 (1줄)</label>
+            <input type="text" id="meetingContext" style="width:100%"
+                   placeholder="예: 26년 4월 3주차 기업지원팀 주간회의 - 신규 수임 건 배분">
+          </div>
+          <div class="fld">
+            <label style="display:block;margin-bottom:4px;font-size:12px">이번 회의에만 특별히 등장하는 용어·사업장명 (쉼표 구분)</label>
+            <input type="text" id="extraTerms" style="width:100%"
+                   placeholder="예: ㈜도원건설, 출산육아기 고용안정장려금, 찾아드림">
+          </div>
+        </div>
+      </details>
+
       <div class="row" style="margin-top:10px">
-        <label>요약 모델:</label>
+        <label>전사 모델:</label>
+        <select id="transcriptionModel">
+          <option value="whisper-1">Whisper-1 (안정)</option>
+          <option value="gpt-4o-mini-transcribe">GPT-4o-mini-transcribe (빠름·저렴)</option>
+          <option value="gpt-4o-transcribe">GPT-4o-transcribe (최고 정확도)</option>
+        </select>
+        <label style="margin-left:16px">요약 모델:</label>
         <select id="summaryModel">
           <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (권장)</option>
           <option value="claude-opus-4-5">Claude Opus 4.5 (고품질)</option>
@@ -374,6 +403,19 @@ const runBtn = document.getElementById('runBtn');
 
 document.getElementById('meetingDate').valueAsDate = new Date();
 
+// 고급 설정 localStorage 복원 + 자동 저장
+(function() {
+  const attendeesEl = document.getElementById('attendees');
+  const contextEl   = document.getElementById('meetingContext');
+  const termsEl     = document.getElementById('extraTerms');
+  attendeesEl.value = localStorage.getItem('dw_meeting_attendees') || '';
+  contextEl.value   = localStorage.getItem('dw_meeting_context_last') || '';
+  termsEl.value     = localStorage.getItem('dw_meeting_extra_terms_last') || '';
+  attendeesEl.addEventListener('change', () => localStorage.setItem('dw_meeting_attendees', attendeesEl.value));
+  contextEl.addEventListener('change',   () => localStorage.setItem('dw_meeting_context_last', contextEl.value));
+  termsEl.addEventListener('change',     () => localStorage.setItem('dw_meeting_extra_terms_last', termsEl.value));
+})();
+
 ['dragenter', 'dragover'].forEach(ev => {
   dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('drag'); });
 });
@@ -540,23 +582,48 @@ function chunkSamples(samples, sampleRate, chunkSeconds) {
   return chunks;
 }
 
-// 노무/고용지원금 도메인 용어 — Whisper가 고유명사·전문용어를 정확히 받아적도록 힌트로 주입
-const DOMAIN_PROMPT =
-  '노무법인 도원 회의. 주요 용어: 고용지원금, 고용유지지원금, 청년내일채움공제, ' +
-  '두루누리, 사회보험료, 4대보험, 국민연금, 건강보험, 고용보험, 산재보험, ' +
-  '근로계약서, 최저임금, 연차수당, 주휴수당, 퇴직금, 중간정산, 육아휴직, ' +
-  '근로기준법, 고용노동부, 근로복지공단, 건강보험공단, 국민연금공단, ' +
-  '4대보험 취득·상실, 이직확인서, 자격취득신고, 대리인, 사업주, 피보험자, ' +
-  '원청, 하도급, 건설업 환급, 직장복귀. 김동우 노무사, 임태주 대표.';
+// 고정 도메인 용어 (변경 빈도 낮음)
+const BASE_DOMAIN_TERMS = [
+  '노무법인 도원', '기업지원팀', '고용센터', '근로복지공단',
+  '고용지원금', '청년일자리도약장려금', '출산육아기 고용안정장려금',
+  '정규직 전환 지원금', '고령자 계속고용 장려금', '산재 직장복귀 지원금',
+  '고용보험법', '고용창출장려금', '고용안정장려금',
+  '4대보험', '국민연금', '건강보험', '고용보험', '산재보험',
+  '대리인 선임', '관리번호', '사업자등록번호', '피보험자',
+  '찾아드림', '고용24', '고산토탈', '근로내용확인신고서',
+];
 
-async function whisperCall(blob, apiKey, filename) {
+function buildWhisperPrompt(attendees, extraTerms, prevTailText) {
+  const parts = [];
+  // 참석자 이름 최우선 (앞쪽 토큰 영향력)
+  if (attendees) {
+    parts.push('참석자: ' + attendees + '.');
+  } else {
+    parts.push('참석자: 김동우 주임, 임태주 대표.');
+  }
+  // 이번 회의 한정 용어
+  if (extraTerms) parts.push('주요 용어: ' + extraTerms + '.');
+  // 고정 도메인 용어
+  parts.push('도메인: ' + BASE_DOMAIN_TERMS.join(', ') + '.');
+  // 이전 청크 말미 (청크 경계 문맥 유지, 최대 200자)
+  if (prevTailText) {
+    parts.push('앞선 발화 말미: ' + prevTailText.slice(-200));
+  }
+  // Whisper prompt ≒ 224 tokens → 한국어 약 380자 이내로 절단
+  return parts.join(' ').slice(0, 380);
+}
+
+async function whisperCall(blob, apiKey, filename, promptText) {
+  const transcModel = (document.getElementById('transcriptionModel') || {}).value || 'whisper-1';
+  const isGPT4o = transcModel === 'gpt-4o-transcribe' || transcModel === 'gpt-4o-mini-transcribe';
   const fd = new FormData();
   fd.append('file', blob, filename || 'audio.wav');
-  fd.append('model', 'whisper-1');
+  fd.append('model', transcModel);
   fd.append('language', 'ko');
-  fd.append('response_format', 'verbose_json');
-  fd.append('prompt', DOMAIN_PROMPT);
-  fd.append('temperature', '0');
+  fd.append('response_format', isGPT4o ? 'json' : 'verbose_json');
+  const pText = promptText !== undefined ? promptText : buildWhisperPrompt('', '');
+  fd.append('prompt', pText);
+  if (!isGPT4o) fd.append('temperature', '0.2');
 
   const resp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
@@ -591,7 +658,11 @@ function extractSegments(resp, timeOffset) {
   })).filter(s => s.text);
 }
 
-async function transcribeAudio(file, apiKey) {
+async function transcribeAudio(file, apiKey, meta) {
+  const attendees  = (meta && meta.attendees)  || '';
+  const extraTerms = (meta && meta.extraTerms) || '';
+  const defaultPrompt = buildWhisperPrompt(attendees, extraTerms, '');
+
   const ext = getFileExt(file.name);
   const supported = WHISPER_FORMATS.includes(ext);
 
@@ -601,7 +672,7 @@ async function transcribeAudio(file, apiKey) {
     const safeName = 'audio.' + ext;
     log('직접 전송 경로 (원본 ' + (file.size / 1024 / 1024).toFixed(1) + 'MB → ' + safeName + ')');
     try {
-      const r = await whisperCall(file, apiKey, safeName);
+      const r = await whisperCall(file, apiKey, safeName, defaultPrompt);
       return {
         text: (r.text || '').trim(),
         duration: r.duration || null,
@@ -636,7 +707,7 @@ async function transcribeAudio(file, apiKey) {
   if (estBytes <= SAFE_LIMIT) {
     log('단일 WAV 전송 경로');
     const wav = encodeWAV(samples, TARGET_SR);
-    const r = await whisperCall(wav, apiKey, 'audio.wav');
+    const r = await whisperCall(wav, apiKey, 'audio.wav', defaultPrompt);
     return {
       text: (r.text || '').trim(),
       duration: r.duration || duration,
@@ -646,18 +717,22 @@ async function transcribeAudio(file, apiKey) {
     };
   }
 
-  // Path C: 청크 분할 — 각 청크 segment 타임스탬프를 전체 기준으로 오프셋
+  // Path C: 청크 분할 — 이전 청크 말미를 다음 prompt에 주입, 타임스탬프 오프셋 적용
   const chunks = chunkSamples(samples, TARGET_SR, CHUNK_SEC);
   log('청크 ' + chunks.length + '개 (각 ' + (CHUNK_SEC / 60) + '분) 분할 전사 시작');
   const parts = [];
   const allSegments = [];
+  let prevTail = '';
   for (let i = 0; i < chunks.length; i++) {
+    const dynamicPrompt = buildWhisperPrompt(attendees, extraTerms, prevTail);
     log('청크 ' + (i + 1) + '/' + chunks.length + ' 전사 중...');
     const wav = encodeWAV(chunks[i], TARGET_SR);
-    const r = await whisperCall(wav, apiKey, 'chunk_' + (i + 1) + '.wav');
-    parts.push((r.text || '').trim());
+    const r = await whisperCall(wav, apiKey, 'chunk_' + (i + 1) + '.wav', dynamicPrompt);
+    const chunkText = (r.text || '').trim();
+    parts.push(chunkText);
     allSegments.push(...extractSegments(r, i * CHUNK_SEC));
-    log('청크 ' + (i + 1) + '/' + chunks.length + ' 완료 (' + (r.text || '').trim().length + '자)');
+    prevTail = chunkText;
+    log('청크 ' + (i + 1) + '/' + chunks.length + ' 완료 (' + chunkText.length + '자)');
   }
   return {
     text: parts.filter(x => x).join('\n\n'),
@@ -671,24 +746,40 @@ async function transcribeAudio(file, apiKey) {
 /* ═══════════════════════════════════════════
    Claude summarization
    ═══════════════════════════════════════════ */
-async function summarizeWithClaude(transcript, title, apiKey, model) {
-  const titleLine = title ? `회의 제목: ${title}\n\n` : '';
-  const prompt = `${titleLine}아래는 회의 녹음을 Whisper로 전사한 원문입니다. 한국어로 다음 형식의 JSON만 출력하세요.
+async function summarizeWithClaude(transcript, title, apiKey, model, attendees, meetingContext) {
+  const metaBlock = [
+    title          ? `회의 제목: ${title}`      : '',
+    meetingContext ? `회의 맥락: ${meetingContext}` : '',
+    attendees      ? `참석자: ${attendees}`     : '',
+  ].filter(Boolean).join('\n');
+
+  const prompt = `${metaBlock ? metaBlock + '\n\n' : ''}아래는 노무법인 도원 기업지원팀의 회의 녹음 전사 원문입니다.
+기업지원팀은 고용지원금 대리인 업무(신청·수령 대행)와 4대보험 환급 검토를 수행합니다.
+회의에는 통상 사업장별 진행상황, 지원금 검토 결과, 대리인 선임/갱신, 자료 요청, 업무 분장이 등장합니다.
+
+아래 JSON 스키마로만 출력하세요. JSON 외 텍스트, 마크다운 코드펜스 모두 금지.
 
 {
-  "summary": "회의 전체 내용을 7~12문장으로 정리한 요약",
-  "key_decisions": ["결정된 사항 1", "결정된 사항 2"],
-  "action_items": [
-    {"task": "해야 할 일", "owner": "담당자(명시된 경우, 없으면 '미지정')", "due": "기한(명시된 경우, 없으면 '미정')"}
+  "summary": "회의의 핵심 맥락을 5~8문장으로. 무엇을 위해 모였고, 어떤 결론으로 마무리됐는지. 참석자 이름은 직함과 함께 사용.",
+  "topics": ["논의 주제 1 (구체적으로)", "논의 주제 2"],
+  "sites_discussed": [
+    {"site": "사업장명 또는 '일반논의'", "points": ["논의된 사항1", "논의된 사항2"]}
   ],
-  "topics": ["논의 주제 1", "논의 주제 2"]
+  "key_decisions": ["결정된 사항을 '누가/무엇을/언제까지' 형태로 명확하게"],
+  "action_items": [
+    {"task": "해야 할 일 (동사로 끝나게 — ~하기)", "owner": "담당자 이름(명시된 경우), 없으면 '미지정'", "due": "YYYY-MM-DD 또는 '이번 주', '다음 회의 전' 등, 없으면 '미정'"}
+  ],
+  "open_questions": ["결론이 안 난 채 남은 쟁점 (없으면 빈 배열)"],
+  "terminology_notes": ["전사에서 잘못 받아적혔을 가능성이 있는 용어·이름 (있으면, 없으면 빈 배열)"]
 }
 
-규칙:
-- JSON 외의 텍스트는 절대 출력하지 말 것
-- 전사 원문에 없는 사실은 추가하지 말 것
-- action_items의 담당자/기한은 원문에 명시된 경우에만 채우고, 없으면 '미지정'/'미정'으로 표기
-- 회의 진행과 무관한 잡담은 요약에서 제외
+작성 원칙:
+1. 원문에 없는 사실·인물·금액은 절대 추가하지 마세요.
+2. 참석자 이름이 메타정보로 주어졌다면 전사의 오타를 교정해 정확한 이름을 쓰세요.
+3. "sites_discussed"는 특정 회사 이름이 언급된 논의를 묶는 것. 회사명이 없는 일반 논의는 "일반논의"로.
+4. action_items의 task는 "~하기"로 통일.
+5. 잡담·인사·음성 잡음은 요약에서 제외.
+6. 전사에 명백한 오인식이 보이면 terminology_notes에 기록.
 
 전사 원문:
 ---
@@ -705,7 +796,7 @@ ${transcript}
     },
     body: JSON.stringify({
       model: model,
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -735,32 +826,42 @@ function fmtSecMMSS(sec) {
   return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 }
 
-async function diarizeSegments(segments, title, apiKey, model) {
+async function diarizeSegments(segments, title, apiKey, model, attendees) {
   if (!segments || !segments.length) return [];
 
   const numbered = segments.map((s, i) =>
     `[${i}] (${fmtSecMMSS(s.start)}~${fmtSecMMSS(s.end)}) ${s.text}`
   ).join('\n');
-  const titleLine = title ? `회의 제목: ${title}\n\n` : '';
-  const prompt = `${titleLine}아래는 한국어 회의 녹음을 Whisper로 전사한 segment 목록입니다. 각 줄은 \`[번호] (시작~끝) 문장\` 형식입니다.
 
-연속된 segment들을 같은 발화자끼리 묶어 발화 단위(turn)로 재구성하세요. 화자 구분 기준:
-- 말투/어미 변화 (존댓말↔반말, 질문↔답변)
-- 호칭·자기소개 ("노무사님", "대표님", "제가..." 등)
-- 주제 전환 지점
-- 원문에 이름이 명시되면 그 이름을 speaker로 사용, 그렇지 않으면 "화자1", "화자2"… 순으로 부여
+  const attendeeList = (attendees || '').split(',').map(s => s.trim()).filter(Boolean);
+  const attendeeBlock = attendeeList.length
+    ? `\n참석자(최대 화자 수 = ${attendeeList.length}명):\n${attendeeList.map(n => '- ' + n).join('\n')}\n`
+    : '\n참석자 정보 없음 — "화자1", "화자2"… 순으로 부여\n';
 
-출력은 JSON 배열만. 다른 텍스트 금지:
-[
-  {"speaker": "화자1", "text": "합쳐진 발화 내용", "start": 0.0, "end": 4.2, "segment_ids": [0, 1]},
-  ...
-]
+  const titleLine = title ? `회의 제목: ${title}\n` : '';
+  const prompt = `${titleLine}${attendeeBlock}
+아래는 한국어 회의 녹음을 Whisper로 전사한 segment 목록입니다. 각 줄은 \`[번호] (시작~끝) 문장\` 형식.
+
+연속된 segment를 같은 화자끼리 묶어 발화 단위(turn)로 재구성하세요.
+
+화자 식별 기준 (우선순위):
+1. 내용에서 자기소개·호칭·지시 관계가 드러나는 경우 → 해당 참석자 이름으로 귀속
+   - "대표님이…" 라고 부르면 발화자는 대표가 아님
+2. 말투·어미 변화 (존댓말↔반말, 질문↔답변)
+3. 주제 전환과 응답 관계
 
 규칙:
-- 전사 원문에 없는 단어를 만들지 말 것 (오타는 자연스럽게 교정 가능하나 내용 추가 금지)
-- 같은 화자의 짧은 추임새("네", "아", "맞아요")는 바로 앞/뒤 발화에 병합
-- start는 묶인 첫 segment의 시작, end는 마지막 segment의 끝
-- segment_ids는 병합한 원본 segment 인덱스 목록
+- 참석자 목록이 주어졌다면 화자는 ${attendeeList.length || '미상'}명 이하여야 함. 초과 금지.
+- 확실치 않으면 "화자?"로 남겨두고 추정하지 말 것.
+- 짧은 추임새("네", "아", "맞아요")는 앞/뒤 발화에 병합.
+- 전사에 없는 단어 추가 금지. 명백한 오타만 자연스럽게 교정.
+- start = 묶인 첫 segment의 start, end = 마지막 segment의 end.
+
+출력은 JSON 배열만 (마크다운 금지):
+[
+  {"speaker": "임태주 대표", "text": "...", "start": 0.0, "end": 4.2, "segment_ids": [0, 1]},
+  ...
+]
 
 Segment 목록:
 ---
@@ -777,7 +878,7 @@ ${numbered}
     },
     body: JSON.stringify({
       model: model,
-      max_tokens: 8192,
+      max_tokens: 16384,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -842,7 +943,7 @@ function parseSummaryJSON(text) {
   if (s >= 0 && eIdx > s) {
     try { return JSON.parse(t.substring(s, eIdx + 1)); } catch(e) {}
   }
-  return { summary: text, key_decisions: [], action_items: [], topics: [] };
+  return { summary: text, key_decisions: [], action_items: [], topics: [], sites_discussed: [], open_questions: [], terminology_notes: [] };
 }
 
 /* ═══════════════════════════════════════════
@@ -858,10 +959,15 @@ async function runPipeline() {
   if (!openaiKey) { showError('OpenAI API 키를 먼저 입력·저장하세요.'); return; }
   if (!anthropicKey) { showError('Anthropic API 키를 먼저 입력·저장하세요.'); return; }
 
-  const baseTitle = document.getElementById('meetingTitle').value.trim();
-  const dateStr = document.getElementById('meetingDate').value || new Date().toISOString().slice(0, 10);
-  const model = document.getElementById('summaryModel').value;
-  const meetingDate = new Date(dateStr + 'T00:00:00');
+  const baseTitle      = document.getElementById('meetingTitle').value.trim();
+  const dateStr        = document.getElementById('meetingDate').value || new Date().toISOString().slice(0, 10);
+  const model          = document.getElementById('summaryModel').value;
+  const transcModel    = document.getElementById('transcriptionModel').value;
+  const attendees      = document.getElementById('attendees').value.trim();
+  const meetingContext = document.getElementById('meetingContext').value.trim();
+  const extraTerms     = document.getElementById('extraTerms').value.trim();
+  const isGPT4oModel   = transcModel === 'gpt-4o-transcribe' || transcModel === 'gpt-4o-mini-transcribe';
+  const meetingDate    = new Date(dateStr + 'T00:00:00');
 
   runBtn.disabled = true;
   showProgress(true);
@@ -892,7 +998,7 @@ async function runPipeline() {
 
         setStep(1);
         log(prefix + 'Whisper 전사 시작 (파일 크기/포맷에 따라 시간 소요)');
-        const tr = await transcribeAudio(file, openaiKey);
+        const tr = await transcribeAudio(file, openaiKey, { attendees, extraTerms });
         const transcript = (tr.text || '').trim();
         if (!transcript) throw new Error('전사 결과가 비어 있습니다.');
         const pathLabel = { direct: '직접', 're-encoded': '재인코딩', chunked: '청크' + tr.chunks + '개' }[tr.path] || tr.path;
@@ -900,10 +1006,14 @@ async function runPipeline() {
 
         setStep(2);
         log(prefix + '발화자 분리 & 요약 생성 중 (' + model + ')...');
+        const hasSegments = (tr.segments || []).length > 0;
         const [dialogue, sum] = await Promise.all([
-          diarizeSegments(tr.segments || [], fileTitle, anthropicKey, model)
-            .catch(err => { log(prefix + '발화자 분리 실패: ' + (err.message || err) + ' — 원본 segment로 폴백'); return (tr.segments || []).map(s => ({ speaker: '화자?', text: s.text, start: s.start, end: s.end })); }),
-          summarizeWithClaude(transcript, fileTitle, anthropicKey, model),
+          (hasSegments
+            ? diarizeSegments(tr.segments, fileTitle, anthropicKey, model, attendees)
+                .catch(err => { log(prefix + '발화자 분리 실패: ' + (err.message || err) + ' — 원본 segment로 폴백'); return tr.segments.map(s => ({ speaker: '화자?', text: s.text, start: s.start, end: s.end })); })
+            : Promise.resolve([])
+          ),
+          summarizeWithClaude(transcript, fileTitle, anthropicKey, model, attendees, meetingContext),
         ]);
         log(prefix + '발화자 분리 ' + dialogue.length + '개 turn / 결정 ' + (sum.parsed.key_decisions || []).length + '건, 액션 ' + (sum.parsed.action_items || []).length + '건');
 
@@ -925,6 +1035,12 @@ async function runPipeline() {
           key_decisions: sum.parsed.key_decisions || [],
           action_items: sum.parsed.action_items || [],
           topics: sum.parsed.topics || [],
+          sites_discussed: sum.parsed.sites_discussed || [],
+          open_questions: sum.parsed.open_questions || [],
+          terminology_notes: sum.parsed.terminology_notes || [],
+          attendees: attendees,
+          meeting_context: meetingContext,
+          transcription_model: transcModel,
           model: model,
           created_at: now.toISOString(),
         };
@@ -977,11 +1093,40 @@ function renderResult(m) {
 }
 
 function renderSummaryBlock(m) {
+  const sitesBlock = (m.sites_discussed && m.sites_discussed.length)
+    ? `<div class="section"><h4>🏢 사업장별 논의</h4>
+        ${m.sites_discussed.map(s => `
+          <div style="margin-bottom:8px;padding:8px;background:var(--ink-50);border-radius:4px">
+            <div style="font-weight:700;color:var(--ink-900);font-size:13px;margin-bottom:4px">${escHtml(s.site || '일반논의')}</div>
+            <ul style="margin:0;padding-left:20px">
+              ${(s.points || []).map(p => `<li>${escHtml(p)}</li>`).join('')}
+            </ul>
+          </div>
+        `).join('')}
+       </div>`
+    : '';
+
+  const openQBlock = (m.open_questions && m.open_questions.length)
+    ? `<div class="section"><h4>❓ 미결 쟁점</h4>
+        <ul>${m.open_questions.map(q => `<li>${escHtml(q)}</li>`).join('')}</ul>
+       </div>`
+    : '';
+
+  const termBlock = (m.terminology_notes && m.terminology_notes.length)
+    ? `<div class="section" style="background:#fffbeb;padding:8px;border-radius:4px;border-left:3px solid #f59e0b">
+        <h4 style="color:#92400e">⚠ 전사 오인식 가능 항목</h4>
+        <ul>${m.terminology_notes.map(t => `<li>${escHtml(t)}</li>`).join('')}</ul>
+       </div>`
+    : '';
+
   return `
     <div class="summary-box">${escHtml(m.summary || '(요약 없음)')}</div>
+    ${renderList('🗂 논의 주제', m.topics)}
+    ${sitesBlock}
     ${renderList('📌 주요 결정사항', m.key_decisions)}
     ${renderActions(m.action_items)}
-    ${renderList('🗂 논의 주제', m.topics)}
+    ${openQBlock}
+    ${termBlock}
   `;
 }
 
@@ -1090,6 +1235,15 @@ async function openDetail(id) {
   document.getElementById('summaryPane').innerHTML = renderSummaryBlock(m);
   renderDialogue(m.dialogue);
   document.getElementById('transcriptBox').textContent = m.transcript || '(전사 없음)';
+  // gpt-4o-transcribe는 segment 없으므로 발화자별 탭 비활성화
+  const noDialogue = !m.dialogue || !m.dialogue.length;
+  const isGPT4oRec = m.transcription_model === 'gpt-4o-transcribe' || m.transcription_model === 'gpt-4o-mini-transcribe';
+  document.querySelectorAll('.tab').forEach(t => {
+    const isDialogueTab = t.dataset.pane === 'dialoguePane';
+    t.disabled = isDialogueTab && (noDialogue || isGPT4oRec);
+    t.style.opacity = (isDialogueTab && (noDialogue || isGPT4oRec)) ? '0.4' : '';
+    t.title = (isDialogueTab && isGPT4oRec) ? 'GPT-4o-transcribe 모드에서는 화자 분리를 지원하지 않습니다.' : '';
+  });
   document.getElementById('detailModal').classList.add('on');
   // reset tab
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.pane === 'summaryPane'));
@@ -1157,12 +1311,30 @@ async function downloadTranscript() {
   const dialogueBlock = (m.dialogue && m.dialogue.length)
     ? `=== 발화자별 대화 ===\n${m.dialogue.map(t => `[${t.speaker || '화자?'}] (${fmtSecMMSS(t.start)}~${fmtSecMMSS(t.end)})\n${t.text || ''}`).join('\n\n')}\n\n`
     : '';
+  const sitesBlock = (m.sites_discussed && m.sites_discussed.length)
+    ? '=== 사업장별 논의 ===\n' + m.sites_discussed.map(s =>
+        '[' + (s.site || '일반논의') + ']\n' + (s.points || []).map((p, i) => (i + 1) + '. ' + p).join('\n')
+      ).join('\n\n') + '\n\n'
+    : '';
+  const openQBlock = (m.open_questions && m.open_questions.length)
+    ? '=== 미결 쟁점 ===\n' + m.open_questions.map((q, i) => (i + 1) + '. ' + q).join('\n') + '\n\n'
+    : '';
+  const termBlock = (m.terminology_notes && m.terminology_notes.length)
+    ? '=== 전사 오인식 가능 항목 ===\n' + m.terminology_notes.map((t, i) => (i + 1) + '. ' + t).join('\n') + '\n\n'
+    : '';
+
   const text =
     `[회의록] ${m.title}\n날짜: ${m.meeting_date} (${m.week})\n` +
     (m.duration ? `길이: ${Math.round(m.duration / 60)}분\n` : '') +
+    (m.attendees ? `참석자: ${m.attendees}\n` : '') +
+    (m.meeting_context ? `맥락: ${m.meeting_context}\n` : '') +
     `\n=== 요약 ===\n${m.summary || ''}\n\n` +
+    (m.topics && m.topics.length ? `=== 논의 주제 ===\n${m.topics.map((x, i) => (i + 1) + '. ' + x).join('\n')}\n\n` : '') +
+    sitesBlock +
     (m.key_decisions && m.key_decisions.length ? `=== 주요 결정사항 ===\n${m.key_decisions.map((x, i) => (i + 1) + '. ' + x).join('\n')}\n\n` : '') +
     (m.action_items && m.action_items.length ? `=== 액션 아이템 ===\n${m.action_items.map((a, i) => (i + 1) + '. ' + a.task + ' (담당: ' + (a.owner || '미지정') + ', 기한: ' + (a.due || '미정') + ')').join('\n')}\n\n` : '') +
+    openQBlock +
+    termBlock +
     dialogueBlock +
     `=== 전사 원문 ===\n${m.transcript || ''}`;
 
