@@ -180,8 +180,11 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
         <div style="padding:10px;background:var(--ink-50);border-radius:6px;margin-top:6px">
           <div class="fld" style="margin-bottom:8px">
             <label style="display:block;margin-bottom:4px;font-size:12px">참석자 (쉼표 구분, 직함 포함 권장)</label>
-            <input type="text" id="attendees" style="width:100%"
-                   placeholder="예: 임태주 대표, 김동우 주임, 박OO 노무사">
+            <div style="display:flex;gap:6px;align-items:stretch">
+              <input type="text" id="attendees" style="flex:1;min-width:0"
+                     placeholder="예: 임태주 대표, 김동우 주임, 박OO 노무사">
+              <button type="button" class="ghost" onclick="fillTeamAttendees()" title="기업지원팀 회의 디폴트 참석자 10명 자동 입력">기업지원팀</button>
+            </div>
           </div>
           <div class="fld" style="margin-bottom:8px">
             <label style="display:block;margin-bottom:4px;font-size:12px">회의 주제/맥락 (1줄)</label>
@@ -274,6 +277,7 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
       <div class="dialogue-box" id="dialogueBox"></div>
       <div class="row" style="margin-top:8px">
         <button class="sec" onclick="copyDialogue()">📋 발화자 대화 복사</button>
+        <button class="sec" onclick="rediarize()" title="기존 turn을 도원 명단으로 재매칭 (이미 병합된 segment는 그대로 사용)">🔁 발화자 매칭 재실행</button>
       </div>
     </div>
     <div id="transcriptPane" class="tabpane">
@@ -595,6 +599,29 @@ const BASE_DOMAIN_TERMS = [
   '찾아드림', '고용24', '고산토탈', '근로내용확인신고서',
 ];
 
+// 도원 마스터 명단 (회의 중 언급 인식용 — 화자 cap에는 포함 안 됨)
+// 노션 "도원 마스터" DB / dowonhr.com user 디렉토리 기준 빌드타임 추출 (2026-05-11)
+const DOWON_ROSTER = [
+  '김은혜','길경찬','조하늘','정보람','손지영','곽대영','김우석','박유경','전준수','함지우',
+  '김수빈','최린','최민','박정현','박형숙','김동우','임창우','권용식','박정수','김반듸',
+  '김상명','이성미','김지연','이승은','전은미','박진우','이법성','박현지','황지나','박진아',
+  '이선욱','윤상필','박승현','김종원','이진우','김정임','김태형','유희상','강민지','조소윤',
+  '박혜기','박형규','권은비','여명재','김도형','장은채','강잔디','신민규','유슬아','이새봄',
+  '성기태','조아현','최도진','박혜빈',
+];
+
+// 기업지원팀 회의 디폴트 참석자 (직책 포함)
+const TEAM_BIZSUPPORT = [
+  '전준수 팀장', '함지우 프로(파트장)', '김우석 프로(파트장)', '곽대영 프로',
+  '길경찬 프로', '정보람 프로', '손지영 프로',
+  '박유경 스탭', '조하늘 스탭', '김동우 스탭',
+];
+
+function fillTeamAttendees() {
+  document.getElementById('attendees').value = TEAM_BIZSUPPORT.join(', ');
+  log('기업지원팀 참석자 자동 입력 (' + TEAM_BIZSUPPORT.length + '명)');
+}
+
 function buildWhisperPrompt(attendees, extraTerms, prevTailText) {
   const parts = [];
   // 참석자 이름 최우선 (앞쪽 토큰 영향력)
@@ -852,8 +879,16 @@ async function diarizeSegments(segments, title, apiKey, model, attendees) {
     ? `\n참석자(최대 화자 수 = ${attendeeList.length}명):\n${attendeeList.map(n => '- ' + n).join('\n')}\n`
     : '\n참석자 정보 없음 — "화자1", "화자2"… 순으로 부여\n';
 
+  // 도원 직원 전체 명단 (회의 중 "○○님이 그러시는데…" 등으로 언급될 수 있는 인물 — 화자 cap에는 포함 X)
+  // 참석자에 이미 들어간 이름은 중복 제거 (성씨만 일치하는 경우는 그대로 둠)
+  const attendeeNameSet = new Set(attendeeList.map(a => a.replace(/\s*\(.*?\)/g, '').split(/\s+/)[0]));
+  const rosterOnly = (typeof DOWON_ROSTER !== 'undefined' ? DOWON_ROSTER : []).filter(n => !attendeeNameSet.has(n));
+  const rosterBlock = rosterOnly.length
+    ? `\n도원 직원 명단(회의 중 언급될 수 있는 인물 — 화자 cap에 포함 X):\n${rosterOnly.join(', ')}\n`
+    : '';
+
   const titleLine = title ? `회의 제목: ${title}\n` : '';
-  const prompt = `${titleLine}${attendeeBlock}
+  const prompt = `${titleLine}${attendeeBlock}${rosterBlock}
 아래는 한국어 회의 녹음을 Whisper로 전사한 segment 목록입니다. 각 줄은 \`[번호] (시작~끝) 문장\` 형식.
 
 연속된 segment를 같은 화자끼리 묶어 발화 단위(turn)로 재구성하세요.
@@ -861,11 +896,14 @@ async function diarizeSegments(segments, title, apiKey, model, attendees) {
 화자 식별 기준 (우선순위):
 1. 내용에서 자기소개·호칭·지시 관계가 드러나는 경우 → 해당 참석자 이름으로 귀속
    - "대표님이…" 라고 부르면 발화자는 대표가 아님
+   - "○○ 프로/스탭/팀장이 그러시는데" 라고 인용하면 인용된 사람은 발화자 아님 (현장 미참석 가능)
 2. 말투·어미 변화 (존댓말↔반말, 질문↔답변)
 3. 주제 전환과 응답 관계
 
 규칙:
 - 참석자 목록이 주어졌다면 화자는 ${attendeeList.length || '미상'}명 이하여야 함. 초과 금지.
+- "도원 직원 명단"은 회의 중 언급되거나 인용될 수 있는 인물 풀이며, 화자로 배정해서는 안 됨 (단, 참석자 목록과 일치할 때만 화자 가능).
+- Whisper가 도원 직원 이름을 비슷한 발음으로 오인식한 경우 명단의 정확한 이름으로 텍스트 교정 가능 (예: "함지우" 등).
 - 확실치 않으면 "화자?"로 남겨두고 추정하지 말 것.
 - 짧은 추임새("네", "아", "맞아요")는 앞/뒤 발화에 병합.
 - 전사에 없는 단어 추가 금지. 명백한 오타만 자연스럽게 교정.
@@ -1337,6 +1375,51 @@ async function copyDialogue() {
   if (!list.length) { alert('발화자 분리 결과가 없습니다.'); return; }
   const text = list.map(t => `[${t.speaker || '화자?'}] ${t.text || ''}`).join('\n\n');
   navigator.clipboard.writeText(text).then(() => alert('발화자 대화가 클립보드에 복사되었습니다.'));
+}
+
+async function rediarize() {
+  if (!_currentId) return;
+  const m = await dbGet(_currentId);
+  if (!m || !m.dialogue || !m.dialogue.length) {
+    alert('재매칭 가능한 발화자 데이터가 없습니다.');
+    return;
+  }
+  const anthropicKey = localStorage.getItem(KEY_ANTHROPIC);
+  if (!anthropicKey) { alert('Anthropic API 키를 먼저 저장하세요.'); return; }
+
+  const defaultAtt = m.attendees || TEAM_BIZSUPPORT.join(', ');
+  const newAttendees = prompt(
+    '재매칭에 사용할 참석자 (쉼표 구분).\n비워서 확인하면 도원 명단만으로 자동 인식.\n취소 시 중단.',
+    defaultAtt
+  );
+  if (newAttendees === null) return;
+  const attendees = newAttendees.trim();
+
+  // 기존 dialogue를 segment로 캐스팅 (이미 병합된 turn은 그대로 사용)
+  const pseudoSegs = m.dialogue
+    .map(t => ({ start: t.start, end: t.end, text: t.text || '' }))
+    .filter(s => s.text);
+  if (!pseudoSegs.length) { alert('재매칭에 사용할 텍스트가 없습니다.'); return; }
+
+  const model = m.model || 'claude-opus-4-7';
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = '🔁 재매칭 중...'; }
+  log('발화자 매칭 재실행: ' + pseudoSegs.length + ' turn / 모델 ' + model);
+  try {
+    const newDialogue = await diarizeSegments(pseudoSegs, m.title, anthropicKey, model, attendees);
+    m.dialogue = newDialogue;
+    m.attendees = attendees;
+    m.rediarized_at = new Date().toISOString();
+    await dbPut(m);
+    renderDialogue(newDialogue);
+    log('재매칭 완료: ' + newDialogue.length + ' turn');
+    alert('발화자 매칭 재실행이 완료되었습니다.');
+  } catch (e) {
+    log('재매칭 실패: ' + (e.message || e));
+    alert('재매칭 실패: ' + (e.message || e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔁 발화자 매칭 재실행'; }
+  }
 }
 
 function closeDetail() {
