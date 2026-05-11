@@ -1,0 +1,18 @@
+# 환경변수·키
+.env
+.env.local
+*.env
+
+# OS·에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 로컬 백업
+*.bak
+*.bak.html
+
+# 임시·로그
+*.log
+tmp/

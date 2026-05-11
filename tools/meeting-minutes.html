@@ -205,8 +205,10 @@ button.ghost{background:none;color:var(--ink-600);border:1px solid var(--ink-200
         </select>
         <label style="margin-left:16px">요약 모델:</label>
         <select id="summaryModel">
-          <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (권장)</option>
-          <option value="claude-opus-4-5">Claude Opus 4.5 (고품질)</option>
+          <option value="claude-opus-4-7">Claude Opus 4.7 (상세 풀패키지·권장)</option>
+          <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (저비용)</option>
+          <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (구버전)</option>
+          <option value="claude-opus-4-5">Claude Opus 4.5 (구버전)</option>
         </select>
         <button class="primary" id="runBtn" onclick="runPipeline()" disabled style="margin-left:auto">전사 시작</button>
       </div>
@@ -760,16 +762,26 @@ async function summarizeWithClaude(transcript, title, apiKey, model, attendees, 
 아래 JSON 스키마로만 출력하세요. JSON 외 텍스트, 마크다운 코드펜스 모두 금지.
 
 {
-  "summary": "회의의 핵심 맥락을 5~8문장으로. 무엇을 위해 모였고, 어떤 결론으로 마무리됐는지. 참석자 이름은 직함과 함께 사용.",
+  "summary": "회의 전체 내용을 15~25문장으로 상세히 정리. 배경 → 주요 논점 → 결론 흐름. 누가 무엇을 주장·결정·담당했는지 화자를 명시하여 서술. 도메인 용어(고용지원금명·법령·기관·조문번호) 정확히 사용.",
+  "participants": [
+    {"name": "이름 또는 화자 라벨", "role": "역할(직책·소속, 추정 시 '(추정)' 표기)", "key_points": "이 사람이 회의에서 주장·결정·담당한 핵심"}
+  ],
+  "chapters": [
+    {"title": "챕터 제목 (예: '청년일자리도약 부정수급 사례 공유')", "time_range": "MM:SS~MM:SS", "summary": "이 챕터에서 논의된 내용 3~5문장"}
+  ],
   "topics": ["논의 주제 1 (구체적으로)", "논의 주제 2"],
   "sites_discussed": [
     {"site": "사업장명 또는 '일반논의'", "points": ["논의된 사항1", "논의된 사항2"]}
   ],
   "key_decisions": ["결정된 사항을 '누가/무엇을/언제까지' 형태로 명확하게"],
   "action_items": [
-    {"task": "해야 할 일 (동사로 끝나게 — ~하기)", "owner": "담당자 이름(명시된 경우), 없으면 '미지정'", "due": "YYYY-MM-DD 또는 '이번 주', '다음 회의 전' 등, 없으면 '미정'"}
+    {"task": "해야 할 일 (동사로 끝나게 — ~하기)", "owner": "담당자 이름(명시된 경우), 없으면 '미지정'", "due": "YYYY-MM-DD 또는 '이번 주', '다음 회의 전' 등, 없으면 '미정'", "context": "왜 이 일이 나왔는지 한 줄"}
+  ],
+  "key_quotes": [
+    {"speaker": "화자", "quote": "원문 인용 (변형 없이)", "why_important": "이 발언이 왜 핵심인지 한 줄"}
   ],
   "open_questions": ["결론이 안 난 채 남은 쟁점 (없으면 빈 배열)"],
+  "follow_ups": ["다음 회의에서 다뤄야 할 안건 / 후속 검토 필요 사항 (없으면 빈 배열)"],
   "terminology_notes": ["전사에서 잘못 받아적혔을 가능성이 있는 용어·이름 (있으면, 없으면 빈 배열)"]
 }
 
@@ -777,9 +789,11 @@ async function summarizeWithClaude(transcript, title, apiKey, model, attendees, 
 1. 원문에 없는 사실·인물·금액은 절대 추가하지 마세요.
 2. 참석자 이름이 메타정보로 주어졌다면 전사의 오타를 교정해 정확한 이름을 쓰세요.
 3. "sites_discussed"는 특정 회사 이름이 언급된 논의를 묶는 것. 회사명이 없는 일반 논의는 "일반논의"로.
-4. action_items의 task는 "~하기"로 통일.
+4. action_items의 task는 "~하기"로 통일. context는 한 줄로 배경 설명.
 5. 잡담·인사·음성 잡음은 요약에서 제외.
 6. 전사에 명백한 오인식이 보이면 terminology_notes에 기록.
+7. key_quotes는 핵심 발언만 3~7개로 제한 (양보다 질). 인용은 원문 그대로.
+8. chapters는 회의가 충분히 긴 경우(15분+)에 작성, 짧은 회의면 빈 배열.
 
 전사 원문:
 ---
@@ -796,7 +810,7 @@ ${transcript}
     },
     body: JSON.stringify({
       model: model,
-      max_tokens: 8192,
+      max_tokens: 16000,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -943,7 +957,7 @@ function parseSummaryJSON(text) {
   if (s >= 0 && eIdx > s) {
     try { return JSON.parse(t.substring(s, eIdx + 1)); } catch(e) {}
   }
-  return { summary: text, key_decisions: [], action_items: [], topics: [], sites_discussed: [], open_questions: [], terminology_notes: [] };
+  return { summary: text, participants: [], chapters: [], key_decisions: [], action_items: [], topics: [], sites_discussed: [], key_quotes: [], open_questions: [], follow_ups: [], terminology_notes: [] };
 }
 
 /* ═══════════════════════════════════════════
@@ -1032,11 +1046,15 @@ async function runPipeline() {
           transcript: transcript,
           dialogue: dialogue,
           summary: sum.parsed.summary || '',
+          participants: sum.parsed.participants || [],
+          chapters: sum.parsed.chapters || [],
           key_decisions: sum.parsed.key_decisions || [],
           action_items: sum.parsed.action_items || [],
           topics: sum.parsed.topics || [],
           sites_discussed: sum.parsed.sites_discussed || [],
+          key_quotes: sum.parsed.key_quotes || [],
           open_questions: sum.parsed.open_questions || [],
+          follow_ups: sum.parsed.follow_ups || [],
           terminology_notes: sum.parsed.terminology_notes || [],
           attendees: attendees,
           meeting_context: meetingContext,
@@ -1121,11 +1139,15 @@ function renderSummaryBlock(m) {
 
   return `
     <div class="summary-box">${escHtml(m.summary || '(요약 없음)')}</div>
+    ${renderParticipants(m.participants)}
+    ${renderChapters(m.chapters)}
     ${renderList('🗂 논의 주제', m.topics)}
     ${sitesBlock}
     ${renderList('📌 주요 결정사항', m.key_decisions)}
     ${renderActions(m.action_items)}
+    ${renderQuotes(m.key_quotes)}
     ${openQBlock}
+    ${renderList('🔜 후속 안건', m.follow_ups)}
     ${termBlock}
   `;
 }
@@ -1137,14 +1159,49 @@ function renderList(title, items) {
 
 function renderActions(items) {
   if (!items || !items.length) return '';
-  const html = items.map(a => `
-    <div class="action-item">
-      <div>${escHtml(a.task || '')}</div>
-      <div class="meta">👤 ${escHtml(a.owner || '미지정')}</div>
-      <div class="meta">📅 ${escHtml(a.due || '미정')}</div>
-    </div>
-  `).join('');
+  const html = items.map(a => {
+    if (typeof a === 'string') return `<div class="action-item"><div>${escHtml(a)}</div></div>`;
+    const ctx = a.context ? `<div style="font-size:11px;color:var(--ink-500);margin-top:3px">${escHtml(a.context)}</div>` : '';
+    return `
+      <div class="action-item">
+        <div><div>${escHtml(a.task || '')}</div>${ctx}</div>
+        <div class="meta">👤 ${escHtml(a.owner || '미지정')}</div>
+        <div class="meta">📅 ${escHtml(a.due || '미정')}</div>
+      </div>
+    `;
+  }).join('');
   return `<div class="section"><h4>✅ 액션 아이템</h4>${html}</div>`;
+}
+
+function renderParticipants(items) {
+  if (!items || !items.length) return '';
+  const html = items.map(p => {
+    if (typeof p === 'string') return `<li>${escHtml(p)}</li>`;
+    const role = p.role ? ` <span style="color:var(--ink-500);font-size:12px">— ${escHtml(p.role)}</span>` : '';
+    const pts = p.key_points ? `<div style="font-size:12px;color:var(--ink-600);margin-top:2px">${escHtml(p.key_points)}</div>` : '';
+    return `<li><b>${escHtml(p.name || '화자?')}</b>${role}${pts}</li>`;
+  }).join('');
+  return `<div class="section"><h4>👥 참여자</h4><ul>${html}</ul></div>`;
+}
+
+function renderChapters(items) {
+  if (!items || !items.length) return '';
+  const html = items.map(c => {
+    const tr = c.time_range ? ` <span style="color:var(--ink-500);font-size:11px;margin-left:6px">${escHtml(c.time_range)}</span>` : '';
+    const sm = c.summary ? `<div style="font-size:12px;color:var(--ink-700);margin-top:3px;line-height:1.5">${escHtml(c.summary)}</div>` : '';
+    return `<div style="padding:8px 10px;background:var(--ink-50);border-left:3px solid var(--primary);border-radius:4px;margin:5px 0"><b>${escHtml(c.title || '')}</b>${tr}${sm}</div>`;
+  }).join('');
+  return `<div class="section"><h4>📑 챕터별 정리</h4>${html}</div>`;
+}
+
+function renderQuotes(items) {
+  if (!items || !items.length) return '';
+  const html = items.map(q => {
+    if (typeof q === 'string') return `<li>${escHtml(q)}</li>`;
+    const why = q.why_important ? `<div style="font-size:11px;color:var(--ink-500);margin-top:3px">→ ${escHtml(q.why_important)}</div>` : '';
+    return `<div style="padding:8px 10px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:4px;margin:5px 0;font-size:12px;line-height:1.5"><b>${escHtml(q.speaker || '화자?')}</b>: "${escHtml(q.quote || '')}"${why}</div>`;
+  }).join('');
+  return `<div class="section"><h4>💬 핵심 인용</h4>${html}</div>`;
 }
 
 /* ═══════════════════════════════════════════
@@ -1322,6 +1379,29 @@ async function downloadTranscript() {
   const termBlock = (m.terminology_notes && m.terminology_notes.length)
     ? '=== 전사 오인식 가능 항목 ===\n' + m.terminology_notes.map((t, i) => (i + 1) + '. ' + t).join('\n') + '\n\n'
     : '';
+  const partBlock = (m.participants && m.participants.length)
+    ? '=== 참여자 ===\n' + m.participants.map((p, i) => {
+        if (typeof p === 'string') return (i + 1) + '. ' + p;
+        const role = p.role ? ' (' + p.role + ')' : '';
+        const pts = p.key_points ? '\n   - ' + p.key_points : '';
+        return (i + 1) + '. ' + (p.name || '화자?') + role + pts;
+      }).join('\n') + '\n\n'
+    : '';
+  const chapBlock = (m.chapters && m.chapters.length)
+    ? '=== 챕터별 정리 ===\n' + m.chapters.map((c, i) =>
+        (i + 1) + '. ' + (c.title || '') + (c.time_range ? ' [' + c.time_range + ']' : '') + (c.summary ? '\n   ' + c.summary : '')
+      ).join('\n') + '\n\n'
+    : '';
+  const quoteBlock = (m.key_quotes && m.key_quotes.length)
+    ? '=== 핵심 인용 ===\n' + m.key_quotes.map((q, i) => {
+        if (typeof q === 'string') return (i + 1) + '. ' + q;
+        const why = q.why_important ? '\n   → ' + q.why_important : '';
+        return (i + 1) + '. ' + (q.speaker || '화자?') + ': "' + (q.quote || '') + '"' + why;
+      }).join('\n') + '\n\n'
+    : '';
+  const followBlock = (m.follow_ups && m.follow_ups.length)
+    ? '=== 후속 안건 ===\n' + m.follow_ups.map((x, i) => (i + 1) + '. ' + x).join('\n') + '\n\n'
+    : '';
 
   const text =
     `[회의록] ${m.title}\n날짜: ${m.meeting_date} (${m.week})\n` +
@@ -1329,11 +1409,19 @@ async function downloadTranscript() {
     (m.attendees ? `참석자: ${m.attendees}\n` : '') +
     (m.meeting_context ? `맥락: ${m.meeting_context}\n` : '') +
     `\n=== 요약 ===\n${m.summary || ''}\n\n` +
+    partBlock +
+    chapBlock +
     (m.topics && m.topics.length ? `=== 논의 주제 ===\n${m.topics.map((x, i) => (i + 1) + '. ' + x).join('\n')}\n\n` : '') +
     sitesBlock +
     (m.key_decisions && m.key_decisions.length ? `=== 주요 결정사항 ===\n${m.key_decisions.map((x, i) => (i + 1) + '. ' + x).join('\n')}\n\n` : '') +
-    (m.action_items && m.action_items.length ? `=== 액션 아이템 ===\n${m.action_items.map((a, i) => (i + 1) + '. ' + a.task + ' (담당: ' + (a.owner || '미지정') + ', 기한: ' + (a.due || '미정') + ')').join('\n')}\n\n` : '') +
+    (m.action_items && m.action_items.length ? `=== 액션 아이템 ===\n${m.action_items.map((a, i) => {
+        if (typeof a === 'string') return (i + 1) + '. ' + a;
+        const ctx = a.context ? '\n   - ' + a.context : '';
+        return (i + 1) + '. ' + a.task + ' (담당: ' + (a.owner || '미지정') + ', 기한: ' + (a.due || '미정') + ')' + ctx;
+      }).join('\n')}\n\n` : '') +
+    quoteBlock +
     openQBlock +
+    followBlock +
     termBlock +
     dialogueBlock +
     `=== 전사 원문 ===\n${m.transcript || ''}`;
