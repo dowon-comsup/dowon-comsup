@@ -120,7 +120,7 @@
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 // === PDF 텍스트 추출 ===
-function setStatus(msg){document.getElementById('result').innerHTML='<p>'+msg+'</p>';}
+function setStatus(msg){document.getElementById('result').innerHTML='<p>'+esc(msg)+'</p>';}
 
 // API 키 초기화
 (function(){
@@ -144,6 +144,29 @@ async function pdfPageToImage(file,pageNum,scale){
 }
 
 // Claude Vision OCR — 등기부등본 전용 프롬프트
+// 모델 정책: 1차 Sonnet 4.6 → 429 동일 모델 재시도 → 5xx Haiku 4.5 폴백
+const VISION_MODEL_PRIMARY='claude-sonnet-4-6';
+const VISION_MODEL_FALLBACK='claude-haiku-4-5-20251001';
+let _visionWarnings=[]; // Vision OCR 진행 중 누적 경고 (분석 시작 시 reset, 결과 상단 배너로 노출)
+
+async function callVisionOnce(apiKey,model,content){
+ const resp=await fetch('https://api.anthropic.com/v1/messages',{
+  method:'POST',
+  headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+  body:JSON.stringify({model,max_tokens:8000,messages:[{role:'user',content}]})
+ });
+ if(!resp.ok){
+  const errText=await resp.text();
+  return {ok:false,status:resp.status,err:errText};
+ }
+ const data=await resp.json();
+ const text=data?.content?.[0]?.type==='text'?data.content[0].text:'';
+ if(!text){
+  return {ok:false,status:200,err:'응답에 텍스트 content 없음: '+JSON.stringify(data).slice(0,200)};
+ }
+ return {ok:true,text,stop:data.stop_reason};
+}
+
 async function visionOcrPdf(file){
  const apiKey=getApiKey();
  if(!apiKey){throw new Error('스캔 PDF 처리에 Anthropic API Key가 필요합니다. 상단에 키를 입력해주세요.');}
@@ -174,30 +197,31 @@ async function visionOcrPdf(file){
 - 줄바꿈을 유지하고, 각 페이지를 [N페이지] 헤더로 구분
 - 텍스트만 출력, 다른 설명 불필요`});
 
-  const resp=await fetch('https://api.anthropic.com/v1/messages',{
-   method:'POST',
-   headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-   body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:8000,messages:[{role:'user',content}]})
-  });
-  if(!resp.ok){
-   const err=await resp.text();
-   if(resp.status===429){
-    setStatus(`API 속도 제한 — 3초 대기 후 재시도...`);
-    await new Promise(r=>setTimeout(r,3000));
-    const resp2=await fetch('https://api.anthropic.com/v1/messages',{
-     method:'POST',
-     headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-     body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:8000,messages:[{role:'user',content}]})
-    });
-    if(!resp2.ok)throw new Error(`Vision API 오류 (${resp2.status})`);
-    const data2=await resp2.json();
-    out+=data2.content[0].text+'\n\n';
-    continue;
-   }
-   throw new Error(`Vision API 오류 (${resp.status}): ${err.substring(0,200)}`);
+  // 1차: Sonnet 4.6
+  let res=await callVisionOnce(apiKey,VISION_MODEL_PRIMARY,content);
+
+  // 429 → 3초 대기 후 동일 모델 재시도
+  if(!res.ok && res.status===429){
+   setStatus('API 속도 제한 — 3초 대기 후 재시도...');
+   await new Promise(r=>setTimeout(r,3000));
+   res=await callVisionOnce(apiKey,VISION_MODEL_PRIMARY,content);
   }
-  const data=await resp.json();
-  out+=data.content[0].text+'\n\n';
+
+  // 5xx → Haiku 4.5 폴백 (Sonnet 일시 장애 시 처리 지속)
+  if(!res.ok && res.status>=500 && res.status<600){
+   setStatus(`Sonnet ${res.status} — Haiku 4.5로 폴백`);
+   const fb=await callVisionOnce(apiKey,VISION_MODEL_FALLBACK,content);
+   if(fb.ok) res=fb;
+   else throw new Error(`Vision API 오류 (Sonnet ${res.status} / Haiku ${fb.status}): ${(fb.err||'').substring(0,200)}`);
+  }
+
+  if(!res.ok) throw new Error(`Vision API 오류 (${res.status}): ${(res.err||'').substring(0,200)}`);
+  if(res.stop==='max_tokens'){
+   const w=`Vision OCR ${b+1}~${batchEnd}p max_tokens 도달 — 일부 텍스트 잘림 가능 (임원·이벤트 누락 위험). [등기부 PDF 원본 텍스트] 패널로 확인 필요.`;
+   console.warn('[Vision]',w);
+   _visionWarnings.push(w);
+  }
+  out+=res.text+'\n\n';
  }
  return out;
 }
@@ -243,31 +267,38 @@ function parseRegistry(text){
  });
  if(cur)blocks.push(cur);
 
- // 동일 (name,rrn) 그룹의 모든 블록 이벤트를 병합 (마지막 블록의 직위 사용)
+ // 동일 (name,rrn) 그룹의 모든 블록 이벤트를 병합 (마지막 블록의 직위를 현행으로 사용)
+ // 각 이벤트에 sourcePos 부착 → 직위 변경(예: 같은 날 이사 사임 + 감사 취임)을 등기 재발행과 구분
  const grouped={};
  blocks.forEach(b=>{
   const key=b.name+b.rrn;
-  if(!grouped[key]) grouped[key]={pos:b.pos,name:b.name,rrn:b.rrn,allLines:[]};
-  grouped[key].pos=b.pos; // 마지막 블록의 직위를 사용
-  grouped[key].allLines.push(...b.lines);
+  if(!grouped[key]) grouped[key]={pos:b.pos,name:b.name,rrn:b.rrn,events:[]};
+  grouped[key].pos=b.pos; // 마지막 블록의 직위를 현행 pos로 사용
+  const bTxt=b.lines.join('\n');
+  let mm; dateRe.lastIndex=0;
+  while((mm=dateRe.exec(bTxt))){
+   grouped[key].events.push({
+    date:`${mm[1]}-${String(mm[2]).padStart(2,'0')}-${String(mm[3]).padStart(2,'0')}`,
+    type:mm[4],
+    sourcePos:b.pos
+   });
+  }
  });
  const result=[];
  Object.entries(grouped).forEach(([key,g])=>{
-  const txt=g.allLines.join('\n');
-  const events=[]; let mm;
-  while((mm=dateRe.exec(txt))){
-   events.push({date:`${mm[1]}-${String(mm[2]).padStart(2,'0')}-${String(mm[3]).padStart(2,'0')}`,type:mm[4]});
-  }
-  dateRe.lastIndex=0;
-  // 중복 이벤트 제거 (같은 날짜+같은 유형)
+  // 중복 이벤트 제거 (같은 날짜+같은 유형+같은 sourcePos)
   const seen=new Set();
-  const uniqEvents=events.filter(e=>{const k=e.date+e.type;if(seen.has(k))return false;seen.add(k);return true;});
+  const uniqEvents=g.events.filter(e=>{const k=e.date+e.type+e.sourcePos;if(seen.has(k))return false;seen.add(k);return true;});
   // 정렬: 날짜순, 같은 날이면 종료 이벤트가 취임보다 앞에 오도록
   uniqEvents.sort((a,b)=>a.date.localeCompare(b.date)||(TERM.includes(a.type)?-1:1));
   // 같은 날 사임/퇴임 + 취임이 모두 있으면 → 등기 재발행(연속 임기)으로 간주, 둘 다 제거
+  // 단 sourcePos 동일할 때만 (동일 직위 transition). 직위 변경(예: 이사→감사 같은 날)은 보존
   const drop=new Set();
   for(let i=0;i<uniqEvents.length-1;i++){
-   if(TERM.includes(uniqEvents[i].type) && (uniqEvents[i+1].type==='취임'||uniqEvents[i+1].type==='중임') && uniqEvents[i].date===uniqEvents[i+1].date){
+   if(TERM.includes(uniqEvents[i].type)
+      && (uniqEvents[i+1].type==='취임'||uniqEvents[i+1].type==='중임')
+      && uniqEvents[i].date===uniqEvents[i+1].date
+      && uniqEvents[i].sourcePos===uniqEvents[i+1].sourcePos){
     drop.add(i); drop.add(i+1);
    }
   }
@@ -442,20 +473,36 @@ function normAddr(s){
                .replace(/광역시|특별시|특별자치시|특별자치도/g,'')
                .toLowerCase();
 }
-// 두 인물(여러 주소 보유 가능)의 주소 동일 여부: 하나라도 완전 일치하면 동일
+// 도로명/지번 표기 차이 동치 처리용 시그널 추출
+//  - ho: 호수 (예: "706호" → "706")
+//  - bldg: 건물명 토큰 (한글 2자+ 흔한 건물 접미사)
+function extractAddrSignals(s){
+ const norm=normAddr(s);
+ const hoM=norm.match(/(\d{2,5})호/);
+ const bldgM=norm.match(/[가-힣]{2,}(?:그린파크|아파트|빌라|빌딩|타워|레지던스|오피스텔|푸르지오|자이|아이파크|더샵|롯데캐슬|이편한세상|힐스테이트)/);
+ return {norm,ho:hoM?hoM[1]:null,bldg:bldgM?bldgM[0]:null};
+}
+// 두 인물(여러 주소 보유 가능)의 주소 매칭:
+//  - same: 정규화 후 완전 일치 → 친족 (도원 기존 기준)
+//  - suspect: 도로명/지번 표기 차이가 있더라도 (건물명 + 호수) 모두 일치 → 친족의심 (가족관계증명서 별도 확인 환기)
 function bestPairSim(addrsA,addrsB){
- let pair=['',''], same=false;
+ let pair=['',''], same=false, suspect=false;
  (addrsA||[]).forEach(a=>(addrsB||[]).forEach(b=>{
-  const A=normAddr(a),B=normAddr(b);
-  if(A&&B&&A===B){ same=true; pair=[a,b]; }
+  const sA=extractAddrSignals(a), sB=extractAddrSignals(b);
+  if(sA.norm&&sB.norm&&sA.norm===sB.norm){ same=true; pair=[a,b]; }
+  else if(!same && sA.ho&&sB.ho&&sA.bldg&&sB.bldg && sA.ho===sB.ho && sA.bldg===sB.bldg){
+   suspect=true; if(!pair[0]||!pair[1]) pair=[a,b];
+  }
  }));
- if(!same){
+ if(!same && !suspect){
   pair=[(addrsA||[])[0]||'', (addrsB||[])[0]||''];
  }
- return {same, a:pair[0], b:pair[1]};
+ return {same, suspect, a:pair[0], b:pair[1]};
 }
-function classifyKin(same){
- return same ? {label:'친족',color:'#fdd'} : {label:'비친족',color:'#fff'};
+function classifyKin(r){
+ if(r&&r.same) return {label:'친족',color:'#fdd'};
+ if(r&&r.suspect) return {label:'친족의심',color:'#ffeedd'};
+ return {label:'비친족',color:'#fff'};
 }
 function renderCeoHistory(periods,officers){
  const host=document.getElementById('ceoHist');
@@ -465,7 +512,7 @@ function renderCeoHistory(periods,officers){
  h+='<table><thead><tr><th style="width:10%">성명</th><th style="width:10%">주민번호</th><th style="width:11%">시작일</th><th style="width:11%">종료일</th><th style="width:8%">종료사유</th><th>주소(최근)</th></tr></thead><tbody>';
  periods.forEach(p=>{
   const lastAddr=p.addrs[p.addrs.length-1]||'';
-  h+=`<tr><td>${p.name}</td><td>${p.rrn}-*</td><td>${p.start}</td><td>${p.end||'현재'}</td><td>${p.endType}</td><td class="reason">${lastAddr}</td></tr>`;
+  h+=`<tr><td>${esc(p.name)}</td><td>${esc(p.rrn)}-*</td><td>${esc(p.start)}</td><td>${esc(p.end||'현재')}</td><td>${esc(p.endType)}</td><td class="reason">${esc(lastAddr)}</td></tr>`;
  });
  h+='</tbody></table>';
 
@@ -480,14 +527,14 @@ function renderCeoHistory(periods,officers){
   h+=`<summary style="cursor:pointer;font-size:13px;font-weight:bold;color:#c50">▶ 공동대표이사 감지${activeBadge} <span class="small" style="font-weight:normal">(클릭하여 펼치기)</span></summary>`;
   h+='<div style="margin-top:6px">';
   if(activeCoCeo && activeCoCeo.isActive){
-   h+=`<p style="margin:4px 0;padding:8px 12px;background:#ffeedd;border:1px solid #e8a;border-radius:4px;font-size:13px"><b>현재 공동대표 ${activeCoCeo.count}인 체제</b>: ${activeCoCeo.names.join(', ')}</p>`;
+   h+=`<p style="margin:4px 0;padding:8px 12px;background:#ffeedd;border:1px solid #e8a;border-radius:4px;font-size:13px"><b>현재 공동대표 ${activeCoCeo.count}인 체제</b>: ${esc(activeCoCeo.names.join(', '))}</p>`;
   }
   h+='<table><thead><tr><th style="width:12%">대표이사 A</th><th style="width:12%">대표이사 B</th><th style="width:13%">공동 재임 시작</th><th style="width:13%">공동 재임 종료</th><th>비고</th></tr></thead><tbody>';
   coCeo.coCeoPeriods.forEach(ov=>{
    const isCurrent=!ov.to;
    const bg=isCurrent?'background:#ffeedd':'';
    const note=isCurrent?'<b>현재 공동대표</b>':'과거 공동대표';
-   h+=`<tr style="${bg}"><td>${ov.names[0]}</td><td>${ov.names[1]}</td><td>${ov.from}</td><td>${ov.to||'현재'}</td><td>${note}</td></tr>`;
+   h+=`<tr style="${bg}"><td>${esc(ov.names[0])}</td><td>${esc(ov.names[1])}</td><td>${esc(ov.from)}</td><td>${esc(ov.to||'현재')}</td><td>${note}</td></tr>`;
   });
   h+='</tbody></table>';
   h+='<p class="small">※ 공동대표이사는 각각 독립적으로 회사를 대표하므로, 고용/산재보험 적용제외 여부를 개별 판단합니다. 공동대표 간 친족관계 여부도 함께 확인하세요.</p>';
@@ -500,7 +547,7 @@ function renderCeoHistory(periods,officers){
  const distinct=[];
  periods.forEach(p=>{ if(!distinct.find(x=>x.name===p.name&&x.rrn===p.rrn)) distinct.push(p); });
  if(distinct.length>=2){
-  h+=`<p class="small" style="margin-top:6px">▶ 대표이사 변경: 총 <b>${distinct.length}</b>명 (${distinct.map(d=>d.name).join(' → ')})</p>`;
+  h+=`<p class="small" style="margin-top:6px">▶ 대표이사 변경: 총 <b>${distinct.length}</b>명 (${esc(distinct.map(d=>d.name).join(' → '))})</p>`;
  } else {
   h+='<p class="small" style="margin-top:6px">▶ 대표이사 변경 이력 없음 (단일 대표)</p>';
  }
@@ -518,19 +565,27 @@ function renderCeoHistory(periods,officers){
   const kinRows=[];
   for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++){
    const r=bestPairSim(arr[i].addrs,arr[j].addrs);
-   if(r.same) kinRows.push({a:arr[i].name,b:arr[j].name,addrA:r.a,addrB:r.b});
+   if(r.same||r.suspect) kinRows.push({a:arr[i].name,b:arr[j].name,addrA:r.a,addrB:r.b,kind:r.same?'친족':'친족의심'});
   }
-  h+='<h3 style="font-size:13px;margin:12px 0 4px">▶ 친족 판정 (주소 동일 쌍만 표시)</h3>';
+  h+='<h3 style="font-size:13px;margin:12px 0 4px">▶ 친족 판정 (주소 동일 또는 동일 건물+호수 쌍 표시)</h3>';
   if(kinRows.length){
-   h+='<table><thead><tr><th style="width:12%">대표이사 A</th><th>A 주소</th><th style="width:12%">대표이사 B</th><th>B 주소</th></tr></thead><tbody>';
+   h+='<table><thead><tr><th style="width:9%">분류</th><th style="width:11%">대표이사 A</th><th>A 주소</th><th style="width:11%">대표이사 B</th><th>B 주소</th></tr></thead><tbody>';
    kinRows.forEach(k=>{
-    h+=`<tr style="background:#fdd"><td>${k.a}</td><td class="reason">${k.addrA}</td><td>${k.b}</td><td class="reason">${k.addrB}</td></tr>`;
+    const bg=k.kind==='친족'?'#fdd':'#ffeedd';
+    h+=`<tr style="background:${bg}"><td><b>${esc(k.kind)}</b></td><td>${esc(k.a)}</td><td class="reason">${esc(k.addrA)}</td><td>${esc(k.b)}</td><td class="reason">${esc(k.addrB)}</td></tr>`;
    });
    h+='</tbody></table>';
   } else {
-   h+='<p class="small" style="color:#090">▶ 친족 관계 없음 (주소 동일한 대표이사 쌍 없음)</p>';
+   h+='<p class="small" style="color:#090">▶ 등기부 주소 동일/유사 쌍 없음 (단, 아래 한계 참조)</p>';
   }
-  h+='<p class="small">※ 주소가 완전히 동일할 경우에만 친족으로 판정합니다. (도로명/지번 등 표기 차이는 비친족으로 처리되어 표시되지 않음)</p>';
+  // 친족 판정의 한계 — 항상 표시 (유무와 무관하게 노무사 별도 확인 환기)
+  h+='<div style="margin-top:8px;padding:10px 12px;background:#fff8e1;border:1px solid #fb8;border-radius:4px;font-size:11.5px;line-height:1.6">'+
+     '<b>⚠ 친족 판정의 한계</b><br>'+
+     '① 본 판정은 <b>등기부등본 주소 완전 일치</b> 여부만 산출. 도로명·지번·호수·층 표기 차이가 있는 동일 주소는 비친족으로 처리됨<br>'+
+     '② <b>4촌 이내 친족·직계존비속·배우자</b>는 등기부만으로 확인 불가 → <b>가족관계증명서·주민등록등본 별도 확인 필수</b><br>'+
+     '③ 친족(동거친족 등) 해당 시 사업주와 친족관계에 있는 자로서 산재·고용보험 적용제외 검토 대상 → 본 툴 판정과 별개로 추가 검토<br>'+
+     '④ 공동대표·외국인 임원(한자/영문명)·미등기 임원은 본 툴에서 누락될 수 있음 — 상단 [추출된 등기임원] 패널로 누락 여부 확인 권장'+
+     '</div>';
  }
  host.innerHTML=h;
 }
@@ -735,7 +790,8 @@ function buildOfficerPeriods(events){
  const ev=(events||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
  const ps=[]; let st=null;
  ev.forEach(e=>{
-  if(e.type==='취임'){if(!st)st=e.date;}
+  // '중임'도 임기 시작점으로 인정 (parseRegistry periods 산출 로직과 일관) — 이전 블록에서 첫 취임이 누락된 경우 대비
+  if(e.type==='취임'||e.type==='중임'){if(!st)st=e.date;}
   else if(T.includes(e.type)){if(st){ps.push({start:st,end:e.date});st=null;}}
  });
  if(st)ps.push({start:st,end:null});
@@ -964,8 +1020,8 @@ function renderFileList(){
  empFiles.forEach((f,i)=>{
   const li=document.createElement('li');
   const label=f.bizNo?(f.bizName?`${f.bizName} (${f.bizNo})`:f.bizNo):(f.bizName||f.file.name);
-  li.innerHTML=`<span class="fname">${f.file.name}</span>`
-   +`<span class="fmeta">${label}</span>`
+  li.innerHTML=`<span class="fname">${esc(f.file.name)}</span>`
+   +`<span class="fmeta">${esc(label)}</span>`
    +`<button onclick="removeEmpFile(${i})">✕</button>`;
   fileListEl.appendChild(li);
  });
@@ -1002,6 +1058,7 @@ document.getElementById('btnRun').onclick=async()=>{
  if(btnRun.disabled) return;
  btnRun.disabled=true;
  document.getElementById('result').innerHTML='<p>처리 중...</p>';
+ _visionWarnings.length=0; // 새 분석 시작 시 이전 경고 비우기
  try{
   // 1) 등기부 파싱 (공통)
   setStatus('등기부 텍스트 추출 중...');
@@ -1087,7 +1144,7 @@ document.getElementById('btnRun').onclick=async()=>{
   renderAllResults();
   document.getElementById('btnExport').disabled=false;
  }catch(e){
-  document.getElementById('result').innerHTML='<p style="color:red">오류: '+e.message+'</p>';
+  document.getElementById('result').innerHTML='<p style="color:red">오류: '+esc(e.message)+'</p>';
   console.error(e);
  }finally{
   btnRun.disabled=false;
@@ -1101,10 +1158,19 @@ function renderAllResults(){
 
  let inlineHtml='';
 
+ // Vision OCR 경고 배너 — max_tokens 도달 등 결과 신뢰성에 영향을 줄 수 있는 사항을 노무사에게 환기
+ if(_visionWarnings.length){
+  inlineHtml+='<div style="margin:8px 0;padding:10px 12px;background:#fff3cd;border:1px solid #ffd966;border-radius:4px;font-size:12px;line-height:1.6">'
+   +'<b>⚠ Vision OCR 경고 '+_visionWarnings.length+'건 — 결과 검토 필요</b>'
+   +'<ul style="margin:6px 0 0 18px;padding:0">'
+   +_visionWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')
+   +'</ul></div>';
+ }
+
  if(bizKeys.length===1){
   // 단일 사업장: 플랫 렌더링
   const biz=ALL_BIZ_RESULTS[bizKeys[0]];
-  const header=biz.bizNo?`<p style="margin:4px 0"><b>사업장:</b> ${biz.bizName||''} <span class="small">${biz.bizNo}</span> — 파일: ${biz.fileName}</p>`:'';
+  const header=biz.bizNo?`<p style="margin:4px 0"><b>사업장:</b> ${esc(biz.bizName||'')} <span class="small">${esc(biz.bizNo)}</span> — 파일: ${esc(biz.fileName)}</p>`:'';
   inlineHtml+=header+renderSummary(biz.results)+renderResultTable(biz.results);
  } else {
   // 복수 사업장: 탭 UI
@@ -1113,7 +1179,7 @@ function renderAllResults(){
   bizKeys.forEach((k,i)=>{
    const b=ALL_BIZ_RESULTS[k];
    const label=b.bizNo?(b.bizName||b.bizNo):b.fileName;
-   tabH+=`<button data-biz="${k}">${label}</button>`;
+   tabH+=`<button data-biz="${esc(k)}">${esc(label)}</button>`;
   });
   tabH+='</div>';
   tabH+='<div id="bizTabContent"></div>';
@@ -1153,7 +1219,7 @@ function renderAllTab(el){
   const biz=ALL_BIZ_RESULTS[k];
   const label=biz.bizNo?(biz.bizName?`${biz.bizName} (${biz.bizNo})`:biz.bizNo):biz.fileName;
   html+=`<div class="biz-section">`;
-  html+=`<div class="biz-header"><h3>${label}</h3><span class="biz-meta">파일: ${biz.fileName}</span></div>`;
+  html+=`<div class="biz-header"><h3>${esc(label)}</h3><span class="biz-meta">파일: ${esc(biz.fileName)}</span></div>`;
   html+=renderSummary(biz.results);
   html+=renderResultTable(biz.results);
   html+=`</div>`;
@@ -1164,7 +1230,7 @@ function renderAllTab(el){
 function renderBizTab(el,bizKey){
  const biz=ALL_BIZ_RESULTS[bizKey];
  const label=biz.bizNo?(biz.bizName?`${biz.bizName} (${biz.bizNo})`:biz.bizNo):biz.fileName;
- let html=`<div style="margin:10px 0"><b>사업장:</b> ${label} <span class="small">파일: ${biz.fileName}</span></div>`;
+ let html=`<div style="margin:10px 0"><b>사업장:</b> ${esc(label)} <span class="small">파일: ${esc(biz.fileName)}</span></div>`;
  html+=renderSummary(biz.results);
  html+=renderResultTable(biz.results);
  el.innerHTML=html;
@@ -1191,17 +1257,17 @@ function renderResultTable(results){
    +'<th>고용 판정</th><th>산재 판정</th><th>사유 / 환급구간</th><th>사업장 확인 필요사유</th>'
    +'</tr></thead><tbody>';
  results.forEach(r=>{
-  const reasonHtml = (r.reason||'').split('\n').map(s=>`<div>${s}</div>`).join('');
-  const confirmHtml = (r.confirm||'').split('\n').filter(Boolean).map(s=>`<div>${s}</div>`).join('') || '<span class="small">-</span>';
+  const reasonHtml = (r.reason||'').split('\n').map(s=>`<div>${esc(s)}</div>`).join('');
+  const confirmHtml = (r.confirm||'').split('\n').filter(Boolean).map(s=>`<div>${esc(s)}</div>`).join('') || '<span class="small">-</span>';
   const histCls=r.isHistorical?' j-historical':'';
-  const periodBadge=r.totalPeriods>1?`<br><span class="period-badge ${r.isHistorical?'past':'current'}">${r.periodLabel||''}</span>`:'';
+  const periodBadge=r.totalPeriods>1?`<br><span class="period-badge ${r.isHistorical?'past':'current'}">${esc(r.periodLabel||'')}</span>`:'';
   const coCeoBadge=r.isActiveCoCeo?'<br><span style="font-size:10px;color:#c50;font-weight:700">공동대표</span>':'';
   h+=`<tr class="${cls[r.judgment]||''}${histCls}">`
-    +`<td>${r.pos}${coCeoBadge}${periodBadge}</td><td>${r.name}</td><td>${r.rrn}-*</td>`
-    +`<td>${r.appoint||''}</td><td>${r.resign||''}</td>`
-    +`<td>${r.eAcq||''}</td><td>${r.eLoss||''}</td>`
-    +`<td>${r.sAcq||''}</td><td>${r.sLoss||''}</td>`
-    +`<td><b>${r.judgmentE||'-'}</b></td><td><b>${r.judgmentS||'-'}</b></td>`
+    +`<td>${esc(r.pos)}${coCeoBadge}${periodBadge}</td><td>${esc(r.name)}</td><td>${esc(r.rrn)}-*</td>`
+    +`<td>${esc(r.appoint||'')}</td><td>${esc(r.resign||'')}</td>`
+    +`<td>${esc(r.eAcq||'')}</td><td>${esc(r.eLoss||'')}</td>`
+    +`<td>${esc(r.sAcq||'')}</td><td>${esc(r.sLoss||'')}</td>`
+    +`<td><b>${esc(r.judgmentE||'-')}</b></td><td><b>${esc(r.judgmentS||'-')}</b></td>`
     +`<td class="reason">${reasonHtml}</td>`
     +`<td class="reason">${confirmHtml}</td>`
     +`</tr>`;
@@ -1212,8 +1278,8 @@ function renderResultTable(results){
 
 function tableize(arr,cols){
  if(!arr.length)return '<p class="small">없음</p>';
- let h='<table><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
- arr.forEach(o=>{h+='<tr>'+cols.map(c=>`<td>${o[c]??''}</td>`).join('')+'</tr>';});
+ let h='<table><tr>'+cols.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>';
+ arr.forEach(o=>{h+='<tr>'+cols.map(c=>`<td>${esc(o[c]??'')}</td>`).join('')+'</tr>';});
  return h+'</table>';
 }
 
