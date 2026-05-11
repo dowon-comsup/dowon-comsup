@@ -6,6 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <title>사업장 조회 | 노무법인 도원</title>
 <script src="../js/config.js"></script>
+<script src="../js/shared.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
   :root {
@@ -318,7 +319,7 @@ async function loadData() {
     document.getElementById('sumNoEmail').textContent = data.filter(b => !b.contact_email).length;
     renderTable();
   } catch(e) {
-    wrap.innerHTML = `<div class="empty"><div class="empty-icon">&#9888;</div>데이터 로드 실패<br><span style="font-size:12px;color:#64748b">${e.message}</span></div>`;
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">&#9888;</div>데이터 로드 실패<br><span style="font-size:12px;color:#64748b">${esc(e.message)}</span></div>`;
     countEl.textContent = '오류';
   }
 }
@@ -340,12 +341,12 @@ function renderTable() {
     const lastReview = biz.last_review_date ? biz.last_review_date.slice(0,10) : '-';
     return `
       <tr data-idx="${i}">
-        <td class="name">${biz.name}</td>
-        <td class="sub hide-mobile">${biz.contact_person || '-'}</td>
-        <td class="sub hide-mobile">${biz.dowon_subsidy_manager || '-'}</td>
-        <td class="amount ${immAmt ? 'green' : 'gray'}">${immAmt || '-'}</td>
-        <td class="amount ${futAmt ? '' : 'gray'} hide-mobile">${futAmt || '-'}</td>
-        <td class="sub hide-mobile">${lastReview}</td>
+        <td class="name">${esc(biz.name)}</td>
+        <td class="sub hide-mobile">${esc(biz.contact_person || '-')}</td>
+        <td class="sub hide-mobile">${esc(biz.dowon_subsidy_manager || '-')}</td>
+        <td class="amount ${immAmt ? 'green' : 'gray'}">${esc(immAmt || '-')}</td>
+        <td class="amount ${futAmt ? '' : 'gray'} hide-mobile">${esc(futAmt || '-')}</td>
+        <td class="sub hide-mobile">${esc(lastReview)}</td>
         <td>${statusBadge}</td>
       </tr>`;
   }).join('');
@@ -398,7 +399,7 @@ function openPanel(biz, tr) {
       </button>
       <div class="mail-btn-sub">
         ${hasEmail
-          ? `수신: ${biz.contact_email} · 클릭 시 Gmail이 열립니다`
+          ? `수신: ${esc(biz.contact_email)} · 클릭 시 Gmail이 열립니다`
           : '이메일 미등록 — 노션에서 담당자 이메일을 입력해주세요'}
       </div>
     </div>
@@ -408,14 +409,14 @@ function openPanel(biz, tr) {
     <div class="panel-section">
       <div class="panel-section-title">기본 정보</div>
       <div class="panel-grid">
-        <div class="panel-field"><div class="panel-field-label">사업자번호</div><div class="panel-field-val">${biz.biz_reg_no || '-'}</div></div>
-        <div class="panel-field"><div class="panel-field-label">관리번호</div><div class="panel-field-val">${biz.mgmt_no || '-'}</div></div>
-        <div class="panel-field"><div class="panel-field-label">담당자</div><div class="panel-field-val">${biz.contact_person || '-'}</div></div>
-        <div class="panel-field"><div class="panel-field-label">연락처</div><div class="panel-field-val">${biz.contact_phone || '-'}</div></div>
-        <div class="panel-field"><div class="panel-field-label">이메일</div><div class="panel-field-val">${biz.contact_email || '-'}</div></div>
-        <div class="panel-field"><div class="panel-field-label">기업규모</div><div class="panel-field-val">${biz.corp_size || '-'}</div></div>
-        <div class="panel-field"><div class="panel-field-label">근로자 수</div><div class="panel-field-val">${biz.worker_count ? biz.worker_count + '명' : '-'}</div></div>
-        <div class="panel-field"><div class="panel-field-label">주소</div><div class="panel-field-val">${biz.address || '-'}</div></div>
+        <div class="panel-field"><div class="panel-field-label">사업자번호</div><div class="panel-field-val">${esc(biz.biz_reg_no || '-')}</div></div>
+        <div class="panel-field"><div class="panel-field-label">관리번호</div><div class="panel-field-val">${esc(biz.mgmt_no || '-')}</div></div>
+        <div class="panel-field"><div class="panel-field-label">담당자</div><div class="panel-field-val">${esc(biz.contact_person || '-')}</div></div>
+        <div class="panel-field"><div class="panel-field-label">연락처</div><div class="panel-field-val">${esc(biz.contact_phone || '-')}</div></div>
+        <div class="panel-field"><div class="panel-field-label">이메일</div><div class="panel-field-val">${esc(biz.contact_email || '-')}</div></div>
+        <div class="panel-field"><div class="panel-field-label">기업규모</div><div class="panel-field-val">${esc(biz.corp_size || '-')}</div></div>
+        <div class="panel-field"><div class="panel-field-label">근로자 수</div><div class="panel-field-val">${biz.worker_count ? esc(biz.worker_count + '명') : '-'}</div></div>
+        <div class="panel-field"><div class="panel-field-label">주소</div><div class="panel-field-val">${esc(biz.address || '-')}</div></div>
       </div>
     </div>
     <div class="divider"></div>
@@ -436,10 +437,10 @@ function openPanel(biz, tr) {
     <div class="panel-section">
       <div class="panel-section-title">도원 담당</div>
       <div class="panel-grid">
-        <div class="panel-field"><div class="panel-field-label">지원금 담당자</div><div class="panel-field-val blue">${biz.dowon_subsidy_manager || '-'}</div></div>
-        <div class="panel-field"><div class="panel-field-label">환급 담당자</div><div class="panel-field-val blue">${biz.dowon_refund_manager || '-'}</div></div>
-        <div class="panel-field"><div class="panel-field-label">약정 요율</div><div class="panel-field-val">${biz.contract_rate || '-'}</div></div>
-        <div class="panel-field"><div class="panel-field-label">최종검토일</div><div class="panel-field-val">${biz.last_review_date ? biz.last_review_date.slice(0,10) : '-'}</div></div>
+        <div class="panel-field"><div class="panel-field-label">지원금 담당자</div><div class="panel-field-val blue">${esc(biz.dowon_subsidy_manager || '-')}</div></div>
+        <div class="panel-field"><div class="panel-field-label">환급 담당자</div><div class="panel-field-val blue">${esc(biz.dowon_refund_manager || '-')}</div></div>
+        <div class="panel-field"><div class="panel-field-label">약정 요율</div><div class="panel-field-val">${esc(biz.contract_rate || '-')}</div></div>
+        <div class="panel-field"><div class="panel-field-label">최종검토일</div><div class="panel-field-val">${esc(biz.last_review_date ? biz.last_review_date.slice(0,10) : '-')}</div></div>
       </div>
     </div>
 
