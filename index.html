@@ -326,7 +326,7 @@
     window.loadToolByPage = function(page, title) {
       if (currentPage === page) return;
       dashboard.style.display = 'none';
-      frame.src = page;
+      frame.src = page + '?v=' + Date.now();
       frame.classList.add('active');
       mainEl.classList.add('frame-mode');
       titleEl.textContent = title;
