@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>임금채권부담금 경감 계산기</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    /* ─── 기본 레이아웃 ─── */
+    body { background: var(--bg); }
+    .page-wrap { max-width: 860px; margin: 0 auto; padding: 28px 24px 60px; }
+
+    /* ─── 페이지 헤더 ─── */
+    .page-hd { margin-bottom: 28px; }
+    .page-hd h1 { font-size: 20px; font-weight: 700; color: var(--ink-900); letter-spacing: -.02em; margin-bottom: 4px; }
+    .page-hd p  { font-size: 13px; color: var(--ink-500); }
+    .law-badge  { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px;
+                  font-size: 11px; color: var(--ink-500); background: var(--ink-50);
+                  border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; }
+
+    /* ─── 섹션 카드 ─── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 16px; }
+    .card-head { display: flex; align-items: center; gap: 10px; padding: 16px 20px 12px;
+                 border-bottom: 1px solid var(--border); }
+    .card-step { width: 22px; height: 22px; border-radius: 50%; background: var(--primary);
+                 color: #fff; font-size: 11px; font-weight: 700;
+                 display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .card-title { font-size: 14px; font-weight: 600; color: var(--ink-800); }
+    .card-body { padding: 16px 20px; }
+
+    /* ─── 폼 ─── */
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .form-row.col3 { grid-template-columns: 1fr 1fr 1fr; }
+    .form-row.col1 { grid-template-columns: 1fr; }
+    @media(max-width:600px){ .form-row, .form-row.col3 { grid-template-columns: 1fr; } }
+
+    .form-field { display: flex; flex-direction: column; gap: 4px; }
+    .form-field label { font-size: 12px; font-weight: 600; color: var(--ink-600); }
+    .form-field input, .form-field select {
+      padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
+      font-size: 13px; color: var(--ink-800); background: var(--surface);
+      transition: border-color .15s;
+    }
+    .form-field input:focus, .form-field select:focus {
+      outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light);
+    }
+    .form-field .hint { font-size: 11px; color: var(--ink-400); }
+
+    /* ─── 연도 테이블 ─── */
+    .year-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .year-table th {
+      padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600;
+      color: var(--ink-500); background: var(--ink-50); border-bottom: 1px solid var(--border);
+    }
+    .year-table td { padding: 8px 6px; border-bottom: 1px solid var(--ink-100); vertical-align: middle; }
+    .year-table tr:last-child td { border-bottom: none; }
+    .year-table input[type="number"], .year-table input[type="text"] {
+      width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 13px; text-align: right; background: var(--surface);
+    }
+    .year-table input:focus { outline: none; border-color: var(--primary); }
+    .year-label { font-weight: 600; color: var(--ink-700); white-space: nowrap; }
+    .year-deadline { font-size: 11px; color: var(--ink-400); }
+    .year-deadline.urgent { color: #dc2626; font-weight: 600; }
+
+    /* ─── 구분 토글 (DC/DB) ─── */
+    .type-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+    .type-tab { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px;
+                font-size: 12px; font-weight: 600; color: var(--ink-500); cursor: pointer;
+                transition: all .15s; background: var(--surface); }
+    .type-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* ─── 결과 섹션 ─── */
+    .result-section { display: none; }
+    .result-section.visible { display: block; }
+
+    .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 16px; }
+    .result-card-head { padding: 14px 20px; background: var(--ink-50); border-bottom: 1px solid var(--border); }
+    .result-card-head h3 { font-size: 13px; font-weight: 700; color: var(--ink-700); }
+    .result-card-body { padding: 16px 20px; }
+
+    /* 총액 강조 */
+    .total-highlight {
+      background: linear-gradient(135deg, #eef2ff 0%, #f0f9ff 100%);
+      border: 1.5px solid var(--primary);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    .total-highlight-label { font-size: 13px; color: var(--ink-600); font-weight: 600; }
+    .total-highlight-value { font-size: 28px; font-weight: 800; color: var(--primary-dark); letter-spacing: -.02em; }
+    .total-highlight-sub { font-size: 12px; color: var(--ink-400); margin-top: 2px; }
+
+    /* 결과 테이블 */
+    .result-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .result-table th { padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600;
+                       color: var(--ink-500); background: var(--ink-50); border-bottom: 1px solid var(--border); }
+    .result-table th.num { text-align: right; }
+    .result-table td { padding: 10px 12px; border-bottom: 1px solid var(--ink-100); }
+    .result-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .result-table tr:last-child td { border-bottom: none; }
+    .result-table tr.total-row td { font-weight: 700; color: var(--ink-900); background: var(--ink-50); border-top: 1.5px solid var(--border); }
+    .badge-ok    { background: var(--ok-bg);   color: var(--ok-text);   padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-warn  { background: var(--warn-bg); color: var(--warn-text); padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-err   { background: var(--err-bg);  color: var(--err-text);  padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+
+    /* 서류 체크리스트 */
+    .checklist { list-style: none; }
+    .checklist li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--ink-100); font-size: 13px; color: var(--ink-700); }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist-icon { width: 18px; height: 18px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .checklist-icon svg { width: 11px; height: 11px; }
+    .checklist-sub { font-size: 11px; color: var(--ink-400); margin-top: 2px; }
+
+    /* 절차 안내 */
+    .proc-steps { display: flex; flex-direction: column; gap: 0; }
+    .proc-step { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--ink-100); }
+    .proc-step:last-child { border-bottom: none; }
+    .proc-num { width: 24px; height: 24px; border-radius: 50%; background: var(--primary-light);
+                color: var(--primary-dark); font-size: 11px; font-weight: 700;
+                display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .proc-content { flex: 1; }
+    .proc-title { font-size: 13px; font-weight: 600; color: var(--ink-800); margin-bottom: 2px; }
+    .proc-desc  { font-size: 12px; color: var(--ink-500); }
+
+    /* 경고 박스 */
+    .warn-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius); padding: 12px 14px; font-size: 12px; color: #92400e; margin-bottom: 12px; }
+    .warn-box strong { display: block; margin-bottom: 2px; }
+
+    /* 계산 버튼 */
+    .btn-calc { width: 100%; padding: 13px; background: var(--primary); color: #fff;
+                border: none; border-radius: var(--radius-lg); font-size: 14px; font-weight: 700;
+                cursor: pointer; transition: background .15s; letter-spacing: -.01em; }
+    .btn-calc:hover { background: var(--primary-dark); }
+    .btn-calc:disabled { background: var(--ink-300); cursor: not-allowed; }
+
+    /* 복사 버튼 */
+    .btn-copy { padding: 7px 14px; background: var(--surface); border: 1px solid var(--border);
+                border-radius: var(--radius); font-size: 12px; font-weight: 600; color: var(--ink-600);
+                cursor: pointer; transition: all .15s; }
+    .btn-copy:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* 정보 알림 */
+    .info-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: var(--radius); padding: 12px 14px; font-size: 12px; color: #0c4a6e; margin-bottom: 12px; }
+
+    /* 소멸시효 상태 */
+    .deadline-ok   { color: var(--ok-text); font-weight: 600; }
+    .deadline-warn { color: var(--warn-text); font-weight: 600; }
+    .deadline-err  { color: var(--err-text); font-weight: 600; }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- 페이지 헤더 -->
+  <div class="page-hd">
+    <h1>임금채권부담금 경감(환급) 계산기</h1>
+    <p>퇴직연금 가입 사업장의 임금채권부담금 경감 적격성 검토 및 환급 추정액을 산출합니다.</p>
+    <span class="law-badge">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      임금채권보장법 §9·§10 / 시행령 §14·§15 / 시행규칙 §9
+    </span>
+  </div>
+
+  <!-- Step 1: 사업장 기본 정보 -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-step">1</div>
+      <span class="card-title">사업장 기본 정보</span>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="form-field">
+          <label>사업장명</label>
+          <input type="text" id="biz-name" placeholder="예: (주)도원산업">
+        </div>
+        <div class="form-field">
+          <label>사업장관리번호 <span style="font-weight:400;color:var(--ink-400)">(11자리, 끝자리 0·6)</span></label>
+          <input type="text" id="biz-no" placeholder="000-00-000000" maxlength="14">
+          <span class="hint">본·지사 합산 신청 시 법인등록번호 기준으로 모든 관리번호 포함</span>
+        </div>
+      </div>
+      <div class="form-row col3">
+        <div class="form-field">
+          <label>퇴직연금 유형</label>
+          <select id="pension-type">
+            <option value="">선택</option>
+            <option value="DC">DC형 (확정기여형)</option>
+            <option value="DB">DB형 (확정급여형)</option>
+            <option value="MIXED">DC+DB 혼합</option>
+            <option value="NONE">미가입</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>운용사 수</label>
+          <select id="pension-provider-count">
+            <option value="1">1개사</option>
+            <option value="2">2개사</option>
+            <option value="3+">3개사 이상</option>
+          </select>
+          <span class="hint">DC 복수 운용사 시 운용사별 가입확인서 각 1장</span>
+        </div>
+        <div class="form-field">
+          <label>본·지사 구조</label>
+          <select id="branch-structure">
+            <option value="single">본사 단일</option>
+            <option value="integrated">본·지사 일괄</option>
+            <option value="separate">지사 별도 퇴직연금 가입</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 미가입 경고 -->
+      <div id="none-warning" class="warn-box" style="display:none;">
+        <strong>경감 신청 불가</strong>
+        퇴직연금(DC/DB형), 중간정산, 출국만기보험, 보증보험 중 하나 이상 가입해야 경감 신청이 가능합니다.
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: 연도별 납부 내역 -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-step">2</div>
+      <span class="card-title">연도별 보수총액·납부 내역</span>
+    </div>
+    <div class="card-body">
+      <div class="info-box">
+        <strong style="display:block;margin-bottom:3px;">확인 방법: 근복 토탈서비스 → 사업장 → 보험료 납부내역 조회</strong>
+        기준요율(0.6‰)은 고용노동부 고시로 매년 변경될 수 있습니다. 납부 연도별 고시를 확인 후 입력하세요.
+      </div>
+
+      <table class="year-table">
+        <thead>
+          <tr>
+            <th style="width:110px">보험연도</th>
+            <th>보수총액 (원)</th>
+            <th style="width:110px">기준요율 (‰)</th>
+            <th>임채부담금 납부액 (원)</th>
+            <th style="width:130px">소멸시효</th>
+          </tr>
+        </thead>
+        <tbody id="year-tbody">
+          <!-- JS로 채움 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Step 3: 퇴직연금 가입현황 -->
+  <div class="card" id="pension-detail-card">
+    <div class="card-head">
+      <div class="card-step">3</div>
+      <span class="card-title">퇴직연금 가입현황 <span style="font-size:12px;font-weight:400;color:var(--ink-400)">(산출기준일: 각 검토연도 전년도 말일)</span></span>
+    </div>
+    <div class="card-body">
+
+      <div id="dc-guide" style="display:none;">
+        <div class="info-box">DC형 가입확인서의 <strong>가입기간 합계</strong>와 <strong>근속년수 합계</strong>를 입력합니다.<br>복수 운용사인 경우 중복가입자를 제외한 실인원 기준으로 합산합니다.</div>
+      </div>
+      <div id="db-guide" style="display:none;">
+        <div class="info-box">DB형은 <strong>적립비율</strong>을 % 단위로 입력합니다 (예: 79.20 입력 → 내부 0.792로 환산).<br>주간사 통합 발급 권장. 미발급 시 운용사별 합산 후 중복가입자 제외.</div>
+      </div>
+
+      <table class="year-table" id="pension-table">
+        <thead>
+          <tr id="pension-thead">
+            <!-- JS로 채움 -->
+          </tr>
+        </thead>
+        <tbody id="pension-tbody">
+          <!-- JS로 채움 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 계산 버튼 -->
+  <button class="btn-calc" id="btn-calc" onclick="calculate()">환급 추정액 계산하기</button>
+
+  <!-- ─── 결과 섹션 ─── -->
+  <div class="result-section" id="result-section">
+
+    <!-- 총액 강조 -->
+    <div class="total-highlight" id="total-highlight">
+      <div>
+        <div class="total-highlight-label">총 환급 추정액</div>
+        <div class="total-highlight-sub" id="result-sub"></div>
+      </div>
+      <div style="text-align:right">
+        <div class="total-highlight-value" id="total-value">0원</div>
+        <button class="btn-copy" onclick="copyResult()" style="margin-top:8px">결과 복사</button>
+      </div>
+    </div>
+
+    <!-- 연도별 결과 -->
+    <div class="result-card">
+      <div class="result-card-head">
+        <h3>연도별 환급 추정액</h3>
+      </div>
+      <div class="result-card-body">
+        <table class="result-table" id="result-table">
+          <thead>
+            <tr>
+              <th>보험연도</th>
+              <th class="num">보수총액</th>
+              <th class="num">기준요율</th>
+              <th class="num">지급보장비율</th>
+              <th class="num">경감요율</th>
+              <th class="num">환급 추정액</th>
+              <th>소멸시효 만료</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+          <tbody id="result-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 과납·향후 절감 합산 -->
+    <div class="result-card">
+      <div class="result-card-head" style="display:flex;align-items:center;justify-content:space-between;">
+        <h3>절감 효과 요약</h3>
+      </div>
+      <div class="result-card-body">
+        <table class="result-table" id="savings-table">
+          <thead>
+            <tr>
+              <th>구분</th>
+              <th class="num">금액</th>
+              <th>비고</th>
+            </tr>
+          </thead>
+          <tbody id="savings-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 신청 서류 체크리스트 -->
+    <div class="result-card">
+      <div class="result-card-head">
+        <h3>신청 서류 체크리스트</h3>
+      </div>
+      <div class="result-card-body">
+        <ul class="checklist" id="checklist">
+          <!-- JS로 채움 -->
+        </ul>
+      </div>
+    </div>
+
+    <!-- 신청 절차 -->
+    <div class="result-card">
+      <div class="result-card-head">
+        <h3>신청 절차</h3>
+      </div>
+      <div class="result-card-body">
+        <div class="proc-steps">
+          <div class="proc-step">
+            <div class="proc-num">1</div>
+            <div class="proc-content">
+              <div class="proc-title">퇴직연금 운용사 → 가입확인서 수령</div>
+              <div class="proc-desc">산출기준일: <strong>검토 연도 전년도 말일</strong> 기준 · 연도별 1장 · DB형은 주간사 통합 발급 권장</div>
+            </div>
+          </div>
+          <div class="proc-step">
+            <div class="proc-num">2</div>
+            <div class="proc-content">
+              <div class="proc-title">근복 토탈서비스 → 임채부담금 경감 신청</div>
+              <div class="proc-desc">민원접수/신고 → 임채부담금 경감 신청 · DB형: 적립비율 입력 시 <strong>% 값 ÷100 환산 필수</strong> (예: 79.20 → 0.792)</div>
+            </div>
+          </div>
+          <div class="proc-step">
+            <div class="proc-num">3</div>
+            <div class="proc-content">
+              <div class="proc-title">과납금 환급 계좌 신청 (별도 절차)</div>
+              <div class="proc-desc">민원접수/신고 → 보험료신고 → 과납금 환급 계좌 신청 · 경감 신청과 <strong>별도로</strong> 반드시 진행</div>
+            </div>
+          </div>
+          <div class="proc-step">
+            <div class="proc-num">4</div>
+            <div class="proc-content">
+              <div class="proc-title">처리 확인 (약 2개월)</div>
+              <div class="proc-desc">신청 후 1주 → 요율 변경 확인 · 1개월 → 과납 보험료 발생 확인 · 2개월 → 환급 처리 확인</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 주의사항 -->
+    <div class="warn-box">
+      <strong>주의사항</strong>
+      · 본 계산 결과는 추정값이며 도원 어드민 자동 산출값과 대조 후 최종 확인하세요.<br>
+      · DB형 복수 운용사인 경우 중복 가입자 제외 실인원 계산이 필요합니다.<br>
+      · 퇴직정산분(해당 연도 퇴사자 기준)이 별도로 발생할 수 있습니다 — 퇴사자 있으면 공단 유선 문의.<br>
+      · 공단의 과납 보험료 처리 누락 가능 → 신청 후 2개월 시점 반드시 재확인.
+    </div>
+
+  </div><!-- /result-section -->
+
+</div><!-- /page-wrap -->
+
+<script>
+(function() {
+
+  /* ── 상수 ── */
+  const CURRENT_YEAR = 2026;
+  const BASE_RATE_DEFAULT = 0.6; // ‰ (기준요율 기본값, 매년 고시 확인 필요)
+  const CHECK_YEARS = [CURRENT_YEAR - 3, CURRENT_YEAR - 2, CURRENT_YEAR - 1]; // 2023, 2024, 2025
+
+  /* ── 소멸시효 만료일 계산 (납부 다음해 3.31 기준 + 3년) ── */
+  function getDeadline(year) {
+    // 보험연도 year의 확정보험료 납부기한: 익년 3.31
+    // 소멸시효 기산일: 익년 4.1, 만료: 기산일 + 3년
+    const deadline = new Date(year + 1 + 3, 2, 31); // year+4년 3월 31일
+    return deadline;
+  }
+
+  function formatDate(d) {
+    return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function daysLeft(d) {
+    const now = new Date();
+    return Math.ceil((d - now) / 86400000);
+  }
+
+  /* ── 숫자 포맷 ── */
+  function fmt(n) { return Math.round(n).toLocaleString('ko-KR'); }
+  function fmtRate(r) { return r.toFixed(4); }
+
+  /* ── 연도 테이블 초기화 ── */
+  function initYearTable() {
+    const tbody = document.getElementById('year-tbody');
+    tbody.innerHTML = '';
+    CHECK_YEARS.forEach(year => {
+      const dl = getDeadline(year);
+      const days = daysLeft(dl);
+      let dlClass = 'deadline-ok';
+      let dlBadge = '';
+      if (days < 0) { dlClass = 'deadline-err'; dlBadge = ' <span class="badge-err">만료</span>'; }
+      else if (days < 90) { dlClass = 'deadline-warn'; dlBadge = ' <span class="badge-warn">⚠ 임박</span>'; }
+
+      tbody.innerHTML += `
+        <tr>
+          <td>
+            <div class="year-label">${year}년</div>
+            <div class="year-deadline ${dlClass}">${formatDate(dl)}${dlBadge}</div>
+          </td>
+          <td><input type="number" id="pay-total-${year}" placeholder="0" min="0" step="1000000" oninput="autoCalcPaid(${year})"></td>
+          <td><input type="number" id="base-rate-${year}" value="${BASE_RATE_DEFAULT}" step="0.01" min="0.1" max="2" style="text-align:center"></td>
+          <td><input type="number" id="paid-amount-${year}" placeholder="자동 계산 또는 직접 입력" min="0" step="1000"></td>
+          <td style="text-align:center">
+            <span class="${dlClass}" style="font-size:12px;font-weight:600">${days < 0 ? '만료' : days + '일'}</span>
+          </td>
+        </tr>`;
+    });
+  }
+
+  /* ── 납부액 자동 계산 ── */
+  window.autoCalcPaid = function(year) {
+    const total = parseFloat(document.getElementById(`pay-total-${year}`).value) || 0;
+    const rate  = parseFloat(document.getElementById(`base-rate-${year}`).value) || BASE_RATE_DEFAULT;
+    const paid  = document.getElementById(`paid-amount-${year}`);
+    if (total > 0 && !paid._manualEdit) {
+      paid.value = Math.round(total * rate / 1000);
+    }
+  };
+
+  /* ── 퇴직연금 테이블 초기화 ── */
+  function initPensionTable(type) {
+    const thead = document.getElementById('pension-thead');
+    const tbody = document.getElementById('pension-tbody');
+    const dcGuide = document.getElementById('dc-guide');
+    const dbGuide = document.getElementById('db-guide');
+
+    dcGuide.style.display = (type === 'DC' || type === 'MIXED') ? '' : 'none';
+    dbGuide.style.display = (type === 'DB' || type === 'MIXED') ? '' : 'none';
+
+    if (type === 'DC' || type === 'MIXED') {
+      thead.innerHTML = `<th style="width:110px">보험연도</th><th>가입기간 합계 (년)</th><th>근속년수 합계 (년)</th><th>지급보장비율 (자동)</th>`;
+      tbody.innerHTML = '';
+      CHECK_YEARS.forEach(year => {
+        tbody.innerHTML += `
+          <tr>
+            <td class="year-label">${year}년<br><span style="font-size:11px;color:var(--ink-400)">기준일: ${year-1}.12.31</span></td>
+            <td><input type="number" id="pjoin-${year}" placeholder="예: 45.5" step="0.01" min="0" oninput="calcRatio(${year})"></td>
+            <td><input type="number" id="ptenure-${year}" placeholder="예: 52.0" step="0.01" min="0.01" oninput="calcRatio(${year})"></td>
+            <td id="pratio-${year}" style="text-align:right;font-weight:600;color:var(--primary-dark)">—</td>
+          </tr>`;
+      });
+    } else if (type === 'DB') {
+      thead.innerHTML = `<th style="width:110px">보험연도</th><th>DB형 적립비율 (%)</th><th>지급보장비율 (=적립비율)</th>`;
+      tbody.innerHTML = '';
+      CHECK_YEARS.forEach(year => {
+        tbody.innerHTML += `
+          <tr>
+            <td class="year-label">${year}년<br><span style="font-size:11px;color:var(--ink-400)">기준일: ${year-1}.12.31</span></td>
+            <td><input type="number" id="db-rate-${year}" placeholder="예: 79.20" step="0.01" min="0" max="100" oninput="calcDbRatio(${year})">
+                <div class="hint">% 단위 입력 (내부: ÷100 환산)</div></td>
+            <td id="pratio-${year}" style="text-align:right;font-weight:600;color:var(--primary-dark)">—</td>
+          </tr>`;
+      });
+    } else {
+      thead.innerHTML = '<th>—</th>';
+      tbody.innerHTML = '<tr><td style="color:var(--ink-400);font-size:13px;padding:14px">퇴직연금 유형을 먼저 선택하세요.</td></tr>';
+    }
+  }
+
+  window.calcRatio = function(year) {
+    const join   = parseFloat(document.getElementById(`pjoin-${year}`)?.value) || 0;
+    const tenure = parseFloat(document.getElementById(`ptenure-${year}`)?.value) || 0;
+    const el = document.getElementById(`pratio-${year}`);
+    if (!el) return;
+    if (tenure === 0) { el.textContent = '—'; return; }
+    const ratio = Math.min(join / tenure, 1.0);
+    el.textContent = (ratio * 100).toFixed(1) + '%';
+    el.dataset.ratio = ratio;
+  };
+
+  window.calcDbRatio = function(year) {
+    const pct = parseFloat(document.getElementById(`db-rate-${year}`)?.value) || 0;
+    const el  = document.getElementById(`pratio-${year}`);
+    if (!el) return;
+    const ratio = Math.min(pct / 100, 1.0);
+    el.textContent = (ratio * 100).toFixed(1) + '%';
+    el.dataset.ratio = ratio;
+  };
+
+  /* ── 퇴직연금 유형 변경 ── */
+  document.getElementById('pension-type').addEventListener('change', function() {
+    const t = this.value;
+    document.getElementById('none-warning').style.display = (t === 'NONE') ? '' : 'none';
+    initPensionTable(t);
+  });
+
+  /* ── 계산 실행 ── */
+  window.calculate = function() {
+    const bizName = document.getElementById('biz-name').value.trim() || '—';
+    const pensionType = document.getElementById('pension-type').value;
+
+    if (!pensionType || pensionType === 'NONE') {
+      alert('퇴직연금 유형을 선택하세요 (미가입 시 경감 신청 불가).');
+      return;
+    }
+
+    let totalRefund = 0;
+    let rows = [];
+    let hasExpired = false;
+    let hasUrgent  = false;
+
+    CHECK_YEARS.forEach(year => {
+      const payTotal  = parseFloat(document.getElementById(`pay-total-${year}`)?.value) || 0;
+      const baseRate  = parseFloat(document.getElementById(`base-rate-${year}`)?.value) || BASE_RATE_DEFAULT;
+      const paidAmt   = parseFloat(document.getElementById(`paid-amount-${year}`)?.value) || 0;
+      const ratioEl   = document.getElementById(`pratio-${year}`);
+      const ratio     = ratioEl ? (parseFloat(ratioEl.dataset.ratio) || 0) : 0;
+
+      const discountRate = baseRate * 0.5 * ratio; // ‰
+      const refund = payTotal > 0 ? Math.round(payTotal * discountRate / 1000) : 0;
+      totalRefund += refund;
+
+      const dl    = getDeadline(year);
+      const days  = daysLeft(dl);
+      if (days < 0) hasExpired = true;
+      if (days >= 0 && days < 90) hasUrgent = true;
+
+      let statusBadge = '';
+      if (days < 0) statusBadge = '<span class="badge-err">만료</span>';
+      else if (days < 90) statusBadge = '<span class="badge-warn">임박</span>';
+      else statusBadge = '<span class="badge-ok">신청가능</span>';
+
+      rows.push({ year, payTotal, baseRate, ratio, discountRate, refund, dl, days, statusBadge, paidAmt });
+    });
+
+    /* 결과 테이블 */
+    const rtbody = document.getElementById('result-tbody');
+    rtbody.innerHTML = '';
+    rows.forEach(r => {
+      rtbody.innerHTML += `
+        <tr>
+          <td><strong>${r.year}년</strong></td>
+          <td class="num">${r.payTotal > 0 ? fmt(r.payTotal) + '원' : '—'}</td>
+          <td class="num">${r.baseRate}‰</td>
+          <td class="num">${r.ratio > 0 ? (r.ratio*100).toFixed(1) + '%' : '—'}</td>
+          <td class="num">${r.ratio > 0 ? fmtRate(r.discountRate) + '‰' : '—'}</td>
+          <td class="num"><strong>${r.refund > 0 ? fmt(r.refund) + '원' : '—'}</strong></td>
+          <td style="font-size:12px">${formatDate(r.dl)}<br><span style="color:var(--ink-400)">${r.days < 0 ? '만료' : r.days + '일 남음'}</span></td>
+          <td>${r.statusBadge}</td>
+        </tr>`;
+    });
+    rtbody.innerHTML += `
+      <tr class="total-row">
+        <td colspan="5">합계</td>
+        <td class="num">${fmt(totalRefund)}원</td>
+        <td colspan="2">—</td>
+      </tr>`;
+
+    /* 총액 강조 */
+    document.getElementById('total-value').textContent = fmt(totalRefund) + '원';
+    document.getElementById('result-sub').textContent =
+      `${bizName} · ${CHECK_YEARS[0]}~${CHECK_YEARS[CHECK_YEARS.length-1]}년분 직전 3개년`;
+
+    /* 절감 요약 */
+    const stbody = document.getElementById('savings-tbody');
+    const annualEst = rows.find(r => r.year === CURRENT_YEAR - 1);
+    const annualRefund = annualEst ? annualEst.refund : Math.round(totalRefund / 3);
+    stbody.innerHTML = `
+      <tr><td>과거 3개년 환급 추정액</td><td class="num">${fmt(totalRefund)}원</td><td>경감 미신청 소급분</td></tr>
+      <tr><td>연간 향후 절감 추정액</td><td class="num">약 ${fmt(annualRefund)}원 / 년</td><td>경감 신청 후 매년</td></tr>
+      <tr class="total-row"><td>5년 누적 절감 추정액</td><td class="num">약 ${fmt(totalRefund + annualRefund * 5)}원</td><td>과거 3년 + 향후 5년 기준</td></tr>`;
+
+    /* 서류 체크리스트 */
+    const cl = document.getElementById('checklist');
+    const checkItems = [
+      { text: '임금채권부담금 경감신청서 (별지 제7호서식)', sub: '근로복지공단 토탈서비스 자동 생성' },
+      { text: '퇴직연금제도 가입확인서', sub: pensionType === 'DB' ? 'DB형 — 각 검토연도 전년도 말일 기준, 주간사 통합 발급 권장' : 'DC형 — 각 검토연도 전년도 말일 기준, 운용사별 각 1장' },
+      { text: '사업자등록증 (법인등기부등본)', sub: '본·지사 일괄 신청 시 전 사업장 목록 포함' },
+      { text: '대리인선임신고서 (별지 제1호)', sub: '근로복지공단 제출용' },
+      { text: '과납금 환급 계좌 신청 (별도 절차)', sub: '민원접수/신고 → 보험료신고 → 과납금 환급 계좌 신청' },
+    ];
+    if (pensionType === 'DB') {
+      checkItems.splice(2, 0, { text: 'DB형 적립비율 확인서', sub: '주간사 발급 또는 운용사별 별도 수령 후 중복가입자 제외' });
+    }
+    cl.innerHTML = checkItems.map(item => `
+      <li>
+        <div class="checklist-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div><div>${item.text}</div><div class="checklist-sub">${item.sub}</div></div>
+      </li>`).join('');
+
+    /* 결과 표시 */
+    const resultSection = document.getElementById('result-section');
+    resultSection.classList.add('visible');
+    resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  /* ── 결과 복사 ── */
+  window.copyResult = function() {
+    const bizName = document.getElementById('biz-name').value.trim() || '—';
+    const rows = CHECK_YEARS.map(year => {
+      const refundEl = document.querySelector(`#result-tbody tr:nth-child(${CHECK_YEARS.indexOf(year)+1}) td:nth-child(6)`);
+      return refundEl ? `${year}년: ${refundEl.textContent.trim()}` : '';
+    }).filter(Boolean).join(' / ');
+    const total = document.getElementById('total-value').textContent;
+    const text = `[임채부담금 경감 검토 결과]\n사업장: ${bizName}\n${rows}\n총 추정액: ${total}\n\n신청 필요: 근복 토탈서비스 → 임채부담금 경감 신청 + 과납금 환급 계좌 신청`;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.querySelector('.btn-copy');
+      btn.textContent = '복사 완료!';
+      setTimeout(() => btn.textContent = '결과 복사', 1500);
+    });
+  };
+
+  /* ── 초기화 ── */
+  initYearTable();
+  initPensionTable('');
+
+  // 납부액 수동 편집 감지
+  document.addEventListener('change', function(e) {
+    if (e.target.id && e.target.id.startsWith('paid-amount-')) {
+      e.target._manualEdit = true;
+    }
+  });
+
+})();
+</script>
+
+</body>
+</html>

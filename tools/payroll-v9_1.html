@@ -18,8 +18,8 @@ v9.0 changelog (2026-04-22)
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" integrity="sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" integrity="sha384-MhvFknC0AhqKZXwSCyPeIirpE1IhTafmLXTvTCai5pxjAqFcqEAAqKH/2lXrFVPn" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" integrity="sha384-VQePqH/QE94Buf4g/4MI5NrqDYjdqT7JW6KzhieQUlw6w7U7VD59fPqCAunpXEu6" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="../assets/style.css">
 <style>
 :root {
@@ -877,12 +877,12 @@ function onScopeChange() {
 
 // API 사용량 추적
 function getApiUsage() {
-  const today = new Date().toISOString().slice(0,10);
+  const today = new Date().toLocaleDateString('sv-SE', {timeZone:'Asia/Seoul'});
   const raw = localStorage.getItem('api_usage_' + today);
   return raw ? JSON.parse(raw) : {pages:0, cost:0};
 }
 function addApiUsage(pages) {
-  const today = new Date().toISOString().slice(0,10);
+  const today = new Date().toLocaleDateString('sv-SE', {timeZone:'Asia/Seoul'});
   const u = getApiUsage();
   const costPerPage = _visionModel === 'gemini' ? VISION_MODELS.primary.costPerPage : VISION_MODELS.fallback.costPerPage;
   u.pages += pages;
@@ -896,7 +896,7 @@ function updateApiUsageDisplay() {
   document.getElementById('apiCostToday').textContent = Math.round(u.cost);
 }
 function resetApiUsage() {
-  const today = new Date().toISOString().slice(0,10);
+  const today = new Date().toLocaleDateString('sv-SE', {timeZone:'Asia/Seoul'});
   localStorage.removeItem('api_usage_' + today);
   updateApiUsageDisplay();
 }
@@ -5767,7 +5767,7 @@ function exportManualChecks() {
     data.push([i+1, mc.priority||'P2', mc.name, mc.month||'', mc.content, pay, trf, diff, mc.checked?'O':'']);
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), '수기확인목록');
-  XLSX.writeFile(wb, `수기확인_${now.toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `수기확인_${now.toLocaleDateString('sv-SE', {timeZone:'Asia/Seoul'})}.xlsx`);
 }
 
 // ===== EXPORT =====
@@ -5874,7 +5874,7 @@ function exportResults() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mcData), '수기확인목록');
   }
 
-  XLSX.writeFile(wb, `급여서류_검증결과_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `급여서류_검증결과_${new Date().toLocaleDateString('sv-SE', {timeZone:'Asia/Seoul'})}.xlsx`);
 }
 
 // ===== UTILS =====
