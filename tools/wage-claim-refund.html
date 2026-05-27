@@ -405,9 +405,9 @@
 (function() {
 
   /* ── 상수 ── */
-  const CURRENT_YEAR = 2026;
+  const CURRENT_YEAR = new Date().getFullYear(); // 매년 자동 갱신
   const BASE_RATE_DEFAULT = 0.6; // ‰ (기준요율 기본값, 매년 고시 확인 필요)
-  const CHECK_YEARS = [CURRENT_YEAR - 3, CURRENT_YEAR - 2, CURRENT_YEAR - 1]; // 2023, 2024, 2025
+  const CHECK_YEARS = [CURRENT_YEAR - 3, CURRENT_YEAR - 2, CURRENT_YEAR - 1];
 
   /* ── 소멸시효 만료일 계산 (납부 다음해 3.31 기준 + 3년) ── */
   function getDeadline(year) {
@@ -478,7 +478,7 @@
     dcGuide.style.display = (type === 'DC' || type === 'MIXED') ? '' : 'none';
     dbGuide.style.display = (type === 'DB' || type === 'MIXED') ? '' : 'none';
 
-    if (type === 'DC' || type === 'MIXED') {
+    if (type === 'DC') {
       thead.innerHTML = `<th style="width:110px">보험연도</th><th>가입기간 합계 (년)</th><th>근속년수 합계 (년)</th><th>지급보장비율 (자동)</th>`;
       tbody.innerHTML = '';
       CHECK_YEARS.forEach(year => {
@@ -488,6 +488,25 @@
             <td><input type="number" id="pjoin-${year}" placeholder="예: 45.5" step="0.01" min="0" oninput="calcRatio(${year})"></td>
             <td><input type="number" id="ptenure-${year}" placeholder="예: 52.0" step="0.01" min="0.01" oninput="calcRatio(${year})"></td>
             <td id="pratio-${year}" style="text-align:right;font-weight:600;color:var(--primary-dark)">—</td>
+          </tr>`;
+      });
+    } else if (type === 'MIXED') {
+      thead.innerHTML = `<th style="width:100px">보험연도</th>
+        <th>[DC] 가입기간 (년)</th><th>[DC] 근속년수 (년)</th><th>[DC] 비율</th>
+        <th>[DB] 적립비율 (%)</th><th>[DB] 비율</th>
+        <th style="color:var(--primary-dark)">[적용] 높은 값</th>`;
+      tbody.innerHTML = '';
+      CHECK_YEARS.forEach(year => {
+        tbody.innerHTML += `
+          <tr>
+            <td class="year-label">${year}년<br><span style="font-size:11px;color:var(--ink-400)">기준일: ${year-1}.12.31</span></td>
+            <td><input type="number" id="pjoin-${year}" placeholder="예: 45.5" step="0.01" min="0" oninput="calcMixedRatio(${year})"></td>
+            <td><input type="number" id="ptenure-${year}" placeholder="예: 52.0" step="0.01" min="0.01" oninput="calcMixedRatio(${year})"></td>
+            <td id="pdc-ratio-${year}" style="text-align:right;font-weight:600;color:var(--ink-500)">—</td>
+            <td><input type="number" id="db-rate-${year}" placeholder="예: 79.20" step="0.01" min="0" max="100" oninput="calcMixedRatio(${year})">
+                <div class="hint">% 단위 입력</div></td>
+            <td id="pdb-ratio-${year}" style="text-align:right;font-weight:600;color:var(--ink-500)">—</td>
+            <td id="pratio-${year}" style="text-align:right;font-weight:700;color:var(--primary-dark)">—</td>
           </tr>`;
       });
     } else if (type === 'DB') {
@@ -528,6 +547,24 @@
     el.dataset.ratio = ratio;
   };
 
+  // MIXED: DC·DB 각각 산출 후 높은 값을 경감 비율로 사용 (추정값 — 실무 정산 시 비율 재확인)
+  window.calcMixedRatio = function(year) {
+    const join   = parseFloat(document.getElementById(`pjoin-${year}`)?.value)   || 0;
+    const tenure = parseFloat(document.getElementById(`ptenure-${year}`)?.value) || 0;
+    const pct    = parseFloat(document.getElementById(`db-rate-${year}`)?.value) || 0;
+    const dcEl   = document.getElementById(`pdc-ratio-${year}`);
+    const dbEl   = document.getElementById(`pdb-ratio-${year}`);
+    const el     = document.getElementById(`pratio-${year}`);
+    if (!el) return;
+    const dcRatio = tenure > 0 ? Math.min(join / tenure, 1.0) : 0;
+    const dbRatio = pct    > 0 ? Math.min(pct / 100,    1.0) : 0;
+    if (dcEl) dcEl.textContent = dcRatio > 0 ? (dcRatio * 100).toFixed(1) + '%' : '—';
+    if (dbEl) dbEl.textContent = dbRatio > 0 ? (dbRatio * 100).toFixed(1) + '%' : '—';
+    const combined = Math.max(dcRatio, dbRatio);
+    el.textContent  = combined > 0 ? (combined * 100).toFixed(1) + '%' : '—';
+    el.dataset.ratio = combined;
+  };
+
   /* ── 퇴직연금 유형 변경 ── */
   document.getElementById('pension-type').addEventListener('change', function() {
     const t = this.value;
@@ -557,14 +594,15 @@
       const ratioEl   = document.getElementById(`pratio-${year}`);
       const ratio     = ratioEl ? (parseFloat(ratioEl.dataset.ratio) || 0) : 0;
 
-      const discountRate = baseRate * 0.5 * ratio; // ‰
-      const refund = payTotal > 0 ? Math.round(payTotal * discountRate / 1000) : 0;
-      totalRefund += refund;
-
       const dl    = getDeadline(year);
       const days  = daysLeft(dl);
       if (days < 0) hasExpired = true;
       if (days >= 0 && days < 90) hasUrgent = true;
+
+      const discountRate = baseRate * 0.5 * ratio; // ‰
+      // 소멸시효 만료 연도는 환급 불가 → 합산 제외
+      const refund = (payTotal > 0 && days >= 0) ? Math.round(payTotal * discountRate / 1000) : 0;
+      totalRefund += refund;
 
       let statusBadge = '';
       if (days < 0) statusBadge = '<span class="badge-err">만료</span>';
@@ -585,7 +623,7 @@
           <td class="num">${r.baseRate}‰</td>
           <td class="num">${r.ratio > 0 ? (r.ratio*100).toFixed(1) + '%' : '—'}</td>
           <td class="num">${r.ratio > 0 ? fmtRate(r.discountRate) + '‰' : '—'}</td>
-          <td class="num"><strong>${r.refund > 0 ? fmt(r.refund) + '원' : '—'}</strong></td>
+          <td class="num"><strong>${r.refund > 0 ? fmt(r.refund) + '원' : r.days < 0 ? '<span class="badge-err">환급 불가 (만료)</span>' : '—'}</strong></td>
           <td style="font-size:12px">${formatDate(r.dl)}<br><span style="color:var(--ink-400)">${r.days < 0 ? '만료' : r.days + '일 남음'}</span></td>
           <td>${r.statusBadge}</td>
         </tr>`;
