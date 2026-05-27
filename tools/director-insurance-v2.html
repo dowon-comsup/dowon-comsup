@@ -84,11 +84,12 @@
   <a href="../index.html">&larr; 대시보드로 돌아가기</a>
 </div>
 <h1>적용제외 근로자성 판단 <span style="font-size:13px;color:var(--ink-400)">v2.0</span></h1>
-<p class="small">고용·산재보험 적용제외 근로자성을 자동 판정합니다. &nbsp;<b>[등기임원]</b> 법인등기부등본 PDF + 근로자고용정보현황 → 취득취소/상실신고/정상 판정 &nbsp;|&nbsp; <b>[가족종사자]</b> 동거 여부 + 근로자성 체크리스트 → 고용·산재 적용제외 여부 검토. 모든 처리는 브라우저 내에서만 수행됩니다.</p>
+<p class="small">고용·산재보험 적용제외 근로자성을 자동 판정합니다. &nbsp;<b>[등기임원]</b> 법인등기부등본 PDF + 근로자고용정보현황 → 취득취소/상실신고/정상 판정 &nbsp;|&nbsp; <b>[가족종사자]</b> 동거 여부 + 근로자성 체크리스트 → 고용·산재 적용제외 여부 검토 &nbsp;|&nbsp; <b>[비등기임원]</b> 임원위촉계약서 기반 + 체크리스트 → 근로자성 판정. 모든 처리는 브라우저 내에서만 수행됩니다.</p>
 
 <div class="main-tab-bar">
   <button class="main-tab-btn active" data-tab="director" onclick="switchMainTab('director',this)">📋 등기임원 판정</button>
   <button class="main-tab-btn" data-tab="family" onclick="switchMainTab('family',this)">👨‍👩‍👧 가족종사자 판정</button>
+  <button class="main-tab-btn" data-tab="nonreg" onclick="switchMainTab('nonreg',this)">🏢 비등기임원 판정</button>
 </div>
 
 <div id="mainTab-director">
@@ -186,6 +187,41 @@
   <div id="familyResult"><p class="small">판정 실행 후 결과가 표시됩니다.</p></div>
 
 </div><!-- /mainTab-family -->
+
+<!-- =============================================
+     비등기임원 판정 탭
+     ============================================= -->
+<div id="mainTab-nonreg" style="display:none">
+
+  <!-- 법적 근거 -->
+  <div class="box" style="background:#fffbef;border-color:#d97706;padding:12px 16px;margin-bottom:8px">
+    <b style="color:#92400e">⚖ 법적 근거 · 실무 기준</b>
+    <div class="small" style="margin-top:8px;line-height:1.8">
+      <b>비등기임원 정의</b> — 법인등기부에 등재되지 않은 임원(전무·상무·부사장·본부장 등). 등기임원과 달리 <b>위임계약과 근로계약 사이 회색 지대</b>에 위치.<br>
+      <b>고용보험</b> — 고용보험법 §2 제1호 · 근로기준법 §2 ①1: 실질적 지배종속 관계(지휘·감독, 보수 대가성, 근태 통제) 여부로 근로자성 판단.<br>
+      <b>산재보험</b> — 산업재해보상보험법 §6: 실질 노무 제공 기준. 등기 여부보다 <b>실제 근무 실태</b>가 핵심.<br>
+      <b>판례</b> — 대법원 2003다5061(2003.9.26) · 2019다208462: ① 업무 지휘·감독 ② 보수의 근로대가성 ③ 근무시간·장소 지정 여부로 근로자성 판단.<br>
+      <b style="color:#b45309">핵심 쟁점</b> — <b>임원위촉계약서(위임)</b>가 있어도 실질 근로관계가 인정되면 취득취소 불가. 서류보다 <b>실태</b>가 우선.
+    </div>
+  </div>
+
+  <!-- 근로자 목록 + 추가 버튼 -->
+  <div class="box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <b>비등기임원 목록</b>
+      <button class="sec" style="padding:6px 14px;font-size:12px;margin:0" onclick="addNrMember()">+ 임원 추가</button>
+    </div>
+    <div id="nrMemberList"></div>
+    <p class="small" id="nrHint" style="color:var(--ink-400)">[+ 임원 추가] 버튼으로 비등기임원을 입력하세요.</p>
+  </div>
+
+  <div style="text-align:center;margin:8px 0">
+    <button onclick="judgeNrAll()">▶ 판정 실행</button>
+  </div>
+
+  <div id="nrResult"><p class="small">판정 실행 후 결과가 표시됩니다.</p></div>
+
+</div><!-- /mainTab-nonreg -->
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1442,6 +1478,7 @@ function switchMainTab(tab, btn) {
   btn.classList.add('active');
   document.getElementById('mainTab-director').style.display = tab === 'director' ? '' : 'none';
   document.getElementById('mainTab-family').style.display  = tab === 'family'   ? '' : 'none';
+  document.getElementById('mainTab-nonreg').style.display  = tab === 'nonreg'   ? '' : 'none';
 }
 
 // =============================================
@@ -1782,6 +1819,322 @@ function _renderFResult(results) {
   </div>`;
 
   document.getElementById('familyResult').innerHTML = sumHtml + tbl + fActionHtml + warn;
+}
+
+// =============================================
+// 비등기임원 판정 모듈
+// =============================================
+
+// ── 체크리스트 정의 ─────────────────────────────
+const NR_NEG = [ // 근로자성 부인요소 (적용제외 방향)
+  { id:'delegation',   w:3, label:'임원위촉계약서(위임계약) 작성·보관',
+    note:'상법상 위임관계 형태 — 근로계약과 명확히 구별' },
+  { id:'management',   w:2, label:'이사회·경영회의 참여 및 경영의사결정 실질 관여',
+    note:'단순 직함 부여가 아닌 실질적 경영 참여 확인' },
+  { id:'freeWork',     w:2, label:'근무시간·장소 미규정, 출퇴근 자유',
+    note:'지휘·감독 관계 없음 — 독립적 업무 수행' },
+  { id:'authority',    w:1, label:'타 근로자 채용·지휘·감독 권한 보유',
+    note:'사업주 권한 위임 상태 (인사권 포함)' },
+  { id:'remuneration', w:1, label:'임원보수로 처리 (갑종 근로소득세 아닌 임원보수세)',
+    note:'지급조서상 근로소득이 아닌 임원 보수 처리' },
+];
+
+const NR_POS = [ // 근로자성 인정요소 (정상 유지 방향)
+  { id:'laborContract', w:3, label:'근로계약서 체결',
+    note:'고용·노동계약서 형태로 작성된 서면 계약서 존재' },
+  { id:'attendance',   w:2, label:'타 직원과 동일한 출퇴근·근태 관리',
+    note:'근태기록부·출퇴근 체크·지각/조퇴 처리 동일 적용' },
+  { id:'benefit',      w:2, label:'타 직원과 동일 복리후생(연차·퇴직금 등) 적용',
+    note:'취업규칙 동일 적용 (상위 처우 차이는 무관)' },
+  { id:'withholding',  w:1, label:'갑종 근로소득세 원천징수 신고',
+    note:'근로소득 원천징수영수증 발급 이력' },
+  { id:'payslip',      w:1, label:'급여명세서 정기 발급 (근기법 §48 ②)',
+    note:'임원보수 지급서와 달리 급여명세서 형태로 발급' },
+];
+
+let nrMembers = [];
+let nrCounter = 0;
+
+// ── 임원 카드 추가 ─────────────────────────────
+function addNrMember() {
+  document.getElementById('nrHint').style.display = 'none';
+  const id = ++nrCounter;
+  nrMembers.push({ id });
+  const wrap = document.getElementById('nrMemberList');
+
+  const negChecks = NR_NEG.map(c => `
+    <label class="fcheck-label">
+      <input type="checkbox" id="nrc-${id}-${c.id}" onchange="updateNrScore(${id})">
+      <span><b style="color:#b91c1c">[+${c.w}pt]</b> ${esc(c.label)}<em class="fcheck-note">${esc(c.note)}</em></span>
+    </label>`).join('');
+
+  const posChecks = NR_POS.map(c => `
+    <label class="fcheck-label">
+      <input type="checkbox" id="nrc-${id}-${c.id}" onchange="updateNrScore(${id})">
+      <span><b style="color:#065f46">[+${c.w}pt]</b> ${esc(c.label)}<em class="fcheck-note">${esc(c.note)}</em></span>
+    </label>`).join('');
+
+  const card = document.createElement('div');
+  card.className = 'fcard';
+  card.id = 'nrcard-' + id;
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <b style="font-size:13px">비등기임원 #${id}</b>
+      <button style="background:#d44;padding:3px 10px;font-size:11px;margin:0" onclick="removeNrMember(${id})">삭제</button>
+    </div>
+    <div class="fcard-grid-3">
+      <div>
+        <label class="flabel">직위명</label>
+        <input class="finput" id="nrtitle-${id}" placeholder="전무, 상무, 부사장 등">
+      </div>
+      <div>
+        <label class="flabel">성명</label>
+        <input class="finput" id="nrname-${id}" placeholder="홍길동">
+      </div>
+      <div>
+        <label class="flabel">계약 유형</label>
+        <select class="finput" id="nrcontract-${id}" onchange="updateNrContractHint(${id})">
+          <option value="">선택</option>
+          <option value="delegation">임원위촉계약서 (위임)</option>
+          <option value="labor">근로계약서</option>
+          <option value="none">별도 계약 없음 (구두)</option>
+        </select>
+      </div>
+    </div>
+    <div class="fcard-grid-2">
+      <div>
+        <label class="flabel">고용보험 취득일 <span class="small">(있는 경우)</span></label>
+        <input class="finput" type="date" id="nre-${id}">
+      </div>
+      <div>
+        <label class="flabel">산재보험 취득일 <span class="small">(있는 경우)</span></label>
+        <input class="finput" type="date" id="nrs-${id}">
+      </div>
+    </div>
+    <div id="nrcontract-hint-${id}" style="font-size:11.5px;padding:6px 10px;border-radius:4px;margin-bottom:10px;display:none"></div>
+    <div class="fcard-grid-2" style="align-items:start">
+      <div class="fchecks-section negative">
+        <h4>근로자성 부인요소 — 적용제외(취득취소) 방향</h4>
+        ${negChecks}
+      </div>
+      <div class="fchecks-section positive">
+        <h4>근로자성 인정요소 — 정상 유지 방향</h4>
+        ${posChecks}
+      </div>
+    </div>
+    <div id="nrscore-${id}" style="font-size:12px;color:var(--ink-600);text-align:right;margin-top:4px;padding-top:6px;border-top:1px dashed var(--border-dark)"></div>
+  `;
+  wrap.appendChild(card);
+}
+
+function removeNrMember(id) {
+  nrMembers = nrMembers.filter(m => m.id !== id);
+  const el = document.getElementById('nrcard-' + id);
+  if (el) el.remove();
+  if (!nrMembers.length) document.getElementById('nrHint').style.display = '';
+}
+
+function updateNrScore(id) {
+  let neg = 0, pos = 0;
+  NR_NEG.forEach(c => { if (document.getElementById(`nrc-${id}-${c.id}`)?.checked) neg += c.w; });
+  NR_POS.forEach(c => { if (document.getElementById(`nrc-${id}-${c.id}`)?.checked) pos += c.w; });
+  const net = neg - pos;
+  const el = document.getElementById('nrscore-' + id);
+  if (el) {
+    const col = net >= 4 ? '#b91c1c' : net >= 1 ? '#b45309' : '#065f46';
+    el.innerHTML = `부인요소 <b style="color:#b91c1c">${neg}점</b> &nbsp; 인정요소 <b style="color:#065f46">${pos}점</b> &nbsp; 순점수 <b style="color:${col}">${net >= 0 ? '+' : ''}${net}점</b>`;
+  }
+}
+
+function updateNrContractHint(id) {
+  const val = document.getElementById(`nrcontract-${id}`)?.value;
+  const hintEl = document.getElementById(`nrcontract-hint-${id}`);
+  if (!hintEl) return;
+  const hints = {
+    delegation: { bg:'#fff3cd', color:'#92400e', text:'⚠ 임원위촉계약서(위임계약) — 상법상 위임관계로 근로자성 낮음. 단, 실질 근로관계가 인정되면 취득취소 불가.' },
+    labor:      { bg:'#d1fae5', color:'#065f46', text:'✓ 근로계약서 — 근로자성 인정 가능성 높음. 체크리스트상 인정요소도 함께 확인하세요.' },
+    none:       { bg:'#fef2f2', color:'#b91c1c', text:'⚠ 별도 계약 없음(구두) — 실질 근로관계 여부로 판단. 서면 계약 부재 시 분쟁 위험 높음.' },
+  };
+  if (hints[val]) {
+    Object.assign(hintEl.style, { background: hints[val].bg, color: hints[val].color, display: '' });
+    hintEl.textContent = hints[val].text;
+  } else {
+    hintEl.style.display = 'none';
+  }
+}
+
+// ── 판정 실행 ──────────────────────────────────
+function judgeNrAll() {
+  if (!nrMembers.length) { alert('비등기임원을 추가하세요.'); return; }
+  const results = nrMembers.map(m => {
+    const id = m.id;
+    const title    = (document.getElementById('nrtitle-' + id)?.value || '').trim() || '임원';
+    const name     = (document.getElementById('nrname-'  + id)?.value || '').trim() || ('#' + id);
+    const contract = document.getElementById('nrcontract-' + id)?.value || '';
+    const eAcq     = document.getElementById('nre-' + id)?.value || '';
+    const sAcq     = document.getElementById('nrs-' + id)?.value || '';
+    let neg = 0, pos = 0;
+    NR_NEG.forEach(c => { if (document.getElementById(`nrc-${id}-${c.id}`)?.checked) neg += c.w; });
+    NR_POS.forEach(c => { if (document.getElementById(`nrc-${id}-${c.id}`)?.checked) pos += c.w; });
+    return _judgeNrOne({ title, name, contract, eAcq, sAcq, neg, pos });
+  });
+  _renderNrResult(results);
+  document.getElementById('nrResult').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ── 개인별 판정 로직 ───────────────────────────
+function _judgeNrOne({ title, name, contract, eAcq, sAcq, neg, pos }) {
+  const cutoff = CUTOFF;
+  const net = neg - pos;
+
+  const baseNote = {
+    delegation: '임원위촉계약서(위임계약) — 상법상 위임관계. 원칙적으로 근로자성 낮음.',
+    labor:      '근로계약서 체결 — 근로자성 인정 가능성 높음.',
+    none:       '별도 계약 없음(구두) — 실질 근로관계 여부로 판단.',
+  }[contract] || '계약유형 미선택 — 계약서 확인 필요.';
+
+  // 고용보험 판정
+  let empJ, empD;
+  if (contract === 'labor' && net <= 0) {
+    empJ = '정상 (근로자성 인정)';
+    empD = `근로계약서 체결 + 인정요소 우세(순점수 ${net}점) → 고용보험 가입 유지 권고. ${baseNote}`;
+  } else if (net >= 4) {
+    empJ = '취득취소 가능';
+    empD = `부인요소 우세(순점수 +${net}점) → 고용보험 적용제외 검토. ${baseNote}`;
+  } else if (net >= 1) {
+    empJ = '검토필요';
+    empD = `판단 모호(순점수 +${net}점) → 서류 보강 및 관할 근로복지공단 확인 권고. ${baseNote}`;
+  } else {
+    empJ = '정상 (근로자성 인정)';
+    empD = `인정요소 우세(순점수 ${net}점) → 고용보험 가입 유지 권고. ${baseNote}`;
+  }
+
+  // 산재보험 판정 (실질 노무 제공 기준 더 넓게 인정)
+  let accJ, accD;
+  if (contract === 'labor' && net <= 0) {
+    accJ = '정상 (근로자성 인정)';
+    accD = `근로계약서 체결 + 인정요소 우세 → 산재보험 가입 유지 권고.`;
+  } else if (net >= 5) {
+    accJ = '취득취소 가능';
+    accD = `부인요소 강함(순점수 +${net}점) → 산재보험 적용제외 검토. 단, 산재는 실질 노무 제공 기준이 넓어 신중 판단 필요.`;
+  } else if (net >= 2) {
+    accJ = '검토필요';
+    accD = `판단 모호(순점수 +${net}점) → 산재보험은 적용 범위가 넓어 취득취소보다 유지 결론이 많음. 별도 검토 권고.`;
+  } else {
+    accJ = '정상 (근로자성 인정)';
+    accD = `인정요소 우세(순점수 ${net}점) → 산재보험 가입 유지 권고.`;
+  }
+
+  // 소멸시효 계산
+  function toStr(acq, label) {
+    if (!acq) return null;
+    if (acq < cutoff)
+      return `${label} 취득일(${acq}) < 소멸시효 기준(${cutoff}) → 시효 내(${cutoff}~)만 환급`;
+    return `${label} 취득일(${acq}) → 전체 기간 시효 내 (기준: ${cutoff})`;
+  }
+
+  const rank = { '취득취소 가능': 3, '검토필요': 2, '정상 (근로자성 인정)': 1 };
+  const topRank = Math.max(rank[empJ] || 0, rank[accJ] || 0);
+  const color = topRank >= 3 ? 'j-cancel' : topRank >= 2 ? 'j-review' : 'j-ok';
+
+  return { title, name, contract, neg, pos, net, empJ, empD, accJ, accD,
+    eTO: toStr(eAcq, '고용보험'), sTO: toStr(sAcq, '산재보험'),
+    color, eAcq, sAcq };
+}
+
+// ── 결과 렌더링 ────────────────────────────────
+function _renderNrResult(results) {
+  const contractLabel = { delegation:'임원위촉(위임)', labor:'근로계약서', none:'없음(구두)', '':'미선택' };
+
+  // 요약
+  const cnt = {};
+  results.forEach(r => { cnt[r.empJ] = (cnt[r.empJ] || 0) + 1; });
+  let sumHtml = '<p style="margin:8px 0 6px"><b>요약(고용보험 기준):</b> ';
+  Object.entries(cnt).forEach(([k, v]) => { sumHtml += `${esc(k)} <b>${v}건</b> &nbsp;`; });
+  sumHtml += `<span class="small">(총 ${results.length}명)</span></p>`;
+
+  // 결과 테이블
+  let tbl = '<div style="overflow-x:auto"><table><colgroup>'
+    + '<col style="width:7%"><col style="width:7%"><col style="width:10%">'
+    + '<col style="width:4%"><col style="width:4%"><col style="width:5%">'
+    + '<col style="width:11%"><col style="width:11%">'
+    + '<col style="width:18%"><col style="width:18%"><col style="width:auto">'
+    + '</colgroup>'
+    + '<thead><tr>'
+    + '<th>직위</th><th>성명</th><th>계약유형</th><th>부인</th><th>인정</th><th>순점</th>'
+    + '<th>고용보험 판정</th><th>산재보험 판정</th>'
+    + '<th>고용보험 근거</th><th>산재보험 근거</th><th>소멸시효</th>'
+    + '</tr></thead><tbody>';
+
+  results.forEach(r => {
+    const netFmt = r.net > 0 ? `<b style="color:#b91c1c">+${r.net}</b>`
+                 : r.net < 0 ? `<b style="color:#065f46">${r.net}</b>`
+                 : `<b>${r.net}</b>`;
+    const toHtml = [r.eTO, r.sTO].filter(Boolean).map(t => `<div>${esc(t)}</div>`).join('')
+      || '<span class="small">—</span>';
+
+    tbl += `<tr class="${r.color || ''}">`
+      + `<td>${esc(r.title)}</td>`
+      + `<td>${esc(r.name)}</td>`
+      + `<td>${esc(contractLabel[r.contract] || r.contract)}</td>`
+      + `<td style="text-align:center"><b style="color:#b91c1c">${r.neg}</b></td>`
+      + `<td style="text-align:center"><b style="color:#065f46">${r.pos}</b></td>`
+      + `<td style="text-align:center">${netFmt}</td>`
+      + `<td><b>${esc(r.empJ)}</b></td>`
+      + `<td><b>${esc(r.accJ)}</b></td>`
+      + `<td class="reason"><div>${esc(r.empD)}</div></td>`
+      + `<td class="reason"><div>${esc(r.accD)}</div></td>`
+      + `<td class="reason">${toHtml}</td>`
+      + `</tr>`;
+  });
+  tbl += '</tbody></table></div>';
+
+  // 취득취소 있는 경우 추가 안내 블록
+  const hasCancelNr = results.some(r => r.empJ === '취득취소 가능' || r.accJ === '취득취소 가능');
+  let actionHtml = '';
+  if (hasCancelNr) {
+    actionHtml = `
+    <div style="margin-top:12px;padding:10px 12px;background:#fff3cd;border:1px solid #f59e0b;border-radius:4px;font-size:11.5px;line-height:1.8">
+      <b>⚠ 취득취소 신청 전 필수 확인사항 (교육자료 §4)</b>
+      <div style="margin-top:5px;display:grid;gap:2px">
+        <div>① 퇴직 후 3개월 내 <b>이직확인서 발급·처리 이력</b> 여부 확인</div>
+        <div>② <b>실업급여·고용지원금 수급 이력</b> 여부 확인 — 부정수급 환수·제재 위험</div>
+        <div>③ <b>소득세 감면 수령 여부</b> 확인 (중소기업 취업청년 등)</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;padding:10px 12px;background:#f0f9ff;border:1px solid #7dd3fc;border-radius:4px;font-size:11.5px;line-height:1.8">
+      <b>📋 취득취소 신청 시 제출서류 (비등기임원, 교육자료 §6)</b>
+      <div style="margin-top:5px;display:grid;gap:3px">
+        <div>• <b>임원위촉계약서</b> (위임계약 형태 확인용)</div>
+        <div>• <b>법인등기부등본</b> (비등기임원 여부 확인)</div>
+        <div>• <b>이사회 회의록</b> (선임 근거)</div>
+        <div>• 개명 이력 있는 경우: 위 서류 + <b>주민등록 초본</b></div>
+      </div>
+    </div>
+    <div style="margin-top:8px;padding:10px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:4px;font-size:11.5px;line-height:1.8">
+      <b>📌 피보험자·고용정보 내역취소신청 절차 (고용24, 교육자료 §7)</b>
+      <ol style="margin:6px 0 0 20px;padding:0">
+        <li>고용24 → 피보험자·고용정보 <b>내역취소신청</b> 메뉴 접근</li>
+        <li><b>고용보험 / 산재보험</b> — 해당 보험 체크</li>
+        <li><b>취소내역 기입</b> (취득일·상실일·사유)</li>
+        <li>비고란 <b>작성 금지</b></li>
+        <li>은행계좌 — 있으면 기재, <b>없으면 미기입</b></li>
+        <li>증빙서류 첨부 제출</li>
+        <li>신고자료 검증 후 취소 확인 → PDF <b>반드시 보관</b></li>
+      </ol>
+    </div>`;
+  }
+
+  const warn = `<div style="margin-top:12px;padding:10px 12px;background:#fff8e1;border:1px solid #fb8;border-radius:4px;font-size:11.5px;line-height:1.7">
+    <b>⚠ 주의사항</b><br>
+    ① 본 판정은 체크리스트 기반 <b>참고 자료</b>입니다. 최종 판단은 담당 노무사 · 관할 근로복지공단이 확인합니다.<br>
+    ② 임원위촉계약서가 있어도 실질 근로관계(출퇴근 통제, 급여명세서 발급 등)가 인정되면 취득취소 <b>불가</b>.<br>
+    ③ 비등기임원도 실질 지배종속 관계가 인정되면 4대보험 <b>의무 가입</b> 대상.<br>
+    ④ <b>소멸시효 3년</b>: 보험료 납부기한 다음 날 기산 (고용·산재보험료징수 등에 관한 법률 §41).<br>
+    ⑤ 국민연금·건강보험은 본 도구에서 다루지 않습니다.
+  </div>`;
+
+  document.getElementById('nrResult').innerHTML = sumHtml + tbl + actionHtml + warn;
 }
 </script>
 <script src="../assets/modal.js"></script>
