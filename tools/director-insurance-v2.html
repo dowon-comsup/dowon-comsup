@@ -1374,18 +1374,38 @@ function renderResultTable(results){
     +`<td>${esc(r.appoint||'')}</td><td>${esc(r.resign||'')}</td>`
     +`<td>${esc(r.eAcq||'')}</td><td>${esc(r.eLoss||'')}</td>`
     +`<td>${esc(r.sAcq||'')}</td><td>${esc(r.sLoss||'')}</td>`
-    +`<td><b>${esc(r.judgmentE||'-')}</b></td><td><b>${esc(r.judgmentS||'-')}</b></td>`
+    +`<td>${r.judgmentE==='상실신고'?`<b>${esc(r.judgmentE)}</b><br><span style="font-size:10px;color:#92400e;background:#fef3c7;padding:1px 4px;border-radius:2px;white-space:nowrap">코드41·사유01</span>`:esc(r.judgmentE)==='-'?'-':`<b>${esc(r.judgmentE||'-')}</b>`}</td>`
+    +`<td>${r.judgmentS==='상실신고'?`<b>${esc(r.judgmentS)}</b><br><span style="font-size:10px;color:#92400e;background:#fef3c7;padding:1px 4px;border-radius:2px;white-space:nowrap">코드41·사유01</span>`:esc(r.judgmentS)==='-'?'-':`<b>${esc(r.judgmentS||'-')}</b>`}</td>`
     +`<td class="reason">${reasonHtml}</td>`
     +`<td class="reason">${confirmHtml}</td>`
     +`</tr>`;
  });
  h+='</tbody></table>';
 
- // ── Fix ②: 취득취소·상실신고 시 필수 확인사항 경고 ─────────────
- const _needsAction = results.some(r => r.judgment === '취득취소' || r.judgment === '상실신고');
- if (_needsAction) {
-  h += `<div style="margin-top:14px;padding:12px 14px;background:#fff3cd;border:1px solid #f59e0b;border-radius:6px;font-size:12px;line-height:1.8">
-    <b>⚠ 취득취소·상실신고 신청 전 필수 확인사항 (교육자료 §4)</b>
+ // ── 취소신고 vs 상실신고 분리 안내 ─────────────────────────────
+ const _hasCancel = results.some(r => r.judgment === '취득취소');
+ const _hasLoss   = results.some(r => r.judgment === '상실신고');
+ if (_hasCancel || _hasLoss) {
+  // ② 취소신고 vs 상실신고 구분 안내 박스
+  h += `<div style="margin-top:14px;padding:12px 14px;background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;font-size:12px;line-height:1.8">
+    <b>📌 취소신고 vs 상실신고 구분 (교육자료 §7)</b>
+    <table style="margin-top:8px;font-size:12px;border-collapse:collapse;width:100%">
+      <thead><tr style="background:#dbeafe">
+        <th style="padding:5px 8px;border:1px solid #bfdbfe;text-align:left">구분</th>
+        <th style="padding:5px 8px;border:1px solid #bfdbfe;text-align:left">상황</th>
+        <th style="padding:5px 8px;border:1px solid #bfdbfe;text-align:left">처리 방법</th>
+        <th style="padding:5px 8px;border:1px solid #bfdbfe;text-align:left">환급 범위</th>
+      </tr></thead>
+      <tbody>
+        <tr${_hasCancel ? ' style="background:#fef9c3"' : ''}><td style="padding:5px 8px;border:1px solid #bfdbfe"><b>취소신고</b></td><td style="padding:5px 8px;border:1px solid #bfdbfe">처음부터 잘못 취득 (적용제외 대상이었음)</td><td style="padding:5px 8px;border:1px solid #bfdbfe">고용24 → 피보험자·고용정보 <b>내역취소신청</b></td><td style="padding:5px 8px;border:1px solid #bfdbfe">취득일부터 전체 기간 환급</td></tr>
+        <tr${_hasLoss ? ' style="background:#fef9c3"' : ''}><td style="padding:5px 8px;border:1px solid #bfdbfe"><b>상실신고</b></td><td style="padding:5px 8px;border:1px solid #bfdbfe">취임 시점부터 신분 변경 (임원 등기 등)</td><td style="padding:5px 8px;border:1px solid #bfdbfe">고용24 → 자격관리 → <b>근로자자격상실신고</b> (구분코드 41, 사유 01)</td><td style="padding:5px 8px;border:1px solid #bfdbfe">상실일 이후 일할 계산 환급</td></tr>
+      </tbody>
+    </table>
+  </div>`;
+
+  // 필수 확인사항 경고 (취소·상실 공통)
+  h += `<div style="margin-top:10px;padding:12px 14px;background:#fff3cd;border:1px solid #f59e0b;border-radius:6px;font-size:12px;line-height:1.8">
+    <b>⚠ 신청 전 필수 확인사항 (교육자료 §4)</b>
     <div style="margin-top:6px;display:grid;gap:3px">
       <div>① 퇴직 후 3개월 내 <b>이직확인서 발급·처리 이력</b> 여부 확인 — 이직확인서 제출 후 취득취소 진행 시 실업급여 관계 정리 필요</div>
       <div>② <b>실업급여·고용지원금 수급 이력</b> 여부 확인 — 취득취소 시 부정수급 인정·환수·제재 위험</div>
@@ -1393,9 +1413,9 @@ function renderResultTable(results){
     </div>
   </div>`;
 
-  // ── Fix ③: 제출서류 안내 ──────────────────────────────────────
+  // ③ 제출서류 안내 — 통장사본(공통필수) + 상실신고 전용 서류 포함
   h += `<div style="margin-top:10px;padding:12px 14px;background:#f0f9ff;border:1px solid #7dd3fc;border-radius:6px;font-size:12px;line-height:1.8">
-    <b>📋 취득취소 신청 시 제출서류 안내 (교육자료 §6)</b>
+    <b>📋 제출서류 안내 (교육자료 §6)</b>
     <table style="margin-top:8px;font-size:12px;border-collapse:collapse;width:100%">
       <thead><tr style="background:#e0f2fe">
         <th style="padding:5px 8px;border:1px solid #bae6fd;text-align:left">대상 유형</th>
@@ -1406,14 +1426,17 @@ function renderResultTable(results){
         <tr><td style="padding:5px 8px;border:1px solid #bae6fd">비등기임원</td><td style="padding:5px 8px;border:1px solid #bae6fd">임원위촉계약서</td></tr>
         <tr><td style="padding:5px 8px;border:1px solid #bae6fd">대표자 본인이 대상인 경우</td><td style="padding:5px 8px;border:1px solid #bae6fd">사업자등록증 + 법인등기부등본</td></tr>
         <tr><td style="padding:5px 8px;border:1px solid #bae6fd">개명 이력 있는 경우 (추가)</td><td style="padding:5px 8px;border:1px solid #bae6fd">위 서류 + <b>주민등록 초본</b></td></tr>
+        <tr style="background:#fef9c3"><td style="padding:5px 8px;border:1px solid #bae6fd"><b>통장사본 (공통 필수)</b></td><td style="padding:5px 8px;border:1px solid #bae6fd">환급금 수령 계좌 — 금액이 클수록 공단에서 거의 100% 요청. <b>사전 준비 필수</b></td></tr>
+        ${_hasLoss ? `<tr style="background:#fff0f0"><td style="padding:5px 8px;border:1px solid #bae6fd"><b>상실신고 전용 (추가)</b></td><td style="padding:5px 8px;border:1px solid #bae6fd">등기년도 <b>원천징수부</b> + 등기 <b>전년도 원천징수영수증</b> (보수총액 일할 계산용)</td></tr>` : ''}
       </tbody>
     </table>
   </div>`;
 
-  // ── Fix ④: 신청 절차 7단계 ──────────────────────────────────
-  h += `<div style="margin-top:10px;padding:12px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:12px;line-height:1.8">
-    <b>📌 피보험자·고용정보 내역취소신청 절차 (고용24, 교육자료 §7)</b>
-    <ol style="margin:6px 0 0 20px;padding:0">
+  // ④ 절차 블록: 취소신고 + 상실신고 분리
+  h += `<div style="margin-top:10px;padding:12px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:12px;line-height:1.8">`;
+  if (_hasCancel) {
+    h += `<b>📌 [취소신고] 피보험자·고용정보 내역취소신청 절차 (고용24, 교육자료 §7)</b>
+    <ol style="margin:6px 0 6px 20px;padding:0">
       <li>고용24 → 피보험자·고용정보 <b>내역취소신청</b> 메뉴 접근</li>
       <li><b>고용보험 / 산재보험</b> — 해당 보험 체크 (복수 선택 가능)</li>
       <li><b>취소내역 기입</b> (취득일·상실일·사유 등)</li>
@@ -1422,7 +1445,24 @@ function renderResultTable(results){
       <li>증빙서류 첨부 제출</li>
       <li>신고자료 검증 후 취소 확인 → 제출서류 PDF <b>반드시 보관</b></li>
     </ol>
-  </div>`;
+    <div style="background:#fef9c3;padding:5px 8px;border-radius:4px;margin-bottom:${_hasLoss ? '10px' : '0'}">
+      ⚠ <b>외국인 체크</b>: 주민번호 뒷자리 첫째 자리가 <b>5 또는 6</b>이면 외국인 — 별도 체류자격 확인 필요<br>
+      ⚠ <b>생년월일 8자리</b>: 내역취소신청 화면 입력창이 있는 경우 반드시 YYYYMMDD 8자리 기재
+    </div>`;
+  }
+  if (_hasLoss) {
+    h += `<b>📌 [상실신고] 근로자 자격상실신고 절차 (고용24, 코드41·사유01)</b>
+    <ol style="margin:6px 0 0 20px;padding:0">
+      <li>고용24 → 자격관리 → <b>근로자자격상실신고</b> 메뉴 접근</li>
+      <li><b>구분코드 41</b> 선택 (고용보험 비적용 사유)</li>
+      <li><b>사유 01</b> 선택 (법 제10조 적용제외자)</li>
+      <li>상실일 = <b>임원 취임일</b> (신분 변경 시점 — 취임 전일까지 피보험자격 유지)</li>
+      <li>보수총액 = <b>상실일까지 일할 계산</b> (월급 ÷ 해당 월 일수 × 근무일)</li>
+      <li>증빙서류 첨부 (법인등기부등본·원천징수부 등)</li>
+      <li>신고자료 검증 후 접수 → 결과물 PDF <b>반드시 보관</b></li>
+    </ol>`;
+  }
+  h += `</div>`;
  }
 
  return h;
@@ -1804,6 +1844,7 @@ function _renderFResult(results) {
           <tr><td style="padding:4px 8px;border:1px solid #bae6fd">배우자·직계존비속·형제자매</td><td style="padding:4px 8px;border:1px solid #bae6fd">가족관계확인증명서</td></tr>
           <tr><td style="padding:4px 8px;border:1px solid #bae6fd">기타 친족 (4촌 이내)</td><td style="padding:4px 8px;border:1px solid #bae6fd">가족관계확인증명서 + <b>근로의 실질 불인정 입증자료</b></td></tr>
           <tr><td style="padding:4px 8px;border:1px solid #bae6fd">개명 이력 있는 경우 (추가)</td><td style="padding:4px 8px;border:1px solid #bae6fd">위 서류 + 주민등록 초본</td></tr>
+          <tr style="background:#fef9c3"><td style="padding:4px 8px;border:1px solid #bae6fd"><b>통장사본 (공통 필수)</b></td><td style="padding:4px 8px;border:1px solid #bae6fd">환급금 수령 계좌 — 금액이 클수록 공단에서 거의 100% 요청. <b>사전 준비 필수</b></td></tr>
         </tbody>
       </table>
     </div>`;
@@ -2104,12 +2145,17 @@ function _renderNrResult(results) {
     </div>
     <div style="margin-top:8px;padding:10px 12px;background:#f0f9ff;border:1px solid #7dd3fc;border-radius:4px;font-size:11.5px;line-height:1.8">
       <b>📋 취득취소 신청 시 제출서류 (비등기임원, 교육자료 §6)</b>
-      <div style="margin-top:5px;display:grid;gap:3px">
-        <div>• <b>임원위촉계약서</b> (위임계약 형태 확인용)</div>
-        <div>• <b>법인등기부등본</b> (비등기임원 여부 확인)</div>
-        <div>• <b>이사회 회의록</b> (선임 근거)</div>
-        <div>• 개명 이력 있는 경우: 위 서류 + <b>주민등록 초본</b></div>
-      </div>
+      <table style="margin-top:6px;font-size:11.5px;border-collapse:collapse;width:100%">
+        <thead><tr style="background:#e0f2fe">
+          <th style="padding:4px 8px;border:1px solid #bae6fd;text-align:left">대상 유형</th>
+          <th style="padding:4px 8px;border:1px solid #bae6fd;text-align:left">필수 제출서류</th>
+        </tr></thead>
+        <tbody>
+          <tr><td style="padding:4px 8px;border:1px solid #bae6fd">비등기임원 (공통)</td><td style="padding:4px 8px;border:1px solid #bae6fd"><b>임원위촉계약서</b> + <b>법인등기부등본</b> + <b>이사회 회의록</b> (선임 근거)</td></tr>
+          <tr><td style="padding:4px 8px;border:1px solid #bae6fd">개명 이력 있는 경우 (추가)</td><td style="padding:4px 8px;border:1px solid #bae6fd">위 서류 + <b>주민등록 초본</b></td></tr>
+          <tr style="background:#fef9c3"><td style="padding:4px 8px;border:1px solid #bae6fd"><b>통장사본 (공통 필수)</b></td><td style="padding:4px 8px;border:1px solid #bae6fd">환급금 수령 계좌 — 금액이 클수록 공단에서 거의 100% 요청. <b>사전 준비 필수</b></td></tr>
+        </tbody>
+      </table>
     </div>
     <div style="margin-top:8px;padding:10px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:4px;font-size:11.5px;line-height:1.8">
       <b>📌 피보험자·고용정보 내역취소신청 절차 (고용24, 교육자료 §7)</b>
