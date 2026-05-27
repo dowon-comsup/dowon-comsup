@@ -249,6 +249,11 @@
       <!-- 내부 도구 -->
       <div class="sidebar-section-title">내부 도구</div>
 
+      <a href="#" class="sidebar-link" data-page="tools/call-dashboard.html" data-title="통화 기록 대시보드" title="통화 기록 대시보드" onclick="loadTool(this);return false">
+        <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z"/></svg></span>
+        <span class="sidebar-link-text">통화 기록 대시보드</span>
+      </a>
+
       <a href="#" class="sidebar-link" data-page="tools/meeting-minutes.html" data-title="회의록 자동화" title="회의록 자동화" onclick="loadTool(this);return false">
         <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
         <span class="sidebar-link-text">회의록 자동화</span>
@@ -407,6 +412,40 @@
                 <div class="tool-card-simple-name">수기서류 OCR</div>
                 <div class="tool-card-simple-desc">스캔 서류에서 Gemini / Claude로 텍스트 자동 추출</div>
                 <div class="tool-card-simple-tags"><span class="tool-tag">AI OCR</span><span class="tool-tag">Gemini / Claude</span></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── 업무 자동화 섹션 ── -->
+        <div class="section-block">
+          <div class="section-header">
+            <div class="section-header-dot" style="background:#0284c7"></div>
+            <span class="section-header-title">업무 자동화</span>
+            <span class="section-header-count">도구 2종</span>
+          </div>
+          <div class="tools-grid-2">
+
+            <div class="tool-card-simple" onclick="loadToolByPage('tools/call-dashboard.html','통화 기록 대시보드')">
+              <div class="tool-card-simple-icon sky">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z"/></svg>
+              </div>
+              <div class="tool-card-simple-body">
+                <div class="tool-card-simple-name">통화 기록 대시보드 <span class="badge-version">v3</span></div>
+                <div class="tool-card-simple-desc">Daglo STT · Claude 분석 · Notion 자동기록 — 팀 통화 현황 실시간 조회</div>
+                <div class="tool-card-simple-tags"><span class="tool-tag">Call Pipeline</span><span class="tool-tag">담당자 통계</span><span class="tool-tag">ARS 감지</span></div>
+              </div>
+            </div>
+
+            <div class="tool-card-simple" onclick="loadToolByPage('tools/meeting-minutes.html','회의록 자동화')">
+              <div class="tool-card-simple-icon gray">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </div>
+              <div class="tool-card-simple-body">
+                <div class="tool-card-simple-name">회의록 자동화</div>
+                <div class="tool-card-simple-desc">회의 내용 자동 정리 및 요약</div>
+                <div class="tool-card-simple-tags"><span class="tool-tag">회의록</span></div>
               </div>
             </div>
 

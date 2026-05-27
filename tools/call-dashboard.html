@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>통화 기록 대시보드 — 도원</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif; background: #f4f6fb; color: #1a1a2e; font-size: 14px; }
+
+    /* ── Header ── */
+    header { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 14px 24px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 100; }
+    header h1 { font-size: 17px; font-weight: 700; }
+    .badge { font-size: 11px; background: #3b5bdb; color: #fff; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+    .badge-schema { font-size: 11px; background: #6d28d9; color: #fff; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+    #last-updated { margin-left: auto; font-size: 12px; color: #9ca3af; white-space: nowrap; }
+    #auto-refresh-status { font-size: 11px; color: #6b7280; }
+
+    main { max-width: 1480px; margin: 0 auto; padding: 20px 24px 40px; }
+
+    /* ── 탭 ── */
+    .tabs { display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; margin-bottom: 18px; }
+    .tab { padding: 10px 20px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color .15s, border-color .15s; }
+    .tab:hover { color: #374151; }
+    .tab.active { color: #3b5bdb; border-bottom-color: #3b5bdb; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── 필터 ── */
+    .filters { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+    .fg { display: flex; flex-direction: column; gap: 4px; }
+    .fg label { font-size: 11px; font-weight: 600; color: #6b7280; }
+    .fg select, .fg input[type=date] { border: 1px solid #d1d5db; border-radius: 8px; padding: 6px 10px; font-size: 13px; background: #fff; min-width: 130px; }
+    .btn { border: none; border-radius: 8px; padding: 7px 16px; font-size: 13px; cursor: pointer; font-weight: 600; }
+    .btn-primary { background: #3b5bdb; color: #fff; }
+    .btn-primary:hover { background: #2f4ac4; }
+    .btn-secondary { background: #f3f4f6; color: #374151; }
+    .btn-secondary:hover { background: #e5e7eb; }
+    .btn-icon { padding: 7px 12px; font-size: 13px; }
+
+    /* ── 통계 카드 ── */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .stat { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 18px; }
+    .stat .lbl { font-size: 11px; font-weight: 600; color: #6b7280; margin-bottom: 6px; }
+    .stat .val { font-size: 24px; font-weight: 700; }
+    .stat.accent-blue  .val { color: #3b5bdb; }
+    .stat.accent-green .val { color: #059669; }
+    .stat.accent-purple .val { color: #7c3aed; }
+    .stat.accent-orange .val { color: #d97706; }
+    .stat.accent-red   .val { color: #dc2626; }
+
+    /* ── 카드 ── */
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
+    .card h2 { font-size: 14px; font-weight: 700; color: #374151; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .chart-wrap { height: 200px; }
+
+    /* ── 테이블 ── */
+    .tbl-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+    .tbl-search { border: 1px solid #d1d5db; border-radius: 8px; padding: 6px 10px; font-size: 13px; width: 220px; }
+    .tbl-info { font-size: 12px; color: #6b7280; }
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { background: #f9fafb; color: #374151; font-weight: 600; text-align: left; padding: 9px 10px; border-bottom: 2px solid #e5e7eb; white-space: nowrap; cursor: pointer; user-select: none; }
+    th:hover { background: #f3f4f6; }
+    th .sort-icon { margin-left: 4px; color: #9ca3af; }
+    td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+    tr:hover td { background: #f9fafb; }
+    .tbl-pagination { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 12px; }
+    .tbl-pagination button { border: 1px solid #d1d5db; border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer; background: #fff; }
+    .tbl-pagination button:disabled { opacity: 0.4; cursor: default; }
+    .tbl-pagination button:not(:disabled):hover { background: #f3f4f6; }
+    .tbl-pagination .pg-info { font-size: 12px; color: #6b7280; }
+    .sc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #6b7280; }
+
+    /* ── 배지 ── */
+    .b-synced   { background: #d1fae5; color: #065f46; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+    .b-pending  { background: #fef3c7; color: #92400e; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+    .b-in       { background: #dbeafe; color: #1e40af; font-size: 11px; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+    .b-out      { background: #ede9fe; color: #5b21b6; font-size: 11px; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+    .b-done     { background: #d1fae5; color: #065f46; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+    .b-ars      { background: #fce7f3; color: #9d174d; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+    .b-proc     { background: #e0f2fe; color: #0369a1; font-size: 11px; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+    .b-fail     { background: #fee2e2; color: #991b1b; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+    .b-wait     { background: #f3f4f6; color: #6b7280; font-size: 11px; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+
+    a.nl       { color: #3b5bdb; text-decoration: none; font-size: 12px; }
+    a.nl:hover { text-decoration: underline; }
+    .empty-row td { text-align: center; color: #9ca3af; padding: 24px; }
+
+    /* ── 에러 배너 ── */
+    #error-banner { display: none; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 10px; color: #991b1b; padding: 14px 18px; margin-bottom: 16px; font-size: 13px; white-space: pre-wrap; line-height: 1.6; }
+
+    /* ── 통계 탭 ── */
+    .stats2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .stats-table table th { cursor: default; }
+    .stats-table table th:hover { background: #f9fafb; }
+
+    /* ── 기관 배지 ── */
+    .org-tag { font-size: 11px; background: #f0fdf4; color: #166534; padding: 1px 7px; border-radius: 12px; border: 1px solid #bbf7d0; white-space: nowrap; }
+    .org-none { font-size: 11px; color: #9ca3af; }
+
+    /* ── 통화시간 ── */
+    .dur { font-size: 12px; color: #374151; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+    /* ── 로딩 스피너 ── */
+    .loading-row td { text-align: center; color: #9ca3af; padding: 32px; font-size: 13px; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #d1d5db; border-top-color: #3b5bdb; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 담당자 칩 ── */
+    .user-chip { display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; color: #1d4ed8; font-size: 11px; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>통화 기록 대시보드</h1>
+  <span class="badge">도원 Call Pipeline</span>
+  <span class="badge-schema">Schema v3</span>
+  <span id="auto-refresh-status">🔄 5분 자동갱신</span>
+  <span id="last-updated"></span>
+</header>
+
+<main>
+  <div id="error-banner"></div>
+
+  <!-- ── 탭 네비게이션 ── -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('records')">📋 통화 기록</div>
+    <div class="tab" onclick="switchTab('stats')">📊 담당자 통계</div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!--  TAB 1: 통화 기록                                     -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div id="tab-records" class="tab-panel active">
+
+    <!-- 필터 -->
+    <div class="filters">
+      <div class="fg"><label>사용자</label><select id="f-user"><option value="">전체</option></select></div>
+      <div class="fg"><label>시작일</label><input type="date" id="f-start"></div>
+      <div class="fg"><label>종료일</label><input type="date" id="f-end"></div>
+      <div class="fg">
+        <label>방향</label>
+        <select id="f-dir">
+          <option value="">전체</option>
+          <option value="inbound">인바운드</option>
+          <option value="outbound">아웃바운드</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Daglo 상태</label>
+        <select id="f-daglo">
+          <option value="">전체</option>
+          <option value="done">처리 완료</option>
+          <option value="ars_skipped">ARS 스킵</option>
+          <option value="processing">처리 중</option>
+          <option value="failed">실패</option>
+          <option value="pending">대기</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>노션 동기화</label>
+        <select id="f-sync">
+          <option value="">전체</option>
+          <option value="synced">완료</option>
+          <option value="pending">대기</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="applyFilters()">조회</button>
+      <button class="btn btn-secondary" onclick="resetFilters()">초기화</button>
+      <button class="btn btn-secondary btn-icon" onclick="refreshAll()" title="새로고침">↺</button>
+    </div>
+
+    <!-- 통계 카드 -->
+    <div class="stats">
+      <div class="stat accent-blue">
+        <div class="lbl">전체 통화</div>
+        <div class="val" id="s-total">-</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">인바운드</div>
+        <div class="val" id="s-in">-</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">아웃바운드</div>
+        <div class="val" id="s-out">-</div>
+      </div>
+      <div class="stat accent-green">
+        <div class="lbl">노션 동기화</div>
+        <div class="val" id="s-sync">-</div>
+      </div>
+      <div class="stat accent-purple">
+        <div class="lbl">총 통화시간</div>
+        <div class="val" id="s-dur">-</div>
+      </div>
+      <div class="stat accent-orange">
+        <div class="lbl">ARS 스킵</div>
+        <div class="val" id="s-ars">-</div>
+      </div>
+      <div class="stat accent-red">
+        <div class="lbl">처리 실패</div>
+        <div class="val" id="s-fail">-</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">처리 중</div>
+        <div class="val" id="s-proc">-</div>
+      </div>
+    </div>
+
+    <!-- 차트 -->
+    <div class="card">
+      <h2>일별 통화량</h2>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    </div>
+
+    <!-- 통화 기록 테이블 -->
+    <div class="card">
+      <h2>통화 기록</h2>
+      <div class="tbl-toolbar">
+        <input class="tbl-search" id="tbl-search" type="text" placeholder="검색 (이름·번호·요약·기관…)" oninput="renderTable()">
+        <span class="tbl-info" id="tbl-info"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th onclick="setSort(0)">통화 시간 <span class="sort-icon" id="si-0"></span></th>
+              <th onclick="setSort(1)">전화번호 <span class="sort-icon" id="si-1"></span></th>
+              <th onclick="setSort(2)">상대방 <span class="sort-icon" id="si-2"></span></th>
+              <th onclick="setSort(3)">담당자 <span class="sort-icon" id="si-3"></span></th>
+              <th onclick="setSort(4)">방향 <span class="sort-icon" id="si-4"></span></th>
+              <th onclick="setSort(5)">통화시간 <span class="sort-icon" id="si-5"></span></th>
+              <th onclick="setSort(6)">Daglo <span class="sort-icon" id="si-6"></span></th>
+              <th onclick="setSort(7)">요약 <span class="sort-icon" id="si-7"></span></th>
+              <th onclick="setSort(8)">노션 <span class="sort-icon" id="si-8"></span></th>
+              <th>링크</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-body">
+            <tr class="loading-row"><td colspan="10"><span class="spinner"></span>데이터를 불러오는 중…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tbl-pagination">
+        <button id="pg-prev" onclick="changePage(-1)">이전</button>
+        <span class="pg-info" id="pg-info"></span>
+        <button id="pg-next" onclick="changePage(1)">다음</button>
+      </div>
+    </div>
+
+  </div><!-- /tab-records -->
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!--  TAB 2: 담당자 통계                                   -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div id="tab-stats" class="tab-panel">
+
+    <div class="filters">
+      <div class="fg"><label>시작일</label><input type="date" id="sf-start"></div>
+      <div class="fg"><label>종료일</label><input type="date" id="sf-end"></div>
+      <button class="btn btn-primary" onclick="applyStatsFilters()">조회</button>
+      <button class="btn btn-secondary" onclick="resetStatsFilters()">초기화</button>
+      <button class="btn btn-secondary btn-icon" onclick="refreshStats()" title="새로고침">↺</button>
+    </div>
+
+    <!-- 통계 요약 카드 -->
+    <div class="stats2" id="stats-user-cards">
+      <!-- JS로 채움 -->
+    </div>
+
+    <!-- 일별 × 담당자 차트 -->
+    <div class="card">
+      <h2>담당자별 일별 통화수</h2>
+      <div class="chart-wrap" style="height:240px"><canvas id="stats-chart"></canvas></div>
+    </div>
+
+    <!-- 통계 상세 테이블 -->
+    <div class="card stats-table">
+      <h2>일별 담당자 통계 <span style="font-size:12px;font-weight:400;color:#6b7280" id="stats-tbl-info"></span></h2>
+      <div class="tbl-wrap">
+        <table id="stats-tbl">
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>담당자</th>
+              <th>통화수</th>
+              <th>총 통화시간</th>
+              <th>ARS 스킵</th>
+              <th>실제 통화수</th>
+            </tr>
+          </thead>
+          <tbody id="stats-tbl-body">
+            <tr class="loading-row"><td colspan="6"><span class="spinner"></span>데이터를 불러오는 중…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /tab-stats -->
+
+</main>
+
+<script>
+  // ────────────────────────────────────────────────────────
+  // Supabase 접속 정보
+  // ────────────────────────────────────────────────────────
+  const SB_URL = 'https://uwjvcgckmgvrxwoujnxn.supabase.co';
+  const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3anZjZ2NrbWd2cnh3b3VqbnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwODQ3ODgsImV4cCI6MjA5MzY2MDc4OH0.u6nqUIiSYB8rI51a-1lkfNvpgM8Yv-QwR4QrFPq05oE';
+
+  // ────────────────────────────────────────────────────────
+  // 전역 상태
+  // ────────────────────────────────────────────────────────
+  let allData     = [];  // v_call_dashboard 전체
+  let filteredRows = [];
+  let allStats    = [];  // call_stats_daily 전체
+  let filteredStats = [];
+  let chart       = null;
+  let statsChart  = null;
+
+  let sortCol = 0, sortAsc = false;
+  let page    = 0;
+  const PAGE_SIZE = 50;
+
+  // 자동 새로고침 (5분)
+  const AUTO_REFRESH_MS = 5 * 60 * 1000;
+  setInterval(refreshAll, AUTO_REFRESH_MS);
+
+  // ────────────────────────────────────────────────────────
+  // 탭 전환
+  // ────────────────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      const panels = ['records', 'stats'];
+      t.classList.toggle('active', panels[i] === name);
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => {
+      p.classList.toggle('active', p.id === 'tab-' + name);
+    });
+  }
+
+  // ────────────────────────────────────────────────────────
+  // Supabase 조회
+  // ────────────────────────────────────────────────────────
+  async function fetchData() {
+    const resp = await fetch(
+      `${SB_URL}/rest/v1/v_call_dashboard?select=*&order=started_at.desc&limit=2000`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    );
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+    return resp.json();
+  }
+
+  async function fetchUsers() {
+    const resp = await fetch(
+      `${SB_URL}/rest/v1/pipeline_users?select=user_id,user_email,user_name&is_active=eq.true&order=user_name`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    );
+    if (!resp.ok) return [];
+    return resp.json();
+  }
+
+  async function fetchStatsData() {
+    const resp = await fetch(
+      `${SB_URL}/rest/v1/call_stats_daily?select=*&order=stat_date.desc&limit=500`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    );
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+    return resp.json();
+  }
+
+  // ────────────────────────────────────────────────────────
+  // 유틸
+  // ────────────────────────────────────────────────────────
+  function fmtKst(s) {
+    if (!s) return '-';
+    return String(s).replace('T', ' ').substring(0, 16);
+  }
+
+  function fmtDuration(sec) {
+    if (!sec && sec !== 0) return '-';
+    const n = Number(sec);
+    if (isNaN(n) || n <= 0) return '-';
+    const m = Math.floor(n / 60);
+    const s = n % 60;
+    return m > 0 ? `${m}분 ${s}초` : `${s}초`;
+  }
+
+  function fmtDurationShort(sec) {
+    if (!sec && sec !== 0) return '-';
+    const n = Number(sec);
+    if (isNaN(n) || n <= 0) return '-';
+    const h = Math.floor(n / 3600);
+    const m = Math.floor((n % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${n % 60}s`;
+    return `${n}s`;
+  }
+
+  function sumSec(rows) {
+    return rows.reduce((acc, r) => acc + (Number(r.duration_sec) || 0), 0);
+  }
+
+  function dagloStatusBadge(status) {
+    switch (status) {
+      case 'done':        return '<span class="b-done">완료</span>';
+      case 'ars_skipped': return '<span class="b-ars">ARS스킵</span>';
+      case 'processing':  return '<span class="b-proc">처리중</span>';
+      case 'failed':      return '<span class="b-fail">실패</span>';
+      case 'pending':
+      default:            return '<span class="b-wait">대기</span>';
+    }
+  }
+
+  // KST 날짜 문자열 (오늘로부터 offsetDays일 이동)
+  // 9 * 3600 * 1000 = UTC+9 오프셋(ms), offsetDays * 86400 * 1000 = 일수(ms)
+  function kstDateStr(offsetDays = 0) {
+    return new Date(Date.now() + 9 * 60 * 60 * 1000 + offsetDays * 24 * 60 * 60 * 1000)
+      .toISOString().slice(0, 10);
+  }
+
+  // ────────────────────────────────────────────────────────
+  // 통화 기록 탭 — 필터
+  // ────────────────────────────────────────────────────────
+  function getFiltered() {
+    const user  = document.getElementById('f-user').value;
+    const start = document.getElementById('f-start').value;
+    const end   = document.getElementById('f-end').value;
+    const dir   = document.getElementById('f-dir').value;
+    const daglo = document.getElementById('f-daglo').value;
+    const sync  = document.getElementById('f-sync').value;
+    return allData.filter(r =>
+      (!user  || r.user_email === user) &&
+      (!start || String(r.call_date) >= start) &&
+      (!end   || String(r.call_date) <= end) &&
+      (!dir   || r.direction === dir) &&
+      (!daglo || r.daglo_status === daglo) &&
+      (!sync  || r.sync_status === sync)
+    );
+  }
+
+  function setDefaultDates() {
+    document.getElementById('f-end').value   = kstDateStr(0);
+    document.getElementById('f-start').value = kstDateStr(-30);
+  }
+
+  function applyFilters() {
+    filteredRows = getFiltered();
+    page = 0;
+    updateStats(filteredRows);
+    updateChart(filteredRows);
+    renderTable();
+  }
+
+  function resetFilters() {
+    ['f-user', 'f-dir', 'f-daglo', 'f-sync'].forEach(id => document.getElementById(id).value = '');
+    setDefaultDates();
+    applyFilters();
+  }
+
+  // ────────────────────────────────────────────────────────
+  // 통계 카드
+  // ────────────────────────────────────────────────────────
+  function updateStats(rows) {
+    const totalSec = sumSec(rows);
+    document.getElementById('s-total').textContent = rows.length;
+    document.getElementById('s-in').textContent    = rows.filter(r => r.direction === 'inbound').length;
+    document.getElementById('s-out').textContent   = rows.filter(r => r.direction === 'outbound').length;
+    document.getElementById('s-sync').textContent  = rows.filter(r => r.sync_status === 'synced').length;
+    document.getElementById('s-dur').textContent   = fmtDurationShort(totalSec);
+    document.getElementById('s-ars').textContent   = rows.filter(r => r.daglo_status === 'ars_skipped').length;
+    document.getElementById('s-fail').textContent  = rows.filter(r => r.daglo_status === 'failed').length;
+    document.getElementById('s-proc').textContent  = rows.filter(r => r.daglo_status === 'processing').length;
+  }
+
+  // ────────────────────────────────────────────────────────
+  // 차트
+  // ────────────────────────────────────────────────────────
+  function updateChart(rows) {
+    const map = {};
+    rows.forEach(r => {
+      const d = String(r.call_date || 'unknown');
+      if (!map[d]) map[d] = { i: 0, o: 0, ars: 0 };
+      if (r.daglo_status === 'ars_skipped') { map[d].ars++; return; }
+      if (r.direction === 'inbound') map[d].i++; else map[d].o++;
+    });
+    const dates = Object.keys(map).sort();
+    if (chart) chart.destroy();
+    chart = new Chart(document.getElementById('chart'), {
+      type: 'bar',
+      data: {
+        labels: dates,
+        datasets: [
+          { label: '인바운드',   data: dates.map(d => map[d].i),   backgroundColor: '#93c5fd', stack: 's' },
+          { label: '아웃바운드', data: dates.map(d => map[d].o),   backgroundColor: '#c4b5fd', stack: 's' },
+          { label: 'ARS스킵',   data: dates.map(d => map[d].ars), backgroundColor: '#fda4af', stack: 's' },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { font: { size: 12 } } } },
+        scales: {
+          x: { stacked: true, ticks: { font: { size: 11 } } },
+          y: { stacked: true, ticks: { stepSize: 1, font: { size: 11 } } },
+        }
+      }
+    });
+  }
+
+  // ────────────────────────────────────────────────────────
+  // 테이블
+  // ────────────────────────────────────────────────────────
+  function rowToArr(r) {
+    return [
+      fmtKst(r.started_at_kst),        // 0: 통화 시간
+      r.phone_masked   || '-',          // 1: 전화번호
+      r.display_name   || r.matched_name || '-', // 2: 상대방
+      r.uploader_name  || '-',          // 3: 담당자
+      r.direction_ko   || r.direction || '-', // 4: 방향
+      r.duration_sec   || 0,            // 5: 통화시간(초)
+      r.daglo_status   || 'pending',    // 6: Daglo
+      r.summary_preview || '',          // 7: 요약
+      r.sync_status    || 'pending',    // 8: 노션
+      r.notion_url     || '',           // 9: 링크
+    ];
+  }
+
+  function setSort(col) {
+    if (sortCol === col) sortAsc = !sortAsc;
+    else { sortCol = col; sortAsc = true; }
+    document.querySelectorAll('.sort-icon').forEach((el, i) => {
+      el.textContent = i === sortCol ? (sortAsc ? '▲' : '▼') : '';
+    });
+    page = 0;
+    renderTable();
+  }
+
+  function changePage(delta) {
+    const q = getSearchQuery();
+    const rows = applySearch(filteredRows, q);
+    const maxPage = Math.max(0, Math.ceil(rows.length / PAGE_SIZE) - 1);
+    page = Math.min(Math.max(0, page + delta), maxPage);
+    renderTable();
+  }
+
+  function getSearchQuery() {
+    return (document.getElementById('tbl-search').value || '').trim().toLowerCase();
+  }
+
+  function applySearch(rows, q) {
+    if (!q) return rows;
+    return rows.filter(r => {
+      const arr = rowToArr(r);
+      return arr.some(cell => String(cell).toLowerCase().includes(q));
+    });
+  }
+
+  function renderTable() {
+    const q    = getSearchQuery();
+    const rows = applySearch(filteredRows, q);
+
+    rows.sort((a, b) => {
+      const av = rowToArr(a)[sortCol];
+      const bv = rowToArr(b)[sortCol];
+      if (typeof av === 'number' && typeof bv === 'number') {
+        return sortAsc ? av - bv : bv - av;
+      }
+      return sortAsc
+        ? String(av).localeCompare(String(bv), 'ko')
+        : String(bv).localeCompare(String(av), 'ko');
+    });
+
+    const total   = rows.length;
+    const maxPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
+    if (page > maxPage) page = maxPage;
+    const slice   = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+    const tbody = document.getElementById('tbl-body');
+    if (slice.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="10">검색 결과 없음.</td></tr>';
+    } else {
+      tbody.innerHTML = slice.map(r => {
+        const [time, phone, name, uploader, dir, durSec, daglo, summary, sync, notion] = rowToArr(r);
+        const dirBadge = dir === '인바운드'
+          ? `<span class="b-in">${dir}</span>`
+          : dir === '아웃바운드' ? `<span class="b-out">${dir}</span>` : dir;
+        const syncBadge = sync === 'synced'
+          ? '<span class="b-synced">완료</span>'
+          : '<span class="b-pending">대기</span>';
+        const notionLink = notion
+          ? `<a href="${notion}" target="_blank" class="nl">열기</a>`
+          : '<span style="color:#9ca3af">-</span>';
+        const summaryEsc = String(summary).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const uploaderChip = uploader !== '-'
+          ? `<span class="user-chip">${uploader}</span>`
+          : '<span style="color:#9ca3af">-</span>';
+        return `<tr>
+          <td style="white-space:nowrap;font-size:12px">${time}</td>
+          <td style="white-space:nowrap;font-size:12px">${phone}</td>
+          <td style="white-space:nowrap;font-size:12px">${name}</td>
+          <td>${uploaderChip}</td>
+          <td>${dirBadge}</td>
+          <td><span class="dur">${fmtDuration(durSec)}</span></td>
+          <td>${dagloStatusBadge(daglo)}</td>
+          <td><div class="sc" title="${summaryEsc}">${summaryEsc || '<span style="color:#9ca3af">-</span>'}</div></td>
+          <td>${syncBadge}</td>
+          <td>${notionLink}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    const from = total === 0 ? 0 : page * PAGE_SIZE + 1;
+    const to   = Math.min((page + 1) * PAGE_SIZE, total);
+    document.getElementById('tbl-info').textContent = total === 0 ? '0건' : `${from}–${to} / ${total}건`;
+    document.getElementById('pg-info').textContent  = total === 0 ? '' : `${page + 1} / ${Math.ceil(total / PAGE_SIZE)}`;
+    document.getElementById('pg-prev').disabled = page === 0;
+    document.getElementById('pg-next').disabled = page >= maxPage;
+  }
+
+  // ────────────────────────────────────────────────────────
+  // 사용자 필터 드롭다운
+  // ────────────────────────────────────────────────────────
+  function populateUserFilter(users) {
+    const sel = document.getElementById('f-user');
+    while (sel.options.length > 1) sel.remove(1);
+    users.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.user_email;
+      opt.textContent = `${u.user_name} (${u.user_id})`;
+      sel.appendChild(opt);
+    });
+  }
+
+  // ────────────────────────────────────────────────────────
+  // 담당자 통계 탭
+  // ────────────────────────────────────────────────────────
+  function getFilteredStats() {
+    const start = document.getElementById('sf-start').value;
+    const end   = document.getElementById('sf-end').value;
+    return allStats.filter(r =>
+      (!start || String(r.stat_date) >= start) &&
+      (!end   || String(r.stat_date) <= end)
+    );
+  }
+
+  function setDefaultStatsDates() {
+    document.getElementById('sf-end').value   = kstDateStr(0);
+    document.getElementById('sf-start').value = kstDateStr(-30);
+  }
+
+  function applyStatsFilters() {
+    filteredStats = getFilteredStats();
+    updateStatsTab(filteredStats);
+  }
+
+  function resetStatsFilters() {
+    setDefaultStatsDates();
+    applyStatsFilters();
+  }
+
+  // 담당자별 집계
+  function aggregateByUser(rows) {
+    const map = {};
+    rows.forEach(r => {
+      const u = r.uploader_name || 'unknown';
+      if (!map[u]) map[u] = { callCount: 0, totalSec: 0, arsSkipped: 0 };
+      map[u].callCount  += Number(r.call_count)        || 0;
+      map[u].totalSec   += Number(r.total_sec)         || 0;
+      map[u].arsSkipped += Number(r.ars_skipped_count) || 0;
+    });
+    return map;
+  }
+
+  function updateStatsTab(rows) {
+    const byUser = aggregateByUser(rows);
+
+    // 담당자별 요약 카드
+    const cardContainer = document.getElementById('stats-user-cards');
+    const users = Object.keys(byUser).sort();
+    if (users.length === 0) {
+      cardContainer.innerHTML = '<div style="color:#9ca3af;font-size:13px;padding:8px">통계 데이터 없음</div>';
+    } else {
+      cardContainer.innerHTML = users.map(u => {
+        const d = byUser[u];
+        const realCalls = d.callCount - d.arsSkipped;
+        return `<div class="stat accent-blue">
+          <div class="lbl">👤 ${u}</div>
+          <div class="val">${d.callCount}</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:4px">
+            실통화 ${realCalls} · ARS스킵 ${d.arsSkipped}<br>
+            ${fmtDurationShort(d.totalSec)}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // 담당자별 일별 차트
+    const dates  = [...new Set(rows.map(r => r.stat_date))].sort();
+    // 담당자 색상: pipeline_users 조회 순서(이름 ASC) 기반 동적 할당
+    const PALETTE = ['#3b5bdb', '#0ca678', '#e67700', '#9c36b5', '#c92a2a', '#1098ad', '#d6336c'];
+    const colorMap = {};
+    users.forEach((u, i) => { colorMap[u] = PALETTE[i % PALETTE.length]; });
+
+    const datasets = users.map((u, i) => {
+      const colors = PALETTE;
+      return {
+        label: u,
+        data: dates.map(d => {
+          const row = rows.find(r => r.stat_date === d && r.uploader_name === u);
+          return row ? (Number(row.call_count) - Number(row.ars_skipped_count || 0)) : 0;
+        }),
+        backgroundColor: colorMap[u] || colors[i % colors.length],
+        stack: 'a',
+      };
+    });
+
+    if (statsChart) statsChart.destroy();
+    statsChart = new Chart(document.getElementById('stats-chart'), {
+      type: 'bar',
+      data: { labels: dates, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { font: { size: 12 } } } },
+        scales: {
+          x: { stacked: true, ticks: { font: { size: 11 } } },
+          y: { stacked: true, ticks: { stepSize: 1, font: { size: 11 } } },
+        }
+      }
+    });
+
+    // 통계 상세 테이블
+    const tbody = document.getElementById('stats-tbl-body');
+    document.getElementById('stats-tbl-info').textContent = `총 ${rows.length}행`;
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">데이터 없음</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const callCount  = Number(r.call_count)        || 0;
+      const ars        = Number(r.ars_skipped_count) || 0;
+      const totalSec   = Number(r.total_sec)         || 0;
+      const realCalls  = callCount - ars;
+      return `<tr>
+        <td style="white-space:nowrap;font-size:12px">${r.stat_date || '-'}</td>
+        <td><span class="user-chip">${r.uploader_name || '-'}</span></td>
+        <td><strong>${callCount}</strong></td>
+        <td><span class="dur">${fmtDurationShort(totalSec)}</span></td>
+        <td>${ars > 0 ? `<span class="b-ars">${ars}</span>` : '<span style="color:#9ca3af">0</span>'}</td>
+        <td><strong>${realCalls}</strong></td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function refreshStats() {
+    document.getElementById('stats-tbl-body').innerHTML =
+      '<tr class="loading-row"><td colspan="6"><span class="spinner"></span>데이터를 불러오는 중…</td></tr>';
+    try {
+      allStats = await fetchStatsData();
+      applyStatsFilters();
+    } catch (e) {
+      document.getElementById('stats-tbl-body').innerHTML =
+        `<tr class="empty-row"><td colspan="6">통계 조회 실패: ${e.message}</td></tr>`;
+    }
+  }
+
+  // ────────────────────────────────────────────────────────
+  // 에러 배너
+  // ────────────────────────────────────────────────────────
+  function showError(msg) {
+    console.error('[Dashboard]', msg);
+    const el = document.getElementById('error-banner');
+    el.textContent = '⚠ ' + msg;
+    el.style.display = 'block';
+    document.getElementById('tbl-body').innerHTML =
+      '<tr class="empty-row"><td colspan="10">데이터 조회 실패</td></tr>';
+  }
+
+  // ────────────────────────────────────────────────────────
+  // 전체 새로고침
+  // ────────────────────────────────────────────────────────
+  async function refreshAll() {
+    try {
+      document.getElementById('error-banner').style.display = 'none';
+      const [data, users, stats] = await Promise.all([
+        fetchData(),
+        fetchUsers(),
+        fetchStatsData().catch(() => []),
+      ]);
+      allData  = data;
+      allStats = stats;
+      document.getElementById('last-updated').textContent =
+        `마지막 조회: ${new Date().toLocaleString('ko-KR')}`;
+      populateUserFilter(users);
+      applyFilters();
+      applyStatsFilters();
+    } catch (e) {
+      showError(`Supabase 조회 실패: ${e.message}\nF12 → Console 확인`);
+    }
+  }
+
+  // ────────────────────────────────────────────────────────
+  // 초기화
+  // ────────────────────────────────────────────────────────
+  async function init() {
+    setDefaultDates();
+    setDefaultStatsDates();
+    // 초기 정렬 아이콘
+    document.getElementById('si-0').textContent = '▼';
+    await refreshAll();
+  }
+
+  init();
+</script>
+</body>
+</html>
