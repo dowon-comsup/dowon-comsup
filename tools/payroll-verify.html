@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>급여서류 검증 v1.0 | 노무법인 도원</title>
+<script src="../js/config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --blue:#2563eb;--blue-bg:#eff6ff;--blue-border:#bfdbfe;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-border:#bbf7d0;
+  --red:#dc2626;--red-bg:#fef2f2;--red-border:#fecaca;
+  --amber:#d97706;--amber-bg:#fffbeb;--amber-border:#fde68a;
+  --gray:#6b7280;--gray-bg:#f9fafb;--border:#e5e7eb;
+  --ink:#111827;--radius:8px;
+}
+body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:#f3f4f6;color:var(--ink);font-size:14px}
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+.topbar a{font-size:12px;color:var(--gray);text-decoration:none}
+.topbar a:hover{color:var(--blue)}
+.header{background:var(--blue);color:#fff;padding:16px 24px;display:flex;align-items:center;gap:12px}
+.header h1{font-size:18px;font-weight:700}
+.badge{background:rgba(255,255,255,.2);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600}
+.badge.green{background:#15803d}
+.api-row{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px}
+.api-dot{width:8px;height:8px;border-radius:50%;background:#6b7280}
+.api-dot.ok{background:#4ade80}
+.api-dot.err{background:#f87171}
+
+.wrap{max-width:1100px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.card-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.step-num{width:22px;height:22px;background:var(--blue);color:#fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+
+/* API 설정 */
+.api-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.api-grid{grid-template-columns:1fr}}
+.api-field label{font-size:11px;font-weight:600;color:var(--gray);display:block;margin-bottom:4px}
+.api-field input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace}
+.api-field input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-border)}
+.api-hint{font-size:11px;color:var(--gray);margin-top:3px}
+.api-status{font-size:11px;margin-top:3px;font-weight:600}
+.api-status.ok{color:var(--green)}
+.api-status.err{color:var(--red)}
+.api-status.warn{color:var(--amber)}
+
+/* 요청서 입력 */
+.req-textarea{width:100%;min-height:110px;border:2px dashed var(--border);border-radius:8px;padding:12px;font-family:inherit;font-size:13px;resize:vertical;transition:border-color .2s}
+.req-textarea:focus{outline:none;border-color:var(--blue)}
+.parse-btn{margin-top:8px;padding:7px 16px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
+.parse-btn:hover{background:#1d4ed8}
+.parsed-preview{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+.worker-chip{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:20px;font-size:12px;font-weight:600}
+.worker-chip .months{font-weight:400;color:var(--gray);font-size:11px}
+.worker-chip .del{cursor:pointer;color:var(--gray);font-size:14px;line-height:1}
+.worker-chip .del:hover{color:var(--red)}
+
+/* 업로드 */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.upload-grid{grid-template-columns:1fr}}
+.upload-area{border:2px dashed var(--border);border-radius:10px;padding:20px;transition:.2s;cursor:pointer;position:relative;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.upload-area:hover,.upload-area.drag{border-color:var(--blue);background:var(--blue-bg)}
+.upload-area.has-files{border-color:var(--green);border-style:solid;background:var(--green-bg)}
+.upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-icon{font-size:28px;margin-bottom:6px}
+.upload-label{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.upload-sub{font-size:11px;color:var(--gray)}
+.file-list{margin-top:12px;display:flex;flex-direction:column;gap:4px;width:100%}
+.file-item{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff;border:1px solid var(--border);border-radius:6px;font-size:11px}
+.file-item .fname{flex:1;font-weight:600;color:var(--blue);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
+.file-item .fsize{color:var(--gray);white-space:nowrap}
+.file-item .fdel{cursor:pointer;color:var(--red);font-weight:700;padding:0 4px;flex-shrink:0}
+.upload-type-label{font-size:12px;font-weight:700;margin-bottom:8px;padding:4px 10px;border-radius:6px;display:inline-block}
+.type-pay{background:var(--blue-bg);color:var(--blue)}
+.type-trf{background:var(--green-bg);color:var(--green)}
+
+/* 실행 */
+.run-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.run-btn{padding:11px 28px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:.15s}
+.run-btn:hover{background:#1d4ed8}
+.run-btn:disabled{background:#9ca3af;cursor:not-allowed}
+.run-status{font-size:12px;color:var(--gray)}
+
+/* 진행률 */
+.progress-wrap{margin-bottom:16px}
+.progress-bar{width:100%;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:4px;transition:width .3s}
+.progress-label{font-size:11px;color:var(--gray);margin-top:4px;display:flex;justify-content:space-between}
+.log{max-height:160px;overflow-y:auto;background:#0f172a;color:#94a3b8;border-radius:6px;padding:10px;font-family:monospace;font-size:10px;line-height:1.6;margin-top:8px}
+.log .l-info{color:#60a5fa}
+.log .l-ok{color:#4ade80}
+.log .l-warn{color:#fb923c}
+.log .l-err{color:#f87171}
+
+/* 결과 */
+.result-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.result-tab{padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;background:var(--gray-bg);border:1px solid var(--border);transition:.15s}
+.result-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* 매트릭스 */
+.matrix-wrap{overflow-x:auto}
+.matrix-table{border-collapse:collapse;font-size:12px;min-width:100%}
+.matrix-table th{background:var(--blue);color:#fff;padding:8px 10px;text-align:center;font-weight:600;white-space:nowrap;position:sticky;top:0}
+.matrix-table th.name-col{text-align:left;min-width:80px}
+.matrix-table th.month-col{min-width:70px}
+.matrix-table td{padding:6px 8px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);text-align:center;white-space:nowrap}
+.matrix-table td.name-col{text-align:left;font-weight:600}
+.matrix-table tr:hover{background:var(--gray-bg)}
+.cell-pass{background:#f0fdf4;color:var(--green);font-weight:700}
+.cell-pass-r{background:#f0fdf4;color:var(--green)}
+.cell-fail{background:var(--red-bg);color:var(--red);font-weight:700}
+.cell-mp{background:var(--amber-bg);color:var(--amber);font-weight:600}
+.cell-mt{background:var(--amber-bg);color:var(--amber);font-weight:600}
+.cell-mb{background:#f3f4f6;color:#9ca3af}
+.cell-inner{display:flex;flex-direction:column;align-items:center;gap:1px}
+.cell-pay{font-size:10px;color:#374151}
+.cell-trf{font-size:10px;color:#374151}
+.cell-status{font-size:10px;font-weight:700}
+
+/* 불일치 목록 */
+.finding-list{display:flex;flex-direction:column;gap:8px}
+.finding{padding:12px 14px;border-radius:8px;border-left:4px solid;font-size:12px}
+.finding.fail{border-color:var(--red);background:var(--red-bg)}
+.finding.missing{border-color:var(--amber);background:var(--amber-bg)}
+.finding-title{font-weight:700;margin-bottom:3px}
+.finding-desc{color:#555}
+
+/* 요약 카드 */
+.summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+@media(max-width:600px){.summary-row{grid-template-columns:repeat(2,1fr)}}
+.summary-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+.summary-num{font-size:28px;font-weight:800;line-height:1}
+.summary-label{font-size:11px;color:var(--gray);margin-top:3px}
+.summary-card.s-pass .summary-num{color:var(--green)}
+.summary-card.s-fail .summary-num{color:var(--red)}
+.summary-card.s-miss .summary-num{color:var(--amber)}
+.summary-card.s-total .summary-num{color:var(--blue)}
+
+.export-btn{padding:8px 18px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.export-btn:hover{background:#15803d}
+.hidden{display:none!important}
+.tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700}
+.tag-pay{background:var(--blue-bg);color:var(--blue)}
+.tag-trf{background:var(--green-bg);color:var(--green)}
+</style>
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 대시보드</a></div>
+
+<div class="header">
+  <h1>급여서류 검증</h1>
+  <span class="badge green">v1.0</span>
+  <span class="badge" id="modelBadge">Gemini 2.5 Flash</span>
+  <div class="api-row">
+    <span class="api-dot" id="geminiDot"></span><span id="geminiLabel" style="font-size:11px">Gemini</span>
+    <span class="api-dot" id="claudeDot" style="margin-left:6px"></span><span id="claudeLabel" style="font-size:11px">Claude</span>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ─── STEP 1: API 설정 ─── -->
+<div class="card">
+  <div class="card-title"><span class="step-num">1</span> API 설정</div>
+  <div class="api-grid">
+    <div class="api-field">
+      <label>Gemini API 키 <span style="color:var(--red)">*</span> (기본 모델)</label>
+      <input type="password" id="geminiKey" placeholder="AIza..." oninput="onGeminiKeyChange()">
+      <div class="api-hint">aistudio.google.com → Get API key (무료)</div>
+      <div class="api-status" id="geminiStatus"></div>
+    </div>
+    <div class="api-field">
+      <label>Claude API 키 (Gemini 실패 시 자동 폴백)</label>
+      <input type="password" id="claudeKey" placeholder="sk-ant-api03-..." oninput="onClaudeKeyChange()">
+      <div class="api-hint">console.anthropic.com → API keys</div>
+      <div class="api-status" id="claudeStatus"></div>
+    </div>
+  </div>
+  <div style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="radio" name="visionModel" value="gemini" checked onchange="onModelChange()">
+      Gemini 우선 (권장·저비용)
+    </label>
+    <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="radio" name="visionModel" value="claude" onchange="onModelChange()">
+      Claude 우선 (한국어 정확)
+    </label>
+    <span id="costHint" style="font-size:11px;color:var(--gray)"></span>
+  </div>
+</div>
+
+<!-- ─── STEP 2: 검증 대상 ─── -->
+<div class="card">
+  <div class="card-title"><span class="step-num">2</span> 검증 대상 입력</div>
+  <textarea class="req-textarea" id="reqText" placeholder="요청서 텍스트를 그대로 붙여넣기하세요.
+
+예시:
+홍길동 2025년 2월 ~ 2026년 2월
+김철수 25년 3월 ~ 25년 12월
+이영희 2025-04-01 ~ 2025-09-30"></textarea>
+  <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+    <button class="parse-btn" onclick="parseRequest()">파싱</button>
+    <span style="font-size:11px;color:var(--gray)">이름(2~4자 한글) + 기간 형식 자동 인식</span>
+  </div>
+  <div class="parsed-preview" id="parsedPreview"></div>
+</div>
+
+<!-- ─── STEP 3: 서류 업로드 ─── -->
+<div class="card">
+  <div class="card-title"><span class="step-num">3</span> 서류 업로드 <span style="font-size:11px;font-weight:400;color:var(--gray)">(PDF · xlsx · xls · csv 모두 가능)</span></div>
+  <div class="upload-grid">
+    <!-- 급여서류 -->
+    <div>
+      <div class="upload-type-label type-pay">📋 급여서류 (급여대장 / 명세서)</div>
+      <div class="upload-area" id="payZone"
+           ondragover="dragOver(event,'payZone')" ondragleave="dragLeave('payZone')"
+           ondrop="dropFiles(event,'pay')">
+        <input type="file" accept=".pdf,.xlsx,.xls,.csv" multiple onchange="addFiles(this,'pay')">
+        <div class="upload-icon">📄</div>
+        <div class="upload-label">파일 드래그 또는 클릭</div>
+        <div class="upload-sub">급여대장, 임금대장, 급여명세서 (복수 가능)</div>
+      </div>
+      <div class="file-list" id="payFileList"></div>
+    </div>
+    <!-- 이체확인증 -->
+    <div>
+      <div class="upload-type-label type-trf">🏦 이체확인증 / 이체내역</div>
+      <div class="upload-area" id="trfZone"
+           ondragover="dragOver(event,'trfZone')" ondragleave="dragLeave('trfZone')"
+           ondrop="dropFiles(event,'trf')">
+        <input type="file" accept=".pdf,.xlsx,.xls,.csv" multiple onchange="addFiles(this,'trf')">
+        <div class="upload-icon">💳</div>
+        <div class="upload-label">파일 드래그 또는 클릭</div>
+        <div class="upload-sub">대량이체영수증, 계좌이체확인증, 이체내역 (복수 가능)</div>
+      </div>
+      <div class="file-list" id="trfFileList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 실행 ─── -->
+<div class="card">
+  <div class="run-bar">
+    <button class="run-btn" id="runBtn" onclick="runVerification()" disabled>검증 실행</button>
+    <span class="run-status" id="runStatus">API 키와 서류를 모두 설정하세요</span>
+  </div>
+  <div id="progressSection" class="hidden" style="margin-top:14px">
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-label"><span id="progressLabel">준비 중...</span><span id="progressPct">0%</span></div>
+    </div>
+    <div class="log" id="logArea"></div>
+  </div>
+</div>
+
+<!-- ─── 결과 ─── -->
+<div id="resultSection" class="hidden">
+  <div class="summary-row" id="summaryCards"></div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div class="result-tabs">
+        <div class="result-tab active" onclick="switchTab('matrix')">매트릭스</div>
+        <div class="result-tab" onclick="switchTab('findings')">불일치 · 누락 <span id="findingCount" style="background:var(--red);color:#fff;border-radius:8px;padding:0 5px;font-size:10px"></span></div>
+        <div class="result-tab" onclick="switchTab('raw')">추출 원본</div>
+      </div>
+      <button class="export-btn" onclick="exportExcel()">엑셀 다운로드</button>
+    </div>
+
+    <div class="tab-content active" id="tab-matrix">
+      <div class="matrix-wrap" id="matrixWrap"></div>
+    </div>
+    <div class="tab-content" id="tab-findings">
+      <div class="finding-list" id="findingList"></div>
+    </div>
+    <div class="tab-content" id="tab-raw">
+      <div style="font-size:11px;color:var(--gray);margin-bottom:8px">Vision AI / Excel 파싱으로 추출된 원본 데이터</div>
+      <div id="rawData" style="font-family:monospace;font-size:11px;background:var(--gray-bg);padding:12px;border-radius:6px;max-height:400px;overflow-y:auto;white-space:pre-wrap"></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// ============================================================
+// CONFIG & STATE
+// ============================================================
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const PDF_SCALE = 2.5;   // PDF 렌더링 배율 (Vision AI 입력 품질)
+const JPEG_Q   = 0.92;   // JPEG 품질
+
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+const CLAUDE_MODELS = ['claude-sonnet-4-6'];
+let _activeGemini = GEMINI_MODELS[0];
+
+const S = {
+  workers: [],   // [{name, months:[{y,m}]}]
+  payFiles: [],  // [File]
+  trfFiles: [],  // [File]
+  geminiKey: '',
+  claudeKey: '',
+  visionPrimary: 'gemini', // 'gemini' | 'claude'
+  // 결과
+  payrollEntries: [],  // [{file,page,month,workerName,amount,raw}]
+  trfEntries:     [],  // [{file,page,month,workerName,amount,raw}]
+  verifyResults:  [],  // [{worker,month,payAmount,trfAmount,status}]
+  logs: []
+};
+
+// ============================================================
+// INIT
+// ============================================================
+(function init() {
+  const gk = localStorage.getItem(DW_CONFIG.STORAGE_KEYS.gemini) || '';
+  const ck = localStorage.getItem(DW_CONFIG.STORAGE_KEYS.anthropic)
+          || localStorage.getItem(DW_CONFIG.STORAGE_KEYS.claude) || '';
+  if(gk){ document.getElementById('geminiKey').value = gk; S.geminiKey = gk; }
+  if(ck){ document.getElementById('claudeKey').value = ck; S.claudeKey = ck; }
+  refreshApiStatus();
+  onModelChange();
+})();
+
+// ============================================================
+// API 키 관리
+// ============================================================
+function onGeminiKeyChange(){
+  S.geminiKey = document.getElementById('geminiKey').value.trim();
+  try{ localStorage.setItem(DW_CONFIG.STORAGE_KEYS.gemini, S.geminiKey); }catch(e){}
+  refreshApiStatus();
+  checkReady();
+}
+function onClaudeKeyChange(){
+  S.claudeKey = document.getElementById('claudeKey').value.trim();
+  try{
+    localStorage.setItem(DW_CONFIG.STORAGE_KEYS.claude, S.claudeKey);
+    if(S.claudeKey.startsWith('sk-ant-'))
+      localStorage.setItem(DW_CONFIG.STORAGE_KEYS.anthropic, S.claudeKey);
+  }catch(e){}
+  refreshApiStatus();
+  checkReady();
+}
+function onModelChange(){
+  S.visionPrimary = document.querySelector('input[name=visionModel]:checked').value;
+  const cost = S.visionPrimary === 'gemini'
+    ? '~₩0.3/페이지 (Gemini Flash)' : '~₩5/페이지 (Claude Sonnet)';
+  document.getElementById('costHint').textContent = cost;
+  document.getElementById('modelBadge').textContent =
+    S.visionPrimary === 'gemini' ? 'Gemini 2.5 Flash' : 'Claude Sonnet';
+  checkReady();
+}
+function refreshApiStatus(){
+  const gs = document.getElementById('geminiStatus');
+  const cs = document.getElementById('claudeStatus');
+  const gd = document.getElementById('geminiDot');
+  const cd = document.getElementById('claudeDot');
+
+  if(S.geminiKey.length > 10){
+    gs.className='api-status ok'; gs.textContent='✅ 키 입력됨';
+    gd.className='api-dot ok';
+  } else if(S.geminiKey.length > 0){
+    gs.className='api-status warn'; gs.textContent='⚠️ 형식 확인';
+    gd.className='api-dot err';
+  } else {
+    gs.className='api-status'; gs.textContent='미입력';
+    gd.className='api-dot';
+  }
+
+  if(S.claudeKey.startsWith('sk-ant-')){
+    cs.className='api-status ok'; cs.textContent='✅ 키 입력됨';
+    cd.className='api-dot ok';
+  } else if(S.claudeKey.length > 0){
+    cs.className='api-status warn'; cs.textContent='⚠️ sk-ant- 형식 확인';
+    cd.className='api-dot err';
+  } else {
+    cs.className='api-status'; cs.textContent='미입력 (폴백 없음)';
+    cd.className='api-dot';
+  }
+}
+function hasApi(){
+  if(S.visionPrimary==='gemini') return S.geminiKey.length > 10;
+  return S.claudeKey.startsWith('sk-ant-');
+}
+
+// ============================================================
+// 요청서 파싱
+// ============================================================
+const SEP = '[-~−–—~∼]';
+const YR  = '(\\d{2,4})';
+const MO  = '(\\d{1,2})';
+
+function fixYear(y){ return y < 100 ? (y < 50 ? 2000+y : 1900+y) : y; }
+
+function buildMonthList(y1,m1,y2,m2){
+  const months=[];
+  let cy=fixYear(y1), cm=m1;
+  const ey=fixYear(y2), em=m2;
+  while(cy<ey||(cy===ey&&cm<=em)){
+    months.push({y:cy,m:cm});
+    cm++; if(cm>12){cm=1;cy++;}
+  }
+  return months;
+}
+
+function parseOneLine(line){
+  // 이름 추출 (2~4자 한글)
+  const nameM = line.match(/([가-힣]{2,4})/);
+  if(!nameM) return null;
+  const name = nameM[1];
+  const rest = line.substring(line.indexOf(name) + name.length);
+
+  // 패턴들
+  let m;
+  // YYYY-MM-DD ~ YYYY-MM-DD
+  m = rest.match(new RegExp(`(\\d{4})[-/.](\\d{1,2})[-/.]\\d{1,2}\\s*${SEP}\\s*(\\d{4})[-/.](\\d{1,2})[-/.]\\d{1,2}`));
+  if(m) return {name, months: buildMonthList(+m[1],+m[2],+m[3],+m[4])};
+
+  // YYYY-MM ~ YYYY-MM
+  m = rest.match(new RegExp(`(\\d{4})[-/.](\\d{1,2})\\s*${SEP}\\s*(\\d{4})[-/.](\\d{1,2})(?![\\d])`));
+  if(m) return {name, months: buildMonthList(+m[1],+m[2],+m[3],+m[4])};
+
+  // YY[YY]년 M월 ~ YY[YY]년 M월
+  m = rest.match(new RegExp(`${YR}년\\s*${MO}월\\s*${SEP}\\s*${YR}년\\s*${MO}월`));
+  if(m) return {name, months: buildMonthList(+m[1],+m[2],+m[3],+m[4])};
+
+  // YY[YY]년 M ~ M월 (단일연도)
+  m = rest.match(new RegExp(`${YR}년\\s*${MO}월?\\s*${SEP}\\s*${MO}월`));
+  if(m) return {name, months: buildMonthList(+m[1],+m[2],+m[1],+m[3])};
+
+  // YY[YY]년 M월 귀속분 (단일월)
+  m = rest.match(new RegExp(`${YR}년\\s*${MO}월`));
+  if(m) return {name, months: buildMonthList(+m[1],+m[2],+m[1],+m[2])};
+
+  return null;
+}
+
+function parseRequest(){
+  const text = document.getElementById('reqText').value;
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const workers = [];
+  const seen = new Set();
+
+  for(const line of lines){
+    const w = parseOneLine(line);
+    if(w && w.months.length > 0 && !seen.has(w.name)){
+      seen.add(w.name);
+      workers.push(w);
+    }
+  }
+
+  S.workers = workers;
+  renderParsedPreview();
+  checkReady();
+}
+
+function renderParsedPreview(){
+  const el = document.getElementById('parsedPreview');
+  if(S.workers.length === 0){
+    el.innerHTML = '<span style="font-size:12px;color:var(--red)">파싱된 대상자 없음 — 이름(2~4자 한글) + 기간 형식 확인</span>';
+    return;
+  }
+  el.innerHTML = S.workers.map((w,i) => `
+    <div class="worker-chip">
+      <span>${w.name}</span>
+      <span class="months">${fmtMonth(w.months[0])} ~ ${fmtMonth(w.months[w.months.length-1])} (${w.months.length}개월)</span>
+      <span class="del" onclick="removeWorker(${i})">✕</span>
+    </div>`).join('');
+}
+
+function removeWorker(i){ S.workers.splice(i,1); renderParsedPreview(); checkReady(); }
+function fmtMonth(m){ return `${m.y}.${String(m.m).padStart(2,'0')}`; }
+function monthKey(y,m){ return `${y}-${String(m).padStart(2,'0')}`; }
+
+// ============================================================
+// 파일 업로드 관리
+// ============================================================
+function addFiles(input, type){
+  const files = Array.from(input.files);
+  if(type==='pay') S.payFiles.push(...files);
+  else             S.trfFiles.push(...files);
+  renderFileLists();
+  checkReady();
+  input.value = '';
+}
+function dropFiles(e, type){
+  e.preventDefault();
+  dragLeave(type==='pay'?'payZone':'trfZone');
+  const files = Array.from(e.dataTransfer.files).filter(f=>isAllowedExt(f));
+  if(type==='pay') S.payFiles.push(...files);
+  else             S.trfFiles.push(...files);
+  renderFileLists();
+  checkReady();
+}
+function dragOver(e,id){ e.preventDefault(); document.getElementById(id).classList.add('drag'); }
+function dragLeave(id){ document.getElementById(id).classList.remove('drag'); }
+function isAllowedExt(f){ return /\.(pdf|xlsx|xls|csv)$/i.test(f.name); }
+function fmtSize(b){ return b>1024*1024?`${(b/1024/1024).toFixed(1)}MB`:`${(b/1024).toFixed(0)}KB`; }
+
+function removeFile(type, idx){
+  if(type==='pay') S.payFiles.splice(idx,1);
+  else             S.trfFiles.splice(idx,1);
+  renderFileLists();
+  checkReady();
+}
+function renderFileLists(){
+  ['pay','trf'].forEach(type=>{
+    const files = type==='pay' ? S.payFiles : S.trfFiles;
+    const el = document.getElementById(type+'FileList');
+    const zone = document.getElementById(type+'Zone');
+    zone.classList.toggle('has-files', files.length>0);
+    el.innerHTML = files.map((f,i)=>`
+      <div class="file-item">
+        <span class="fname">${f.name}</span>
+        <span class="fsize">${fmtSize(f.size)}</span>
+        <span class="fdel" onclick="removeFile('${type}',${i})">✕</span>
+      </div>`).join('');
+  });
+}
+
+function checkReady(){
+  const ok = hasApi() && S.workers.length>0 && (S.payFiles.length>0||S.trfFiles.length>0);
+  document.getElementById('runBtn').disabled = !ok;
+  if(!hasApi()) document.getElementById('runStatus').textContent = 'API 키를 입력하세요';
+  else if(S.workers.length===0) document.getElementById('runStatus').textContent = '검증 대상자를 입력·파싱하세요';
+  else if(S.payFiles.length===0&&S.trfFiles.length===0) document.getElementById('runStatus').textContent = '서류를 업로드하세요';
+  else document.getElementById('runStatus').textContent = '검증 준비 완료';
+}
+
+// ============================================================
+// 로그
+// ============================================================
+function log(type, msg){
+  S.logs.push({type,msg});
+  const area = document.getElementById('logArea');
+  const d = document.createElement('div');
+  d.className = `l-${type}`;
+  d.textContent = `[${new Date().toLocaleTimeString('ko-KR')}] ${msg}`;
+  area.appendChild(d);
+  area.scrollTop = area.scrollHeight;
+}
+function setProgress(pct, label){
+  document.getElementById('progressFill').style.width = pct+'%';
+  document.getElementById('progressLabel').textContent = label;
+  document.getElementById('progressPct').textContent = pct+'%';
+}
+
+// ============================================================
+// VISION AI 호출
+// ============================================================
+const RETRY_DELAYS = [3000, 8000, 15000];
+
+async function _geminiRaw(model, b64, mime, prompt){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${S.geminiKey}`;
+  return fetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      contents:[{parts:[
+        {inline_data:{mime_type:mime,data:b64}},
+        {text:prompt}
+      ]}],
+      generationConfig:{responseMimeType:'application/json'}
+    })
+  });
+}
+
+async function _claudeRaw(b64, mime, prompt){
+  return fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key': S.claudeKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({
+      model: CLAUDE_MODELS[0],
+      max_tokens:2048,
+      messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:mime,data:b64}},
+        {type:'text',text:prompt}
+      ]}]
+    })
+  });
+}
+
+async function callVision(b64, prompt, pageLabel){
+  const mime = 'image/jpeg';
+
+  // Gemini 우선 경로
+  if(S.visionPrimary === 'gemini' && S.geminiKey.length > 10){
+    for(let retry=0; retry<=RETRY_DELAYS.length; retry++){
+      if(retry>0){
+        log('warn', `[${pageLabel}] Gemini 재시도 ${retry}/${RETRY_DELAYS.length} (${RETRY_DELAYS[retry-1]/1000}s 대기)`);
+        await new Promise(r=>setTimeout(r, RETRY_DELAYS[retry-1]));
+      }
+      try{
+        let resp = await _geminiRaw(_activeGemini, b64, mime, prompt);
+        // 404 → 모델 체인
+        if(resp.status===404){
+          const idx = GEMINI_MODELS.indexOf(_activeGemini);
+          for(let ni=idx+1;ni<GEMINI_MODELS.length;ni++){
+            log('warn',`[${pageLabel}] ${_activeGemini} 404 → ${GEMINI_MODELS[ni]} 시도`);
+            resp = await _geminiRaw(GEMINI_MODELS[ni], b64, mime, prompt);
+            if(resp.status!==404){ _activeGemini=GEMINI_MODELS[ni]; break; }
+          }
+        }
+        if(resp.ok){
+          const data = await resp.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+          if(text.trim()) return text;
+        }
+        if(![429,500,503].includes(resp.status)) break;
+      }catch(e){ log('warn',`[${pageLabel}] Gemini 오류: ${e.message}`); }
+    }
+    log('warn',`[${pageLabel}] Gemini 실패 → Claude 폴백`);
+  }
+
+  // Claude 경로 (우선 또는 폴백)
+  if(S.claudeKey.startsWith('sk-ant-')){
+    for(let retry=0; retry<=RETRY_DELAYS.length; retry++){
+      if(retry>0){
+        await new Promise(r=>setTimeout(r, RETRY_DELAYS[retry-1]));
+      }
+      try{
+        const resp = await _claudeRaw(b64, mime, prompt);
+        if(resp.ok){
+          const data = await resp.json();
+          const text = data.content?.find(c=>c.type==='text')?.text||'';
+          if(text.trim()) return text;
+        }
+        if(![429,500,503].includes(resp.status)) break;
+      }catch(e){ log('warn',`[${pageLabel}] Claude 오류: ${e.message}`); }
+    }
+  }
+
+  log('err', `[${pageLabel}] Vision AI 응답 없음 — 해당 페이지 스킵`);
+  return null;
+}
+
+// ============================================================
+// VISION AI 프롬프트
+// ============================================================
+function payrollPrompt(workerNames){
+  return `이 이미지는 급여 관련 서류입니다.
+
+【대상자】${workerNames}
+
+【Step 1 - 문서 유형 판별】
+- "payroll"  : 급여대장(여러 명) 또는 1인 급여명세서 / 임금대장
+- "transfer" : 이체확인증 / 대량이체영수증 / 이체내역
+- "other"    : 두 유형 아님 (표지, 공문 등)
+
+【Step 2 - 귀속 연월 (payroll일 때)】
+우선순위:
+1. "임금산정기간 YYYY-MM-DD ~ YYYY-MM-DD" → 시작일 연월
+2. 제목 또는 헤더의 "YYYY년 M월", "YYYY-MM", "YY.MM"
+3. "귀속월" "급여월" 레이블 옆 값
+⚠️ 지급일/이체일은 귀속월이 아님 (귀속월보다 1~5일 뒤 지급)
+
+【Step 3 - 실수령 금액 (payroll일 때) — 우선순위 순】
+① 공제후차감지급액 / 공제후 차감지급액 / 공제후차인지급액 / 공제후차인 / 공제후지급액
+② 차인지급액 / 차감지급액 / 차인금액 / 차인
+③ 실지급액 / 실수령액 / 세후지급액 / 실지급총액 / 실수령합계
+④ 지급액계 / 지급합계 / 지급금액합계
+
+【절대 추출 금지】
+지급총액 / 임금지급총액 / 과세급여합계 / 공제총액 / 세액 / 소득세
+4대보험합계 / 두루누리지원금 / 총합계 / 소계 / 부서소계 / 계
+
+【서류 형태별 처리】
+- 가로형 대장: 이름이 첫 컬럼(행), 항목이 헤더(열) → 각 이름 행의 해당 금액 컬럼 값
+- 세로형 대장: 항목이 첫 컬럼, 이름이 헤더 → 해당 이름 열의 금액 행 값
+- 1인 명세서: 이름 1명, 위 우선순위 금액 항목 중 하나
+
+【JSON 반환 형식】
+{
+  "doc_type": "payroll",
+  "year_month": "2025-02",
+  "workers": [
+    {"name": "홍길동", "amount": 2450000},
+    {"name": "김철수", "amount": null, "reason": "대장에 없음"}
+  ]
+}
+- amount: 쉼표 제거 정수 (2,450,000 → 2450000)
+- 없으면 null, 읽기 불가 시 -1 (reason 필수)
+- JSON만 반환 (설명 없이)`;
+}
+
+function transferPrompt(workerNames){
+  return `이 이미지는 급여 이체 관련 서류입니다.
+
+【대상자】${workerNames}
+
+【Step 1 - 문서 유형 판별】
+- "transfer" : 이체확인증 / 대량이체영수증 / 인터넷뱅킹이체내역 / 계좌이체확인증
+- "payroll"  : 급여대장 / 급여명세서 (잘못 올린 경우)
+- "other"    : 두 유형 아님
+
+【Step 2 - 이체 연월 (transfer일 때)】
+- 거래일자 / 이체일자 / 처리일자 / 입금일자 → "YYYY-MM" 형식
+- 여러 날짜가 있으면 주요 이체 날짜 기준
+- 이체일(지급일)이 귀속월 기준이므로 그대로 사용
+
+【Step 3 - 이체 금액 (transfer일 때)】
+- 이체금액 / 입금금액 / 거래금액 / 송금금액 / 이체액 / 이체합계 / 지급금액
+- ⚠️ 수수료는 이체금액이 아님 (0원 ~ 수백원)
+- ⚠️ 총합계 행은 개인 금액 아님
+
+【서류 형태별 처리】
+- 대량이체 영수증: 표 형식 (계좌번호 | 이체금액 | 수수료 | 수취인 | 처리결과)
+- 인터넷뱅킹 이체내역: 날짜별 목록 (거래일 | 거래유형 | 이체금액 | 수취인)
+- 핀테크(카카오뱅크/토스 등): 형식 자유, 수취인+금액 추출
+
+【JSON 반환 형식】
+{
+  "doc_type": "transfer",
+  "year_month": "2025-02",
+  "workers": [
+    {"name": "홍길동", "amount": 2450000},
+    {"name": "김철수", "amount": null, "reason": "내역에 없음"}
+  ]
+}
+- amount: 쉼표 제거 정수
+- 없으면 null, 읽기 불가 시 -1
+- JSON만 반환`;
+}
+
+// ============================================================
+// PDF 처리
+// ============================================================
+async function processPdf(file, docType, totalFiles, fileIdx){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  const entries = [];
+  const wnames = S.workers.map(w=>w.name).join(', ');
+  const prompt = docType==='pay' ? payrollPrompt(wnames) : transferPrompt(wnames);
+
+  for(let pi=1; pi<=pdf.numPages; pi++){
+    const pageLabel = `${file.name} p${pi}`;
+    log('info', `[${pageLabel}] 처리 중...`);
+
+    const page = await pdf.getPage(pi);
+
+    // 이미지 렌더링
+    const vp = page.getViewport({scale: PDF_SCALE});
+    const canvas = document.createElement('canvas');
+    canvas.width = vp.width; canvas.height = vp.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({canvasContext:ctx,viewport:vp}).promise;
+    const b64 = canvas.toDataURL('image/jpeg', JPEG_Q).split(',')[1];
+
+    // Vision AI 호출
+    const raw = await callVision(b64, prompt, pageLabel);
+    if(!raw){ log('warn', `[${pageLabel}] 추출 없음 — 스킵`); continue; }
+
+    const parsed = parseVisionJson(raw, pageLabel);
+    if(!parsed){ continue; }
+
+    if(parsed.doc_type === 'other'){
+      log('info', `[${pageLabel}] 관련 없는 페이지 — 스킵`);
+      continue;
+    }
+
+    // 타입 불일치 (예: 급여서류 영역에 이체확인증 업로드)
+    const expectedType = docType==='pay' ? 'payroll' : 'transfer';
+    if(parsed.doc_type !== expectedType){
+      log('warn', `[${pageLabel}] ⚠️ 예상 유형(${expectedType})과 다름(${parsed.doc_type}) — 해당 유형으로 처리`);
+    }
+
+    const month = normalizeMonth(parsed.year_month);
+    if(!month){ log('warn', `[${pageLabel}] 귀속월 인식 실패 — 스킵`); continue; }
+
+    for(const w of (parsed.workers||[])){
+      if(w.amount == null || w.amount === -1) continue;
+      const matched = fuzzyMatchWorker(w.name);
+      if(!matched){ log('warn', `[${pageLabel}] "${w.name}" → 대상자 미매칭 — 스킵`); continue; }
+      entries.push({
+        file: file.name, page: pi,
+        month, workerName: matched,
+        amount: w.amount,
+        rawName: w.name,
+        docType: parsed.doc_type
+      });
+      log('ok', `[${pageLabel}] ${matched} / ${month} / ${fmtNum(w.amount)}원`);
+    }
+  }
+  return entries;
+}
+
+// ============================================================
+// EXCEL 처리
+// ============================================================
+
+// 급여서류 헤더 패턴
+const PAY_AMOUNT_HEADERS = [
+  '공제후차감지급액','공제후 차감지급액','공제후차인지급액','공제후차인','공제후지급액',
+  '차인지급액','차감지급액','차인금액','차인',
+  '실지급액','실수령액','세후지급액','실지급총액','실수령합계',
+  '지급액계','지급합계','지급금액합계','net pay','net_pay','actual pay'
+];
+const PAY_NAME_HEADERS = [
+  '성명','이름','직원명','근로자명','사원명','성명(이름)','이름(성명)',
+  '직원','근로자','사원','이름/성명','성명/이름','name'
+];
+const MONTH_HEADERS = [
+  '귀속월','급여월','지급월','귀속연월','임금귀속월','월','기간',
+  '연월','급여기간','임금기간','정산월','귀속'
+];
+
+// 이체확인증 헤더 패턴
+const TRF_AMOUNT_HEADERS = [
+  '이체금액','이체 금액','입금금액','입금 금액','거래금액','거래 금액',
+  '송금금액','송금 금액','이체액','입금액','금액','이체합계','이체금',
+  '지급금액','지급액','이체합','amount','transfer amount'
+];
+const TRF_NAME_HEADERS = [
+  '수취인','수취인명','받는분','받는사람','입금자','이름','성명',
+  '직원명','사원명','수신인','입금처','payee','beneficiary'
+];
+const DATE_HEADERS = [
+  '거래일자','이체일자','처리일자','입금일자','거래일','날짜','일자',
+  '이체날짜','처리일','발생일','취급일','date','transaction date'
+];
+
+function normalizeHeader(s){
+  return String(s||'').replace(/[\s 　]/g,'').toLowerCase();
+}
+
+function findColIdx(headers, patterns){
+  const norm = headers.map(normalizeHeader);
+  for(const pat of patterns){
+    const pn = normalizeHeader(pat);
+    const idx = norm.findIndex(h => h===pn || h.includes(pn));
+    if(idx >= 0) return idx;
+  }
+  return -1;
+}
+
+async function processExcel(file, docType){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  const entries = [];
+
+  for(const shName of wb.SheetNames){
+    const ws = wb.Sheets[shName];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+    if(rows.length < 2) continue;
+
+    log('info', `[${file.name}/${shName}] 시트 분석 중 (${rows.length}행)`);
+
+    // 헤더 행 탐지 (첫 20행 스캔)
+    let headerRow = -1;
+    for(let ri=0; ri<Math.min(20,rows.length); ri++){
+      const rowStr = rows[ri].map(c=>String(c||'').trim()).join('|');
+      if(docType==='pay'){
+        if(PAY_NAME_HEADERS.some(h=>rowStr.includes(h)) ||
+           PAY_AMOUNT_HEADERS.some(h=>rowStr.includes(h))){ headerRow=ri; break; }
+      } else {
+        if(TRF_NAME_HEADERS.some(h=>rowStr.includes(h)) ||
+           TRF_AMOUNT_HEADERS.some(h=>rowStr.includes(h))){ headerRow=ri; break; }
+      }
+    }
+
+    if(headerRow < 0){
+      log('warn', `[${file.name}/${shName}] 헤더 행 미발견 — 시트 스킵`);
+      continue;
+    }
+
+    const headers = rows[headerRow].map(c=>String(c||'').trim());
+    log('info', `[${file.name}/${shName}] 헤더 행: ${headerRow+1}행`);
+
+    if(docType === 'pay'){
+      const nameIdx   = findColIdx(headers, PAY_NAME_HEADERS);
+      const amtIdx    = findColIdx(headers, PAY_AMOUNT_HEADERS);
+      const monthIdx  = findColIdx(headers, MONTH_HEADERS);
+
+      if(amtIdx < 0){ log('warn', `[${file.name}/${shName}] 금액 컬럼 미발견 — 스킵`); continue; }
+      if(nameIdx < 0){ log('warn', `[${file.name}/${shName}] 이름 컬럼 미발견 — 스킵`); continue; }
+
+      log('info', `[${file.name}/${shName}] 이름:${headers[nameIdx]} 금액:${headers[amtIdx]} 귀속월:${monthIdx>=0?headers[monthIdx]:'(파일명에서 추출)'}`);
+
+      for(let ri=headerRow+1; ri<rows.length; ri++){
+        const row = rows[ri];
+        const rawName  = String(row[nameIdx]||'').trim();
+        const rawAmt   = row[amtIdx];
+        if(!rawName || !rawAmt) continue;
+
+        const matched = fuzzyMatchWorker(rawName);
+        if(!matched) continue;
+
+        const amt = parseAmount(rawAmt);
+        if(isNaN(amt)||amt<=0) continue;
+
+        // 귀속월 결정
+        let month = '';
+        if(monthIdx >= 0){
+          month = normalizeMonth(String(row[monthIdx]||''));
+        }
+        if(!month){
+          month = extractMonthFromFilename(file.name) || extractMonthFromSheetName(shName);
+        }
+        if(!month){ log('warn', `[${file.name}/${shName}] 행${ri+1} 귀속월 미파악 — 스킵`); continue; }
+
+        entries.push({file:file.name, sheet:shName, row:ri+1, month, workerName:matched, amount:amt, rawName, docType:'payroll'});
+        log('ok', `[${file.name}/${shName}] 행${ri+1}: ${matched} / ${month} / ${fmtNum(amt)}원`);
+      }
+    } else {
+      // 이체확인증
+      const nameIdx = findColIdx(headers, TRF_NAME_HEADERS);
+      const amtIdx  = findColIdx(headers, TRF_AMOUNT_HEADERS);
+      const dateIdx = findColIdx(headers, DATE_HEADERS);
+
+      if(amtIdx < 0){ log('warn', `[${file.name}/${shName}] 이체금액 컬럼 미발견 — 스킵`); continue; }
+      if(nameIdx < 0){ log('warn', `[${file.name}/${shName}] 수취인 컬럼 미발견 — 스킵`); continue; }
+
+      log('info', `[${file.name}/${shName}] 수취인:${headers[nameIdx]} 이체금:${headers[amtIdx]} 날짜:${dateIdx>=0?headers[dateIdx]:'(파일명)'}`);
+
+      for(let ri=headerRow+1; ri<rows.length; ri++){
+        const row = rows[ri];
+        const rawName = String(row[nameIdx]||'').trim();
+        const rawAmt  = row[amtIdx];
+        if(!rawName || !rawAmt) continue;
+
+        const matched = fuzzyMatchWorker(rawName);
+        if(!matched) continue;
+
+        const amt = parseAmount(rawAmt);
+        if(isNaN(amt)||amt<=0) continue;
+
+        let month = '';
+        if(dateIdx >= 0) month = normalizeMonth(String(row[dateIdx]||''));
+        if(!month) month = extractMonthFromFilename(file.name) || extractMonthFromSheetName(shName);
+        if(!month){ log('warn', `[${file.name}/${shName}] 행${ri+1} 이체월 미파악 — 스킵`); continue; }
+
+        entries.push({file:file.name, sheet:shName, row:ri+1, month, workerName:matched, amount:amt, rawName, docType:'transfer'});
+        log('ok', `[${file.name}/${shName}] 행${ri+1}: ${matched} / ${month} / ${fmtNum(amt)}원`);
+      }
+    }
+  }
+  return entries;
+}
+
+// ============================================================
+// 유틸
+// ============================================================
+function parseVisionJson(raw, label){
+  // ```json ... ``` 또는 ``` ... ``` 제거
+  let s = raw.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+  try{ return JSON.parse(s); }
+  catch(e){
+    // 단순 수정 시도
+    const m = s.match(/\{[\s\S]*\}/);
+    if(m){ try{ return JSON.parse(m[0]); }catch(e2){} }
+    log('err', `[${label}] JSON 파싱 실패: ${s.substring(0,80)}`);
+    return null;
+  }
+}
+
+function normalizeMonth(s){
+  if(!s) return '';
+  const str = String(s).trim();
+  // YYYY-MM
+  let m = str.match(/(\d{4})[.\-\/](\d{1,2})/);
+  if(m) return monthKey(+m[1], +m[2]);
+  // YYYY년 M월
+  m = str.match(/(\d{4})년\s*(\d{1,2})월/);
+  if(m) return monthKey(+m[1], +m[2]);
+  // YY년 M월
+  m = str.match(/(\d{2})년\s*(\d{1,2})월/);
+  if(m) return monthKey(fixYear(+m[1]), +m[2]);
+  // 숫자만 (엑셀 날짜 직렬번호)
+  const n = +str;
+  if(!isNaN(n) && n > 40000 && n < 50000){
+    // 엑셀 날짜 → JS Date
+    const d = new Date((n - 25569) * 86400 * 1000);
+    return monthKey(d.getUTCFullYear(), d.getUTCMonth()+1);
+  }
+  return '';
+}
+
+function extractMonthFromFilename(fname){
+  const m = fname.match(/(\d{4})[.\-_]?(\d{2})/);
+  if(m && +m[2] >= 1 && +m[2] <= 12) return monthKey(+m[1],+m[2]);
+  const m2 = fname.match(/(\d{4})년\s*(\d{1,2})월/);
+  if(m2) return monthKey(+m2[1],+m2[2]);
+  return '';
+}
+function extractMonthFromSheetName(name){
+  return extractMonthFromFilename(name);
+}
+
+function parseAmount(raw){
+  const s = String(raw||'').replace(/,/g,'').trim();
+  const n = parseInt(s, 10);
+  return isNaN(n) ? NaN : n;
+}
+
+// 편집거리 (Levenshtein)
+function editDist(a, b){
+  const m=a.length, n=b.length;
+  const dp=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++){
+    dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1]
+      : 1+Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  }
+  return dp[m][n];
+}
+
+function fuzzyMatchWorker(rawName){
+  if(!rawName) return null;
+  const clean = rawName.replace(/\s+/g,'');
+  // 완전 일치
+  const exact = S.workers.find(w=>w.name===clean||w.name===rawName);
+  if(exact) return exact.name;
+  // 포함 관계
+  const contains = S.workers.find(w=>clean.includes(w.name)||w.name.includes(clean));
+  if(contains) return contains.name;
+  // 편집거리
+  let best=null, bestScore=Infinity;
+  for(const w of S.workers){
+    const d = editDist(clean, w.name);
+    const ratio = d / Math.max(clean.length, w.name.length);
+    if(d < bestScore && ratio <= 0.35){ bestScore=d; best=w.name; }
+  }
+  return best;
+}
+
+function fmtNum(n){ return typeof n==='number' ? n.toLocaleString('ko-KR') : '-'; }
+function isExtPdf(f){ return /\.pdf$/i.test(f.name); }
+function isExtExcel(f){ return /\.(xlsx|xls|csv)$/i.test(f.name); }
+
+// ============================================================
+// 교차 검증
+// ============================================================
+function crossVerify(){
+  // 모든 월 목록 (요청된 대상자 기준)
+  const monthSet = new Set();
+  for(const w of S.workers) for(const {y,m} of w.months) monthSet.add(monthKey(y,m));
+  const allMonths = Array.from(monthSet).sort();
+
+  const results = [];
+  for(const w of S.workers){
+    const wMonths = w.months.map(({y,m})=>monthKey(y,m));
+    for(const month of wMonths){
+      const payE = S.payrollEntries.filter(e=>e.workerName===w.name && e.month===month);
+      const trfE = S.trfEntries.filter(e=>e.workerName===w.name && e.month===month);
+
+      const payAmt = payE.length>0 ? payE[payE.length-1].amount : null;
+      const trfAmt = trfE.length>0 ? trfE[trfE.length-1].amount : null;
+
+      let status;
+      if(payAmt===null && trfAmt===null) status='missing_both';
+      else if(payAmt===null)              status='missing_pay';
+      else if(trfAmt===null)              status='missing_trf';
+      else if(payAmt===trfAmt)            status='pass';
+      else if(Math.abs(payAmt-trfAmt)<=5) status='pass_round';
+      else                                status='fail';
+
+      results.push({
+        worker:w.name, month,
+        payAmount:payAmt, trfAmount:trfAmt, status,
+        diff: payAmt!=null&&trfAmt!=null ? payAmt-trfAmt : null,
+        payFiles: payE.map(e=>e.file+'p'+e.page),
+        trfFiles: trfE.map(e=>e.file+'p'+(e.page||e.row))
+      });
+    }
+  }
+  return results;
+}
+
+// ============================================================
+// 메인 실행
+// ============================================================
+async function runVerification(){
+  if(!hasApi()||S.workers.length===0) return;
+
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('progressSection').classList.remove('hidden');
+  document.getElementById('resultSection').classList.add('hidden');
+  document.getElementById('logArea').innerHTML = '';
+  S.logs = [];
+  S.payrollEntries = [];
+  S.trfEntries = [];
+  _activeGemini = GEMINI_MODELS[0]; // 모델 초기화
+
+  const total = S.payFiles.length + S.trfFiles.length;
+  let done = 0;
+
+  try{
+    // 급여서류 처리
+    for(const file of S.payFiles){
+      const label = file.name;
+      setProgress(Math.round(done/total*80), `급여서류 처리 중: ${label}`);
+      log('info', `===== 급여서류: ${label} =====`);
+      try{
+        let entries;
+        if(isExtPdf(file))        entries = await processPdf(file,'pay',total,done);
+        else if(isExtExcel(file)) entries = await processExcel(file,'pay');
+        else { log('warn',`${label}: 지원하지 않는 형식`); entries=[]; }
+        S.payrollEntries.push(...entries);
+        log('ok',`${label}: ${entries.length}건 추출`);
+      }catch(e){ log('err',`${label} 처리 오류: ${e.message}`); }
+      done++;
+    }
+
+    // 이체확인증 처리
+    for(const file of S.trfFiles){
+      const label = file.name;
+      setProgress(Math.round(done/total*80), `이체확인증 처리 중: ${label}`);
+      log('info', `===== 이체확인증: ${label} =====`);
+      try{
+        let entries;
+        if(isExtPdf(file))        entries = await processPdf(file,'trf',total,done);
+        else if(isExtExcel(file)) entries = await processExcel(file,'trf');
+        else { log('warn',`${label}: 지원하지 않는 형식`); entries=[]; }
+        S.trfEntries.push(...entries);
+        log('ok',`${label}: ${entries.length}건 추출`);
+      }catch(e){ log('err',`${label} 처리 오류: ${e.message}`); }
+      done++;
+    }
+
+    setProgress(90,'교차 검증 중...');
+    log('info','===== 교차 검증 =====');
+    S.verifyResults = crossVerify();
+
+    setProgress(100,'완료');
+    log('ok', `검증 완료: 총 ${S.verifyResults.length}건`);
+    renderResults();
+
+  } catch(e){
+    log('err', '치명적 오류: ' + e.message);
+    console.error(e);
+  } finally {
+    document.getElementById('runBtn').disabled = false;
+  }
+}
+
+// ============================================================
+// 결과 렌더링
+// ============================================================
+function switchTab(name){
+  document.querySelectorAll('.result-tab').forEach((el,i)=>{
+    const names=['matrix','findings','raw'];
+    el.classList.toggle('active', names[i]===name);
+  });
+  document.querySelectorAll('.tab-content').forEach(el=>{
+    el.classList.toggle('active', el.id==='tab-'+name);
+  });
+}
+
+const STATUS_LABELS = {
+  pass:         {text:'✅ PASS',          cls:'cell-pass'},
+  pass_round:   {text:'✅ PASS(단수)',    cls:'cell-pass-r'},
+  fail:         {text:'❌ FAIL',          cls:'cell-fail'},
+  missing_pay:  {text:'⚠️ 급여서류없음', cls:'cell-mp'},
+  missing_trf:  {text:'⚠️ 이체확인없음', cls:'cell-mt'},
+  missing_both: {text:'—',               cls:'cell-mb'},
+};
+
+function renderResults(){
+  const res = S.verifyResults;
+  const pass      = res.filter(r=>r.status==='pass'||r.status==='pass_round').length;
+  const fail      = res.filter(r=>r.status==='fail').length;
+  const missing   = res.filter(r=>r.status.startsWith('missing')&&r.status!=='missing_both').length;
+  const total     = res.filter(r=>r.status!=='missing_both').length;
+
+  // 요약 카드
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="summary-card s-total"><div class="summary-num">${total}</div><div class="summary-label">총 검증 항목</div></div>
+    <div class="summary-card s-pass"><div class="summary-num">${pass}</div><div class="summary-label">PASS</div></div>
+    <div class="summary-card s-fail"><div class="summary-num">${fail}</div><div class="summary-label">금액 불일치</div></div>
+    <div class="summary-card s-miss"><div class="summary-num">${missing}</div><div class="summary-label">서류 누락</div></div>
+  `;
+
+  // 불일치 배지
+  document.getElementById('findingCount').textContent = fail+missing || '';
+
+  // 매트릭스
+  const allMonths = [...new Set(res.map(r=>r.month))].sort();
+  const workers   = [...new Set(res.map(r=>r.worker))];
+  const map = {};
+  for(const r of res) map[r.worker+'|'+r.month] = r;
+
+  let html = `<table class="matrix-table"><thead><tr>
+    <th class="name-col">이름</th>
+    ${allMonths.map(m=>`<th class="month-col">${m.replace('-','.')}</th>`).join('')}
+  </tr></thead><tbody>`;
+
+  for(const w of workers){
+    html += `<tr><td class="name-col">${w}</td>`;
+    for(const m of allMonths){
+      const r = map[w+'|'+m];
+      if(!r){ html+='<td class="cell-mb">—</td>'; continue; }
+      const sl = STATUS_LABELS[r.status];
+      const payStr = r.payAmount!=null ? fmtNum(r.payAmount) : '없음';
+      const trfStr = r.trfAmount!=null ? fmtNum(r.trfAmount) : '없음';
+      const diffStr = r.diff!=null && r.diff!==0 ? `<br><span style="font-size:9px;color:var(--red)">차액 ${fmtNum(Math.abs(r.diff))}</span>` : '';
+      html += `<td class="${sl.cls}" title="급여:${payStr} / 이체:${trfStr}">
+        <div class="cell-inner">
+          <span class="cell-status">${sl.text}</span>
+          <span class="cell-pay">급여 ${payStr}</span>
+          <span class="cell-trf">이체 ${trfStr}</span>
+          ${diffStr}
+        </div></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('matrixWrap').innerHTML = html;
+
+  // 불일치 · 누락 목록
+  const problems = res.filter(r=>r.status!=='pass'&&r.status!=='pass_round'&&r.status!=='missing_both');
+  let fhtml = '';
+  if(problems.length===0){
+    fhtml = '<div class="finding ok" style="border-color:var(--green);background:var(--green-bg);padding:16px;border-radius:8px"><b>✅ 모든 항목 PASS — 불일치 없음</b></div>';
+  } else {
+    for(const r of problems){
+      const isFail = r.status==='fail';
+      const cls = isFail ? 'fail' : 'missing';
+      let desc = '';
+      if(r.status==='fail') desc = `급여대장 <b>${fmtNum(r.payAmount)}원</b> ≠ 이체금액 <b>${fmtNum(r.trfAmount)}원</b> (차액: ${fmtNum(Math.abs(r.diff))}원)`;
+      else if(r.status==='missing_pay') desc = '급여서류(급여대장/명세서)에서 해당 월 데이터를 찾을 수 없음';
+      else if(r.status==='missing_trf') desc = '이체확인증에서 해당 월 데이터를 찾을 수 없음';
+      fhtml += `<div class="finding ${cls}">
+        <div class="finding-title">${r.worker} — ${r.month.replace('-','년 ')}월</div>
+        <div class="finding-desc">${desc}</div>
+      </div>`;
+    }
+  }
+  document.getElementById('findingList').innerHTML = fhtml;
+
+  // 원본 데이터
+  document.getElementById('rawData').textContent =
+    '【급여서류 추출】\n' + JSON.stringify(S.payrollEntries, null, 2) +
+    '\n\n【이체확인증 추출】\n' + JSON.stringify(S.trfEntries, null, 2);
+
+  document.getElementById('resultSection').classList.remove('hidden');
+  document.getElementById('resultSection').scrollIntoView({behavior:'smooth'});
+}
+
+// ============================================================
+// 엑셀 내보내기
+// ============================================================
+function exportExcel(){
+  const res = S.verifyResults;
+  if(res.length===0){ alert('결과가 없습니다.'); return; }
+
+  const allMonths = [...new Set(res.map(r=>r.month))].sort();
+  const workers   = [...new Set(res.map(r=>r.worker))];
+  const map = {};
+  for(const r of res) map[r.worker+'|'+r.month] = r;
+
+  // Sheet1: 매트릭스
+  const matRows = [];
+  matRows.push(['이름', ...allMonths.map(m=>m.replace('-','.'))]);
+  for(const w of workers){
+    const row = [w];
+    for(const m of allMonths){
+      const r = map[w+'|'+m];
+      if(!r){ row.push('—'); continue; }
+      const sl = STATUS_LABELS[r.status];
+      row.push(sl.text.replace(/[✅❌⚠️]/g,'').trim());
+    }
+    matRows.push(row);
+  }
+
+  // Sheet2: 상세
+  const detailRows = [['이름','월','급여대장금액','이체금액','상태','차액']];
+  for(const r of res){
+    if(r.status==='missing_both') continue;
+    const sl = STATUS_LABELS[r.status];
+    detailRows.push([
+      r.worker,
+      r.month.replace('-','.'),
+      r.payAmount ?? '',
+      r.trfAmount ?? '',
+      sl.text.replace(/[✅❌⚠️]/g,'').trim(),
+      r.diff ?? ''
+    ]);
+  }
+
+  // Sheet3: 불일치만
+  const failRows = [['이름','월','급여대장금액','이체금액','차액','구분']];
+  for(const r of res){
+    if(r.status==='pass'||r.status==='pass_round'||r.status==='missing_both') continue;
+    failRows.push([
+      r.worker, r.month.replace('-','.'),
+      r.payAmount??'없음', r.trfAmount??'없음',
+      r.diff!=null?Math.abs(r.diff):'',
+      r.status==='fail'?'금액불일치':r.status==='missing_pay'?'급여서류누락':'이체확인없음'
+    ]);
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(matRows), '검증매트릭스');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailRows), '상세결과');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(failRows), '불일치목록');
+
+  const today = new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}).replace(/-/g,'');
+  XLSX.writeFile(wb, `급여서류검증_${today}.xlsx`);
+}
+</script>
+</body>
+</html>
