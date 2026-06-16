@@ -251,9 +251,9 @@ async function pdfPageToImage(file,pageNum,scale){
 }
 
 // Claude Vision OCR — 등기부등본 전용 프롬프트
-// 모델 정책: 1차 Sonnet 4.6 → 429 동일 모델 재시도 → 5xx Haiku 4.5 폴백
-const VISION_MODEL_PRIMARY='claude-sonnet-4-6';
-const VISION_MODEL_FALLBACK='claude-haiku-4-5-20251001';
+// 모델 정책: 1차 Opus 4.8(고해상도 비전) → 429 동일 모델 재시도 → 5xx Sonnet 4.6 폴백
+const VISION_MODEL_PRIMARY='claude-opus-4-8';
+const VISION_MODEL_FALLBACK='claude-sonnet-4-6';
 let _visionWarnings=[]; // Vision OCR 진행 중 누적 경고 (분석 시작 시 reset, 결과 상단 배너로 노출)
 
 async function callVisionOnce(apiKey,model,content){
@@ -304,7 +304,7 @@ async function visionOcrPdf(file){
 - 줄바꿈을 유지하고, 각 페이지를 [N페이지] 헤더로 구분
 - 텍스트만 출력, 다른 설명 불필요`});
 
-  // 1차: Sonnet 4.6
+  // 1차: Opus 4.8 (고해상도 비전)
   let res=await callVisionOnce(apiKey,VISION_MODEL_PRIMARY,content);
 
   // 429 → 3초 대기 후 동일 모델 재시도
@@ -314,12 +314,12 @@ async function visionOcrPdf(file){
    res=await callVisionOnce(apiKey,VISION_MODEL_PRIMARY,content);
   }
 
-  // 5xx → Haiku 4.5 폴백 (Sonnet 일시 장애 시 처리 지속)
+  // 5xx → Sonnet 4.6 폴백 (Opus 일시 장애 시 처리 지속)
   if(!res.ok && res.status>=500 && res.status<600){
-   setStatus(`Sonnet ${res.status} — Haiku 4.5로 폴백`);
+   setStatus(`Opus ${res.status} — Sonnet 4.6으로 폴백`);
    const fb=await callVisionOnce(apiKey,VISION_MODEL_FALLBACK,content);
    if(fb.ok) res=fb;
-   else throw new Error(`Vision API 오류 (Sonnet ${res.status} / Haiku ${fb.status}): ${(fb.err||'').substring(0,200)}`);
+   else throw new Error(`Vision API 오류 (Opus ${res.status} / Sonnet ${fb.status}): ${(fb.err||'').substring(0,200)}`);
   }
 
   if(!res.ok) throw new Error(`Vision API 오류 (${res.status}): ${(res.err||'').substring(0,200)}`);
@@ -1295,6 +1295,13 @@ function renderAllResults(){
 
  host.innerHTML=inlineHtml;
 
+ // AI 추론 보조의견 패널 (전체 사업장 결과 기준)
+ const _allDir=bizKeys.flatMap(k=>ALL_BIZ_RESULTS[k].results);
+ if(_allDir.length){
+  _aiFacts.director=serializeDirectorFacts(_allDir);
+  host.insertAdjacentHTML('beforeend', aiAdviceBlock('director'));
+ }
+
  // 복수 사업장인 경우 탭 핸들러 바인딩
  if(bizKeys.length>1){
   document.querySelectorAll('#bizTabs button').forEach(btn=>{
@@ -1860,6 +1867,8 @@ function _renderFResult(results) {
   </div>`;
 
   document.getElementById('familyResult').innerHTML = sumHtml + tbl + fActionHtml + warn;
+  _aiFacts.family = serializeFamilyFacts(results);
+  document.getElementById('familyResult').insertAdjacentHTML('beforeend', aiAdviceBlock('family'));
 }
 
 // =============================================
@@ -2181,6 +2190,96 @@ function _renderNrResult(results) {
   </div>`;
 
   document.getElementById('nrResult').innerHTML = sumHtml + tbl + actionHtml + warn;
+  _aiFacts.nonreg = serializeNrFacts(results);
+  document.getElementById('nrResult').insertAdjacentHTML('beforeend', aiAdviceBlock('nonreg'));
+}
+
+// =============================================
+// AI 추론 보조의견 레이어
+// 결정은 규칙기반 판정이 유지하고, AI는 근로자성·환급 가능성에 대한
+// 참고용 추론만 보탬 (특히 검토필요·사업장확인필요·점수 모호 구간)
+// =============================================
+const AI_ADVICE_MODEL='claude-opus-4-8';
+let _aiFacts={director:'',family:'',nonreg:''};
+
+const AI_ADVICE_SYSTEM=`당신은 노무법인 도원 기업지원팀의 4대보험 적용제외(근로자성) 판단 보조 분석가다. 입력으로 규칙기반 도구가 산출한 대상자별 판정 결과(직위/관계/계약·점수/취득·상실일/규칙판정/근거)를 받는다.
+
+목표: 각 대상자에 대해 규칙판정을 보완하는 '추론 보조의견'을 제시한다. 규칙판정을 뒤집는 단정은 하지 말고, 근로자성 성립 가능성과 환급 가능성을 더 깊이 추론한다.
+
+[작성 규칙]
+- 모든 문장에 태그 표기: [사실] / [추측] / [의견] / [불확실]. 태그 없는 문장 금지.
+- 법적 근거는 조문·판례로 명시: 근로기준법 §2①1(근로자 정의), 대법원 2003다5061(2003.9.26.: 업무 지휘·감독 / 보수의 근로대가성 / 근무시간·장소 지정 여부로 근로자성 판단), 고용보험법 §2①1, 고용·산재보험료징수법 §41(보험료 소멸시효 3년).
+- '일반적으로' 식 회피 표현 금지. 추측을 사실처럼 쓰지 말 것.
+
+[대상자별 출력 형식]
+■ {번호}. {성명} ({직위 또는 관계})
+- 근로자성 성립 가능성: [강/중/약] + 1~2문장 근거
+- 환급 가능성: [높음/중간/낮음/부지급위험] + 근거(취득취소/상실신고/시효 영향)
+- 결론을 바꾸는 핵심 변수: 어떤 서류·사실이 확인되면 판정이 어느 방향으로 움직이는지 1~2개
+- '검토필요'·'사업장확인필요'·점수 모호 구간은 인정/부인 양방향 시나리오를 모두 제시
+
+마지막 줄: 본 의견은 참고용 보조 추론이며 최종 판단은 담당 노무사·관할 근로복지공단 확인이 필요함.
+
+간결하게. 대상자당 5~8줄 이내.`;
+
+function serializeDirectorFacts(results){
+ return results.map((r,i)=>`${i+1}. [등기임원] 직위:${r.pos} 성명:${r.name} 임원취임:${r.appoint||'-'} 퇴임:${r.resign||'-'} | 고용 취득:${r.eAcq||'-'} 상실:${r.eLoss||'-'} / 산재 취득:${r.sAcq||'-'} 상실:${r.sLoss||'-'} | 규칙판정: 고용=${r.judgmentE||'-'} 산재=${r.judgmentS||'-'} (종합 ${r.judgment}) | 사유: ${(r.reason||'').replace(/\n/g,' ')}`).join('\n');
+}
+function serializeFamilyFacts(results){
+ return results.map((r,i)=>`${i+1}. [가족종사자] 성명:${r.name} 관계:${r.rel} 동거:${r.live?'예':'아니오'} 근로자성점수:${r.score} | 규칙판정: 고용=${r.empJ} 산재=${r.accJ} | 고용근거: ${r.empD} | 산재근거: ${r.accD}`).join('\n');
+}
+function serializeNrFacts(results){
+ const cl={delegation:'임원위촉(위임)',labor:'근로계약서',none:'없음(구두)','':'미선택'};
+ return results.map((r,i)=>`${i+1}. [비등기임원] 직위:${r.title} 성명:${r.name} 계약유형:${cl[r.contract]||r.contract} 부인:${r.neg} 인정:${r.pos} 순점수:${r.net} | 규칙판정: 고용=${r.empJ} 산재=${r.accJ} | 고용근거: ${r.empD} | 산재근거: ${r.accD}`).join('\n');
+}
+
+function aiAdviceBlock(kind){
+ return `<div style="margin-top:14px;padding:12px 14px;background:#faf5ff;border:1px solid #d8b4fe;border-radius:6px">
+   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+     <b style="color:#7c3aed">🤖 AI 추론 보조의견</b>
+     <span class="small" style="color:#7c3aed">규칙기반 판정에 대한 참고용 추론 — 최종 판단은 노무사·공단</span>
+     <button class="sec" style="margin:0;padding:5px 12px;font-size:12px" onclick="runAiAdvice('${kind}',this)">추론 생성</button>
+   </div>
+   <div id="aiAdviceOut-${kind}" style="margin-top:10px;font-size:12.5px;line-height:1.75;color:#1f2937"></div>
+ </div>`;
+}
+
+// AI 응답 텍스트 → 안전 HTML (esc 후 **굵게**·4태그 색상·줄바꿈)
+function mdLite(t){
+ let h=esc(t);
+ h=h.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+ h=h.replace(/\[사실\]/g,'<span style="color:#065f46;font-weight:700">[사실]</span>')
+    .replace(/\[추측\]/g,'<span style="color:#b45309;font-weight:700">[추측]</span>')
+    .replace(/\[의견\]/g,'<span style="color:#1d4ed8;font-weight:700">[의견]</span>')
+    .replace(/\[불확실\]/g,'<span style="color:#9333ea;font-weight:700">[불확실]</span>');
+ return h.replace(/\n/g,'<br>');
+}
+
+async function runAiAdvice(kind,btn){
+ const out=document.getElementById('aiAdviceOut-'+kind);
+ if(!out) return;
+ const apiKey=getApiKey();
+ if(!apiKey){ out.innerHTML='<span style="color:#b91c1c">Anthropic API Key를 상단에 입력·저장해주세요.</span>'; return; }
+ const facts=_aiFacts[kind]||'';
+ if(!facts.trim()){ out.innerHTML='<span class="small">판정 결과가 없습니다.</span>'; return; }
+ const orig=btn.textContent; btn.disabled=true; btn.textContent='추론 중...';
+ out.innerHTML='<span class="small">AI가 추론 중입니다... (Opus 4.8)</span>';
+ try{
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{
+   method:'POST',
+   headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+   body:JSON.stringify({model:AI_ADVICE_MODEL,max_tokens:2000,system:AI_ADVICE_SYSTEM,messages:[{role:'user',content:`다음은 4대보험 적용제외 규칙기반 판정 결과입니다. 각 대상자별 보조 의견을 작성하세요.\n\n${facts}`}]})
+  });
+  if(!resp.ok){ const e=await resp.text(); out.innerHTML='<span style="color:#b91c1c">AI 호출 오류 ('+resp.status+'): '+esc(e.substring(0,200))+'</span>'; }
+  else{
+   const data=await resp.json();
+   const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+   out.innerHTML = text ? mdLite(text) : '<span class="small">응답이 비어 있습니다.</span>';
+  }
+ }catch(e){
+  out.innerHTML='<span style="color:#b91c1c">AI 호출 실패: '+esc(String((e&&e.message)||e))+'</span>';
+ }
+ btn.disabled=false; btn.textContent=orig;
 }
 </script>
 <script src="../assets/modal.js"></script>
