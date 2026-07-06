@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <title>임채부담금 사전 견적 (가입일 미상 예측)</title>
+  <script src="../js/config.js"></script>
+  <script src="../js/shared.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    body { background: var(--bg); }
+    .page-wrap { max-width: 920px; margin: 0 auto; padding: 28px 24px 60px; }
+    .page-hd { margin-bottom: 28px; }
+    .page-hd h1 { font-size: 20px; font-weight: 700; color: var(--ink-900); letter-spacing: -.02em; margin-bottom: 4px; }
+    .page-hd p  { font-size: 13px; color: var(--ink-500); }
+    .law-badge  { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px;
+                  font-size: 11px; color: var(--ink-500); background: var(--ink-50);
+                  border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 16px; }
+    .card-head { display: flex; align-items: center; gap: 10px; padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+    .card-step { width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700;
+                 display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .card-title { font-size: 14px; font-weight: 600; color: var(--ink-800); }
+    .card-body { padding: 16px 20px; }
+    .drop-zone { border: 2px dashed var(--border-dark, #d4d4d4); border-radius: var(--radius-lg); padding: 28px 20px; text-align: center;
+                 cursor: pointer; transition: all .15s; font-size: 13px; color: var(--ink-500); }
+    .drop-zone:hover, .drop-zone.drag { border-color: var(--primary); background: var(--primary-light, #eef2ff); }
+    .drop-zone strong { color: var(--ink-700); }
+    .file-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 10px; background: var(--ok-bg, #f0fdf4);
+                color: var(--ok-text, #166534); border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }
+    .stat-box { background: var(--ink-50); border-radius: var(--radius); padding: 10px 12px; }
+    .stat-box .k { font-size: 11px; color: var(--ink-400); }
+    .stat-box .v { font-size: 16px; font-weight: 700; color: var(--ink-800); font-variant-numeric: tabular-nums; }
+    .grid-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .grid-table th { padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; color: var(--ink-500);
+                     background: var(--ink-50); border-bottom: 1px solid var(--border); }
+    .grid-table th.num, .grid-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .grid-table td { padding: 8px 10px; border-bottom: 1px solid var(--ink-100); }
+    .grid-table tr:last-child td { border-bottom: none; }
+    .grid-table tr.total-row td { font-weight: 700; color: var(--ink-900); background: var(--ink-50); border-top: 1.5px solid var(--border); }
+    .grid-table tr.sel td { background: var(--primary-light, #eef2ff); }
+    .grid-table input[type="number"] { width: 130px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+                                       font-size: 13px; text-align: right; }
+    .grid-table input:focus { outline: none; border-color: var(--primary); }
+    .src-badge { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: var(--warn-bg, #fffbeb); color: var(--warn-text, #92400e); font-weight: 600; }
+    .src-badge.fixed { background: var(--ok-bg, #f0fdf4); color: var(--ok-text, #166534); }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip { padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; font-weight: 600;
+            color: var(--ink-500); cursor: pointer; background: var(--surface); transition: all .15s; }
+    .chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    @media(max-width:600px){ .form-row { grid-template-columns: 1fr; } }
+    .form-field { display: flex; flex-direction: column; gap: 4px; }
+    .form-field label { font-size: 12px; font-weight: 600; color: var(--ink-600); }
+    .form-field input, .form-field select { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; }
+    .form-field .hint { font-size: 11px; color: var(--ink-400); }
+    .check-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 13px; color: var(--ink-700); }
+    .check-row label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+    .btn-calc { width: 100%; padding: 13px; background: var(--primary); color: #fff; border: none; border-radius: var(--radius-lg);
+                font-size: 14px; font-weight: 700; cursor: pointer; transition: background .15s; }
+    .btn-calc:hover { background: var(--primary-dark); }
+    .btn-calc:disabled { background: var(--ink-300); cursor: not-allowed; }
+    .btn-copy { padding: 7px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+                font-size: 12px; font-weight: 600; color: var(--ink-600); cursor: pointer; }
+    .btn-copy:hover { border-color: var(--primary); color: var(--primary); }
+    .result-section { display: none; }
+    .result-section.visible { display: block; }
+    .total-highlight { background: linear-gradient(135deg, #eef2ff 0%, #f0f9ff 100%); border: 1.5px solid var(--primary);
+                       border-radius: var(--radius-lg); padding: 20px 24px; margin-bottom: 16px;
+                       display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .total-highlight-label { font-size: 13px; color: var(--ink-600); font-weight: 600; }
+    .total-highlight-value { font-size: 26px; font-weight: 800; color: var(--primary-dark); letter-spacing: -.02em; }
+    .total-highlight-sub { font-size: 12px; color: var(--ink-400); margin-top: 2px; }
+    .badge-ok   { background: var(--ok-bg);   color: var(--ok-text);   padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-warn { background: var(--warn-bg); color: var(--warn-text); padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-err  { background: var(--err-bg);  color: var(--err-text);  padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .warn-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius); padding: 12px 14px;
+                font-size: 12px; color: #92400e; margin-bottom: 12px; }
+    .warn-box strong { display: block; margin-bottom: 2px; }
+    .info-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: var(--radius); padding: 12px 14px;
+                font-size: 12px; color: #0c4a6e; margin-bottom: 12px; }
+    .band { white-space: nowrap; }
+    .band .lo { color: var(--ink-700); font-weight: 600; }
+    .band .hi { color: var(--ink-400); }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div class="page-hd">
+    <h1>임채부담금 사전 견적 <span style="font-weight:500;color:var(--ink-400);font-size:14px">— 퇴직연금 가입일 미상 예측</span></h1>
+    <p>고용현황 엑셀만으로 지급보장비율을 <b>가입일(D)의 함수로 역산</b>하여, 가입확인서 도착 전 시나리오별 환급 예상액 밴드를 산출합니다. 확정 계산은 「임채부담금 환급 계산기」를 사용하세요.</p>
+    <span class="law-badge">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      임금채권보장법 §9·§10·§26① / 시행령 §16 / 고용노동부고시 제2018-50호
+    </span>
+  </div>
+
+  <!-- Step 1: 고용현황 업로드 -->
+  <div class="card">
+    <div class="card-head"><div class="card-step">1</div><span class="card-title">고용현황 엑셀 업로드 (도원어드민 내보내기)</span></div>
+    <div class="card-body">
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <strong>클릭 또는 드래그</strong>로 고용현황_사업장관리번호.xlsx 업로드<br>
+        <span style="font-size:11px">필수 컬럼: 취득일 · 상실일 · 월평균임금(보수) — 근로자별 자격이력 행 단위</span>
+        <div id="file-tag"></div>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none">
+      <div id="parse-summary"></div>
+      <div id="parse-warnings"></div>
+    </div>
+  </div>
+
+  <!-- Step 2: 연도별 보수총액 -->
+  <div class="card" id="card-pay" style="display:none">
+    <div class="card-head"><div class="card-step">2</div><span class="card-title">연도별 보수총액 (폴백 추정 → 신고값으로 교체 권장)</span></div>
+    <div class="card-body">
+      <div class="info-box">폴백 = Σ(월평균임금 × 해당연도 자격월수). <b>고산토탈 20209 부과고지 보험료조회의 임채산정보수액</b>을 입력하면 해당 연도 오차가 0이 됩니다 (입력 시 "신고값" 배지로 전환).</div>
+      <table class="grid-table" id="pay-table"></table>
+      <div class="check-row" style="margin-top:12px">
+        <label><input type="checkbox" id="chk-db-risk"> DB형 가능성 있음 (역산 불가 — 결과를 참고치로만 사용)</label>
+      </div>
+      <div class="check-row" style="margin-top:6px" id="reduced-checks"></div>
+    </div>
+  </div>
+
+  <!-- Step 3: 가입일 시나리오 -->
+  <div class="card" id="card-scenario" style="display:none">
+    <div class="card-head"><div class="card-step">3</div><span class="card-title">퇴직연금 가입일(D) 시나리오</span></div>
+    <div class="card-body">
+      <div class="chip-row" id="chip-row"></div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>직접 입력 (가입일 D)</label>
+          <input type="date" id="custom-d" onchange="selectCustomD()">
+          <span class="hint">전원 D일부터 DC 가입 가정. 회계 계정과목(퇴직연금운용자산) 첫 계상 시점으로 추정 가능</span>
+        </div>
+        <div class="form-field">
+          <label>산식 표시</label>
+          <select id="formula-mode">
+            <option value="band">밴드 표시 (스킬 표준 ~ 36개월 캡)</option>
+            <option value="uncapped">스킬 표준만 (가입기간합÷근속기간합)</option>
+            <option value="cap36">36개월 캡만 (고시 "최종 3년" 해석)</option>
+          </select>
+          <span class="hint">공단 인정값은 가입확인서로만 확정 — 밴드 병기 권장</span>
+        </div>
+      </div>
+      <button class="btn-calc" onclick="runEstimate()">시나리오 예측 계산</button>
+    </div>
+  </div>
+
+  <!-- 결과 -->
+  <div class="result-section" id="results">
+    <div class="total-highlight">
+      <div>
+        <div class="total-highlight-label">선택 시나리오 즉시분 (직전 소급연도 합계)</div>
+        <div class="total-highlight-value" id="total-value">—</div>
+        <div class="total-highlight-sub" id="total-sub"></div>
+      </div>
+      <button class="btn-copy" onclick="copySummary()">요약 복사</button>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">시나리오 비교표 (즉시분 · 향후분)</span></div>
+      <div class="card-body" style="overflow-x:auto"><table class="grid-table" id="cmp-table"></table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title" id="detail-title">선택 시나리오 상세</span></div>
+      <div class="card-body" style="overflow-x:auto"><table class="grid-table" id="detail-table"></table></div>
+    </div>
+
+    <div id="result-warnings"></div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">확정에 필요한 자료 (오차 제거 순서)</span></div>
+      <div class="card-body" style="font-size:13px;color:var(--ink-700);line-height:1.9">
+        ① 고산토탈 <b>요율현황 조회</b> — 경감 기적용 여부(이중경감 방지)·적용 개시연도로 D 후보 압축<br>
+        ② 고산토탈 20209 <b>임채산정보수액</b> — 보수총액 폴백 오차 제거 (Step 2에 입력)<br>
+        ③ 「퇴직연금제도 가입확인서」(각 검토연도 <b>전년도 12/31 기준</b>, DC 운용사별 / DB 주간사 통합) — 지급보장비율 확정<br>
+        ④ DB형이면 적립비율(÷100)로 재계산 — 본 툴 역산치 폐기, 확정 계산기로 이관
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ─── 상수 (연도별 요율 테이블: 상수 아닌 테이블로 관리 — 고시 개정 시 여기만 수정) ───
+  const RATE_TABLE = [ { until: 2025, rate: 0.6 }, { until: 9999, rate: 0.9 } ]; // ‰
+  const PROFIT_CUT = 300000;   // 즉시분 수익성 컷
+  const DAYS_PER_MONTH = 30.4375;
+
+  const baseRate = y => RATE_TABLE.find(r => y <= r.until).rate;
+  const floor10  = x => Math.floor(x / 10) * 10;
+  const fmt      = n => n.toLocaleString('ko-KR');
+  const fmtWon   = n => fmt(Math.round(n)) + '원';
+
+  let recs = [];            // {name, acq:Date, loss:Date|null, wage:number}
+  let excluded = 0, specialExcluded = 0;
+  let payTotals = {};       // year -> {value, source:'fallback'|'fixed'}
+  let selectedD = null;     // Date | 'none'
+  let selectedLabel = '';
+  let lastSummaryText = '';
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const curY = today.getFullYear();
+
+  // 소급 대상 연도: 만료일(연도+4년 3/31) ≥ 오늘. 1분기에는 당해−4년분도 포함 (고정 3개년 룰 금지)
+  function immediateYears(){
+    const ys = [];
+    for (let y = curY - 4; y <= curY - 1; y++){
+      if (new Date(y + 4, 2, 31) >= today) ys.push(y);
+    }
+    return ys;
+  }
+  const IMM_YEARS = immediateYears();
+  const FUT_YEARS = [curY, curY + 1];
+
+  // ─── 날짜 파싱 (ISO / 점·슬래시 / Date / 엑셀 시리얼) ───
+  function parseDate(v){
+    if (v == null || v === '') return null;
+    if (v instanceof Date) return isNaN(v) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+    if (typeof v === 'number'){ // excel serial
+      const d = new Date(Math.round((v - 25569) * 86400000));
+      return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    }
+    const s = String(v).trim().replace(/[./]/g,'-').slice(0,10);
+    const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
+  }
+  const months = (a,b) => Math.max(b - a, 0) / 86400000 / DAYS_PER_MONTH;
+
+  // ─── 업로드 ───
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
+  document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) readFile(e.target.files[0]); });
+
+  function readFile(file){
+    const rd = new FileReader();
+    rd.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array', cellDates:true });
+        parseSheet(wb.Sheets[wb.SheetNames[0]], file.name);
+      } catch(err){ alert('엑셀 파싱 실패: ' + err.message); }
+    };
+    rd.readAsArrayBuffer(file);
+  }
+
+  function parseSheet(sheet, fname){
+    const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'' });
+    // 헤더 행 탐지
+    let hi = -1, map = {};
+    for (let i = 0; i < Math.min(rows.length, 10); i++){
+      const hs = rows[i].map(c => String(c));
+      if (hs.some(h => /취득일|입사일/.test(h))){ hi = i;
+        hs.forEach((h, c) => {
+          if (/(자격)?취득일|입사일/.test(h) && map.acq == null) map.acq = c;
+          if (/상실일|퇴사일/.test(h) && map.loss == null) map.loss = c;
+          if (/월평균(임금|보수)|보수월액/.test(h) && map.wage == null) map.wage = c;
+          if (/근로자명|성명|이름/.test(h) && map.name == null) map.name = c;
+          if (/근로자구분/.test(h) && map.kind == null) map.kind = c;
+        });
+        break;
+      }
+    }
+    if (hi < 0 || map.acq == null){ alert('헤더에서 취득일 컬럼을 찾지 못했습니다.'); return; }
+
+    recs = []; excluded = 0; specialExcluded = 0;
+    for (let i = hi + 1; i < rows.length; i++){
+      const r = rows[i];
+      if (!r || r.every(c => c === '')) continue;
+      const kind = map.kind != null ? String(r[map.kind]) : '';
+      if (/특수형태|노무제공/.test(kind)){ specialExcluded++; continue; }  // 특고 제외
+      const acq = parseDate(r[map.acq]);
+      if (!acq){ excluded++; continue; }                                    // 취득일 없음
+      const loss = map.loss != null ? parseDate(r[map.loss]) : null;
+      const wage = map.wage != null ? (parseInt(String(r[map.wage]).replace(/[^\d]/g,''), 10) || 0) : 0;
+      recs.push({ name: map.name != null ? String(r[map.name]) : '', acq, loss, wage });
+    }
+
+    document.getElementById('file-tag').innerHTML =
+      '<span class="file-tag">✓ ' + escapeHtml(fname) + ' — 유효 ' + recs.length + '건</span>';
+    buildPayTable();
+    renderParseSummary();
+    document.getElementById('card-pay').style.display = '';
+    document.getElementById('card-scenario').style.display = '';
+    buildChips();
+  }
+
+  // ─── 연도별 보수총액 폴백 ───
+  function payFallback(year){
+    const ys = new Date(year,0,1), ye = new Date(year+1,0,1);
+    let tot = 0;
+    recs.forEach(r => {
+      const s = Math.max(r.acq, ys), e = Math.min(r.loss || today, ye);
+      if (e > s) tot += r.wage * months(s, e);
+    });
+    return Math.round(tot);
+  }
+
+  function buildPayTable(){
+    payTotals = {};
+    const allY = [...IMM_YEARS, curY - 0].filter((v,i,a) => a.indexOf(v) === i); // 소급연도 + 직전연도 커버
+    const needY = [...new Set([...IMM_YEARS, IMM_YEARS[IMM_YEARS.length-1]])];
+    needY.forEach(y => payTotals[y] = { value: payFallback(y), source: 'fallback' });
+    const tbl = document.getElementById('pay-table');
+    let html = '<tr><th>보험연도</th><th class="num">보수총액 (원)</th><th>소스</th><th class="num">전년 대비</th><th>시효 만료일</th></tr>';
+    needY.forEach(y => {
+      const p = payTotals[y], prev = payFallback(y-1);
+      const chg = prev > 0 ? (p.value - prev) / prev * 100 : 0;
+      const chgBadge = Math.abs(chg) > 50 ? ' <span class="badge-warn">±50% 급변</span>' : '';
+      const dl = new Date(y+4, 2, 31);
+      const dRem = Math.floor((dl - today) / 86400000);
+      const dlCls = dRem < 0 ? 'badge-err' : (dRem < 90 ? 'badge-warn' : 'badge-ok');
+      const dlTxt = (y+4) + '-03-31' + (dRem < 0 ? ' 만료' : dRem < 90 ? ' 임박 ' + dRem + '일' : '');
+      html += '<tr><td class="year-label">' + y + '</td>' +
+        '<td class="num"><input type="number" id="pay-' + y + '" value="' + p.value + '" oninput="window._payEdited(' + y + ')"></td>' +
+        '<td><span class="src-badge" id="src-' + y + '">폴백 추정</span></td>' +
+        '<td class="num">' + (prev > 0 ? chg.toFixed(0) + '%' : '—') + chgBadge + '</td>' +
+        '<td><span class="' + dlCls + '">' + dlTxt + '</span></td></tr>';
+    });
+    tbl.innerHTML = html;
+
+    // 이중경감 방지 체크박스
+    document.getElementById('reduced-checks').innerHTML =
+      '<span style="font-weight:600;color:var(--ink-600)">이미 경감 적용 연도(요율현황 조회):</span> ' +
+      needY.map(y => '<label><input type="checkbox" id="red-' + y + '"> ' + y + '</label>').join(' ');
+  }
+
+  window._payEdited = function(y){
+    const v = parseInt(document.getElementById('pay-' + y).value, 10) || 0;
+    payTotals[y] = { value: v, source: v === payFallback(y) ? 'fallback' : 'fixed' };
+    const b = document.getElementById('src-' + y);
+    b.textContent = payTotals[y].source === 'fixed' ? '신고값(입력)' : '폴백 추정';
+    b.className = 'src-badge' + (payTotals[y].source === 'fixed' ? ' fixed' : '');
+  };
+
+  function renderParseSummary(){
+    const kDates = {};
+    [...IMM_YEARS, ...FUT_YEARS].forEach(y => kDates[y] = new Date(y-1, 11, 31));
+    let stat = '<div class="stat-grid">';
+    stat += '<div class="stat-box"><div class="k">유효 자격이력</div><div class="v">' + recs.length + '건</div></div>';
+    Object.entries(kDates).slice(0, 4).forEach(([y, K]) => {
+      const n = recs.filter(r => r.acq <= K && (!r.loss || r.loss > K)).length;
+      stat += '<div class="stat-box"><div class="k">' + (+y-1) + '-12-31 재직</div><div class="v">' + n + '명</div></div>';
+    });
+    stat += '</div>';
+    document.getElementById('parse-summary').innerHTML = stat;
+
+    let warns = '';
+    if (excluded > 0) warns += '<div class="warn-box"><strong>취득일 없는 행 ' + excluded + '건 제외</strong>대표·등기임원 가능성 — 등기부와 대조하세요. 임원 보수가 보수총액에 포함돼 있으면 적용제외 연계 재산정 대상.</div>';
+    if (specialExcluded > 0) warns += '<div class="warn-box"><strong>특고(노무제공자) ' + specialExcluded + '건 제외</strong>특고 관리번호는 임채 경감 산정에서 제외됩니다.</div>';
+    document.getElementById('parse-warnings').innerHTML = warns;
+  }
+
+  // ─── 지급보장비율 역산: ratio(K, D) ───
+  function ratio(K, D, cap36){
+    let num = 0, den = 0;
+    recs.forEach(r => {
+      if (!(r.acq <= K && (!r.loss || r.loss > K))) return; // 기준일 재직자만
+      let ten = months(r.acq, K);
+      let enr = D !== 'none' && D <= K ? months(Math.max(r.acq, D), K) : 0;
+      if (cap36){ ten = Math.min(ten, 36); enr = Math.min(enr, ten); }
+      num += enr; den += ten;
+    });
+    return den > 0 ? Math.min(num / den, 1.0) : 0;
+  }
+
+  // 환급액 (노션 v3 절사식: 각 항 10원 미만 절사)
+  function refundOf(year, pay, cr){
+    const base = baseRate(year), eff = base * (1 - 0.5 * cr);
+    return floor10(pay * base / 1000) - floor10(pay * eff / 1000);
+  }
+
+  // ─── 시나리오 정의 ───
+  function scenarioList(){
+    const minAcq = recs.length ? new Date(Math.min(...recs.map(r => +r.acq))) : new Date(2019,0,1);
+    const list = [
+      { id:'upper', label:'상한: 입사 즉시 전원 가입', d: minAcq },
+      { id:'pre22', label:'2022년 이전 가입', d: new Date(2021,6,1) },
+      { id:'mid22', label:'2022년 중 가입', d: new Date(2022,6,1) },
+    ];
+    IMM_YEARS.forEach(y => list.push({ id:'y'+y, label: y + '년 초 가입', d: new Date(y,0,2) }));
+    list.push({ id:'none', label:'미가입', d:'none' });
+    return list;
+  }
+
+  function buildChips(){
+    const row = document.getElementById('chip-row');
+    row.innerHTML = '';
+    scenarioList().forEach((s, i) => {
+      const c = document.createElement('button');
+      c.className = 'chip' + (s.id === 'pre22' ? ' active' : '');
+      c.textContent = s.label;
+      c.onclick = () => { row.querySelectorAll('.chip').forEach(x => x.classList.remove('active')); c.classList.add('active');
+                          selectedD = s.d; selectedLabel = s.label; document.getElementById('custom-d').value = ''; runEstimate(); };
+      row.appendChild(c);
+      if (s.id === 'pre22'){ selectedD = s.d; selectedLabel = s.label; }
+    });
+  }
+
+  window.selectCustomD = function(){
+    const v = document.getElementById('custom-d').value;
+    if (!v) return;
+    selectedD = parseDate(v); selectedLabel = '직접 입력 ' + v;
+    document.querySelectorAll('#chip-row .chip').forEach(x => x.classList.remove('active'));
+    runEstimate();
+  };
+
+  // ─── 메인 계산 ───
+  function calcScenario(D){
+    const rows = [];
+    let immLo = 0, immHi = 0;
+    IMM_YEARS.forEach(y => {
+      const K = new Date(y-1, 11, 31);
+      const reduced = document.getElementById('red-' + y) && document.getElementById('red-' + y).checked;
+      const pay = payTotals[y] ? payTotals[y].value : 0;
+      const eligible = D !== 'none' && D <= K && !reduced;
+      const crU = eligible ? ratio(K, D, false) : 0;
+      const crC = eligible ? ratio(K, D, true)  : 0;
+      const rfU = eligible ? refundOf(y, pay, crU) : 0;
+      const rfC = eligible ? refundOf(y, pay, crC) : 0;
+      immLo += Math.min(rfU, rfC); immHi += Math.max(rfU, rfC);
+      rows.push({ y, K, pay, eligible, reduced, crU, crC, rfU, rfC });
+    });
+    // 향후분: 직전연도 보수총액, 최신 기준일 비율
+    const lastY = IMM_YEARS[IMM_YEARS.length - 1];
+    const futPay = payTotals[lastY] ? payTotals[lastY].value : 0;
+    const futK = new Date(curY - 1, 11, 31);
+    const fCrU = D !== 'none' ? ratio(futK, D, false) : 0;
+    const fCrC = D !== 'none' ? ratio(futK, D, true)  : 0;
+    const futLo = FUT_YEARS.reduce((s, fy) => s + Math.min(refundOf(fy, futPay, fCrU), refundOf(fy, futPay, fCrC)), 0);
+    const futHi = FUT_YEARS.reduce((s, fy) => s + Math.max(refundOf(fy, futPay, fCrU), refundOf(fy, futPay, fCrC)), 0);
+    return { rows, immLo, immHi, futLo, futHi };
+  }
+
+  function bandTxt(lo, hi, mode){
+    if (mode === 'uncapped') return fmt(lo);
+    if (mode === 'cap36') return fmt(hi);
+    return lo === hi ? fmt(lo) : '<span class="band"><span class="lo">' + fmt(lo) + '</span><span class="hi">~' + fmt(hi) + '</span></span>';
+  }
+
+  window.runEstimate = function(){
+    if (!recs.length){ alert('먼저 고용현황 엑셀을 업로드하세요.'); return; }
+    if (selectedD == null){ alert('가입일 시나리오를 선택하세요.'); return; }
+    const mode = document.getElementById('formula-mode').value;
+
+    // 비교표 (전 시나리오)
+    let cmp = '<tr><th>시나리오</th>' + IMM_YEARS.map(y => '<th class="num">' + y + '년분</th>').join('') +
+              '<th class="num">즉시분 합계</th><th class="num">향후분(' + FUT_YEARS.join('·') + ')</th><th>수익성(≥' + fmt(PROFIT_CUT) + ')</th></tr>';
+    const summaryLines = [];
+    scenarioList().forEach(s => {
+      const r = calcScenario(s.d);
+      const isSel = selectedLabel === s.label;
+      const pass = r.immLo >= PROFIT_CUT ? '<span class="badge-ok">통과</span>' :
+                   (r.immHi >= PROFIT_CUT ? '<span class="badge-warn">경계</span>' : '<span class="badge-err">미달</span>');
+      cmp += '<tr' + (isSel ? ' class="sel"' : '') + '><td>' + s.label + '</td>' +
+        r.rows.map(x => '<td class="num">' + (x.eligible ? bandTxt(Math.min(x.rfU,x.rfC), Math.max(x.rfU,x.rfC), mode) : (x.reduced ? '기경감' : '—')) + '</td>').join('') +
+        '<td class="num"><b>' + bandTxt(r.immLo, r.immHi, mode) + '</b></td>' +
+        '<td class="num">' + bandTxt(r.futLo, r.futHi, mode) + '</td><td>' + pass + '</td></tr>';
+      summaryLines.push(s.label + ': 즉시분 ' + fmt(r.immLo) + (r.immLo !== r.immHi ? '~' + fmt(r.immHi) : '') + '원 / 향후분 ' + fmt(r.futLo) + (r.futLo !== r.futHi ? '~' + fmt(r.futHi) : '') + '원');
+    });
+    document.getElementById('cmp-table').innerHTML = cmp;
+
+    // 선택 시나리오 상세
+    const sel = calcScenario(selectedD);
+    let det = '<tr><th>연도</th><th>산출기준일</th><th class="num">보수총액</th><th>소스</th><th class="num">기준요율</th>' +
+              '<th class="num">지급보장비율</th><th class="num">환급액</th><th>비고</th></tr>';
+    sel.rows.forEach(x => {
+      const src = payTotals[x.y] && payTotals[x.y].source === 'fixed' ? '신고값' : '폴백';
+      det += '<tr><td class="year-label">' + x.y + '</td><td>' + (x.y-1) + '-12-31</td>' +
+        '<td class="num">' + fmt(x.pay) + '</td><td><span class="src-badge' + (src==='신고값'?' fixed':'') + '">' + src + '</span></td>' +
+        '<td class="num">' + baseRate(x.y).toFixed(1) + '‰</td>' +
+        '<td class="num">' + (x.eligible ? x.crU.toFixed(3) + (mode==='band' ? ' ~ ' + x.crC.toFixed(3) : '') : '0') + '</td>' +
+        '<td class="num"><b>' + (x.eligible ? bandTxt(Math.min(x.rfU,x.rfC), Math.max(x.rfU,x.rfC), mode) : '0') + '</b></td>' +
+        '<td>' + (x.reduced ? '<span class="badge-err">기경감 — 산정 제외</span>' : x.eligible ? '' : '<span class="badge-warn">기준일 이전 미가입</span>') + '</td></tr>';
+    });
+    det += '<tr class="total-row"><td colspan="6">즉시분 합계</td><td class="num">' + bandTxt(sel.immLo, sel.immHi, mode) + '</td><td>' +
+           (sel.immLo >= PROFIT_CUT ? '<span class="badge-ok">수익성 통과</span>' : sel.immHi >= PROFIT_CUT ? '<span class="badge-warn">경계 — 확정자료 필요</span>' : '<span class="badge-err">30만 미달</span>') + '</td></tr>';
+    det += '<tr class="total-row"><td colspan="6">향후분 (' + FUT_YEARS.join('·') + ', ' + baseRate(curY).toFixed(1) + '‰)</td><td class="num">' + bandTxt(sel.futLo, sel.futHi, mode) + '</td><td></td></tr>';
+    document.getElementById('detail-table').innerHTML = det;
+    document.getElementById('detail-title').textContent = '선택 시나리오 상세 — ' + selectedLabel;
+
+    document.getElementById('total-value').textContent =
+      (mode === 'cap36' ? fmt(sel.immHi) : fmt(sel.immLo)) + (mode === 'band' && sel.immLo !== sel.immHi ? ' ~ ' + fmt(sel.immHi) : '') + '원';
+    document.getElementById('total-sub').textContent = selectedLabel + ' · DC 전원가입 가정 · 소급연도 ' + IMM_YEARS.join('/');
+
+    let rw = '';
+    if (document.getElementById('chk-db-risk').checked)
+      rw += '<div class="warn-box"><strong>DB형 가능성</strong>DB형은 적립비율(÷100) 기준이라 근속 역산이 성립하지 않습니다. 본 결과는 참고치로만 사용하고 가입확인서로 확정하세요.</div>';
+    const fbYears = IMM_YEARS.filter(y => !payTotals[y] || payTotals[y].source !== 'fixed');
+    if (fbYears.length)
+      rw += '<div class="warn-box"><strong>보수총액 폴백 사용 중: ' + fbYears.join(', ') + '</strong>상여·정산분 누락 가능. 임채산정보수액 입력 시 해당 축 오차 0.</div>';
+    rw += '<div class="info-box">본 툴은 <b>사전 견적(예측) 전용</b>입니다. 신청 금액 확정은 가입확인서 수치를 「임채부담금 환급 계산기」에 입력해 산출하세요. 2022년 이전분은 시효(보험연도+4년 3/31) 확인.</div>';
+    document.getElementById('result-warnings').innerHTML = rw;
+
+    lastSummaryText = '[임채 사전 견적] DC 전원가입 가정 / 소급 ' + IMM_YEARS.join('·') + ' / 보수총액 소스: ' +
+      IMM_YEARS.map(y => y + '=' + (payTotals[y] && payTotals[y].source === 'fixed' ? '신고값' : '폴백')).join(', ') + '\n' +
+      summaryLines.join('\n');
+    document.getElementById('results').classList.add('visible');
+  };
+
+  window.copySummary = function(){
+    navigator.clipboard.writeText(lastSummaryText).then(() => alert('요약이 복사되었습니다.'));
+  };
+})();
+</script>
+<script src="../assets/modal.js"></script>
+</body>
+</html>
