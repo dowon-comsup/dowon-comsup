@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>도원 4대보험 환급 콘솔</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --surface:#fff; --border:#e5e7eb; --ink:#111827; --ink2:#6b7280; --ink3:#9ca3af;
+    --blue:#2563eb; --blue-bg:#eff6ff; --green:#16a34a; --green-bg:#f0fdf4;
+    --amber:#d97706; --amber-bg:#fffbeb; --red:#dc2626; --red-bg:#fef2f2; --violet:#7c3aed;
+    --radius:12px; --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 3px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#0f1115;--surface:#171a21;--border:#272b34;--ink:#e5e7eb;--ink2:#9ca3af;--ink3:#6b7280;--blue-bg:#172033;--green-bg:#12200f;--amber-bg:#241c05;--red-bg:#2a1414;}}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;padding:24px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1240px;margin:0 auto}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+  h1{font-size:20px;font-weight:700;letter-spacing:-.02em}
+  .meta{font-size:12px;color:var(--ink2)}
+  .meta b{color:var(--ink)}
+  .refresh{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .src{font-size:11px;color:var(--ink3);border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:4px 8px;width:220px}
+  button{font:inherit;font-size:12px;border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer}
+  button:hover{border-color:var(--blue)}
+  /* tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+  .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+  .tile .lbl{font-size:12px;color:var(--ink2);margin-bottom:6px}
+  .tile .big{font-size:22px;font-weight:700;letter-spacing:-.02em}
+  .tile .sub{font-size:12px;color:var(--ink3);margin-top:2px}
+  /* stage board */
+  .section-title{font-size:14px;font-weight:700;margin:24px 0 12px;display:flex;align-items:center;gap:8px}
+  .board{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:start}
+  @media(max-width:900px){.board{grid-template-columns:repeat(2,1fr)}}
+  .col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px;min-height:60px}
+  .col h3{font-size:12px;font-weight:700;margin-bottom:2px}
+  .col .csum{font-size:11px;color:var(--ink2);margin-bottom:8px}
+  .card{border:1px solid var(--border);border-left:3px solid var(--ink3);border-radius:8px;padding:8px 10px;margin-bottom:6px;background:var(--bg)}
+  .card .n{font-size:12px;font-weight:600}
+  .card .d{font-size:11px;color:var(--ink2);margin-top:2px;display:flex;justify-content:space-between;gap:6px}
+  .card.g{border-left-color:var(--green)} .card.a{border-left-color:var(--amber)} .card.r{border-left-color:var(--red)}
+  .pill{font-size:10px;padding:1px 6px;border-radius:99px;background:var(--blue-bg);color:var(--blue)}
+  .pill.r{background:var(--red-bg);color:var(--red)}
+  /* tabs + table */
+  .tabs{display:flex;gap:6px;margin:24px 0 0}
+  .tab{padding:8px 14px;border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;background:var(--bg);cursor:pointer;font-size:13px;font-weight:600;color:var(--ink2)}
+  .tab.on{background:var(--surface);color:var(--ink)}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:0 var(--radius) var(--radius) var(--radius);overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+  th{font-size:11px;color:var(--ink2);font-weight:600;position:sticky;top:0;background:var(--surface)}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr:hover td{background:var(--bg)}
+  .st{font-size:11px;padding:2px 7px;border-radius:6px;background:var(--bg);border:1px solid var(--border)}
+  .err{padding:16px;background:var(--red-bg);color:var(--red);border-radius:var(--radius);font-size:13px}
+  .muted{color:var(--ink3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🛡️ 4대보험 환급 콘솔</h1>
+    <span class="meta" id="meta"></span>
+    <div class="refresh">
+      <label style="font-size:12px;color:var(--ink2)">담당자
+        <select class="src" id="who" style="width:auto" onchange="render()"><option>전체</option></select>
+      </label>
+      <input class="src" id="src" placeholder="데이터 URL (n8n 웹훅/로컬)" title="포털 배포 시 n8n 웹훅 URL, 로컬은 비워두기">
+      <button onclick="load()">↻ 새로고침</button>
+    </div>
+  </header>
+
+  <div id="err"></div>
+  <div class="tiles" id="tiles"></div>
+
+  <div class="section-title">📋 신청 파이프라인 <span class="muted" style="font-weight:400;font-size:12px">— 단계별 기한 트래킹 (경과일 30↑ 🟡 · 60↑ 🔴)</span></div>
+  <div class="board" id="board"></div>
+
+  <div class="tabs">
+    <div class="tab on" data-t="im" onclick="tab('im')">임채부담금 경감</div>
+    <div class="tab" data-t="ex" onclick="tab('ex')">적용제외 (고용·산재)</div>
+  </div>
+  <div class="panel" id="panel"></div>
+</div>
+
+<script src="../js/config.js"></script>
+<script>
+const DATA_KEY='DW_INS_DATA_URL';
+const WEBHOOK=(window.DW_CONFIG&&DW_CONFIG.WEBHOOK&&DW_CONFIG.WEBHOOK.insurance)||'';
+const STG=['접수','처리확인','지급확인','수임료안내','수임료입금'];
+let DATA=null, cur='im', VIEW={im:[],ex:[]};
+const won=n=>n?Number(n).toLocaleString()+'원':'<span class="muted">-</span>';
+const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const tile=(l,b,s)=>`<div class="tile"><div class="lbl">${l}</div><div class="big">${b}</div><div class="sub">${s}</div></div>`;
+// 소멸 D-day 셀: 만료(회색) / D-90이내(빨강) / 그 외. approx면 ~ 표시
+function sm(dd,date,approx){
+  if(dd==null) return '<span class="muted">-</span>';
+  const a=approx?'~':'';
+  if(dd<0) return `<span class="muted">만료 ${esc(date||'')}</span>`;
+  const c=dd<=90?'color:var(--red);font-weight:700':'';
+  return `<span style="${c}" title="${esc(date||'')}">${a}D-${dd}</span>`;
+}
+const imminent=rows=>rows.filter(r=>r.소멸D!=null&&r.소멸D>=0&&r.소멸D<=90).length;
+
+async function load(){
+  const src=document.getElementById('src').value.trim();
+  if(src) localStorage.setItem(DATA_KEY,src); else localStorage.removeItem(DATA_KEY);
+  document.getElementById('err').innerHTML='';
+  const url=src||WEBHOOK;
+  if(!url){ document.getElementById('err').innerHTML='<div class="err">데이터 소스 미설정 — 상단 URL 칸에 n8n 웹훅 주소를 넣어주세요.</div>'; return; }
+  try{
+    const res=await fetch(url,{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    DATA=await res.json();
+    fillWho();
+    render();
+  }catch(e){
+    document.getElementById('err').innerHTML='<div class="err"><b>데이터 로드 실패</b> ('+esc(e.message)+')<br>이 콘솔은 노션 토큰을 <b>n8n 프록시</b>가 보관하고 <code>'+esc(url)+'</code> 로 반환하는 구조입니다. n8n 워크플로가 아직 연결되지 않았다면 데이터가 비어 보입니다. (로컬 확인: notion-sync에서 <code>node serve.mjs</code>)</div>';
+  }
+}
+
+function fillWho(){
+  const sel=document.getElementById('who'), prev=sel.value;
+  sel.innerHTML='<option>전체</option>'+(DATA.담당자목록||[]).map(n=>`<option>${esc(n)}</option>`).join('');
+  if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+}
+const who=()=>document.getElementById('who').value||'전체';
+const mine=r=>{const w=who();return w==='전체'||(r.담당||[]).includes(w);};
+
+function render(){
+  if(!DATA) return;
+  const im=DATA.임채.rows.filter(mine), ex=DATA.적용제외.rows.filter(mine), pipe=DATA.파이프라인.rows.filter(mine);
+  VIEW={im,ex};
+  const imSum=im.reduce((s,r)=>s+(r.환급예상||0),0), exSum=ex.reduce((s,r)=>s+(r.납부보험료||0),0);
+  document.getElementById('meta').innerHTML=`생성 <b>${esc(DATA.generated)}</b> · 읽기 전용`;
+  const imSoon=imminent(im), exSoon=imminent(ex);
+  document.getElementById('tiles').innerHTML=[
+    tile('임채 경감 검토',im.length+'건',won(imSum)+' 예상환급'+(imSoon?` · <span style="color:var(--red);font-weight:700">소멸임박 ${imSoon}</span>`:'')),
+    tile('적용제외 검토',ex.length+'건',won(exSum)+' 납부보험료'+(exSoon?` · <span style="color:var(--red);font-weight:700">소멸임박 ${exSoon}</span>`:'')),
+    tile('파이프라인',pipe.length+'건',STG.map(k=>`${k} ${pipe.filter(r=>r.stage===k).length}`).join(' · ')),
+  ].join('');
+  renderBoard(pipe);
+  tab(cur);
+}
+
+function renderBoard(pipe){
+  document.getElementById('board').innerHTML=[...STG,'이슈'].map(st=>{
+    const rows=pipe.filter(r=>r.stage===st);
+    const amt=rows.reduce((s,r)=>s+(r.지급액||r.접수금액||0),0);
+    const cards=rows.map(r=>{
+      const age=r.경과일, cls=age>60?'r':age>30?'a':'g';
+      return `<div class="card ${cls}"><div class="n">${esc(r.사업장)}</div>
+        <div class="d"><span>${esc((r.종류||'').replace('고용·산재보험 ',''))}</span><span>${age!=null?'D+'+age:''}</span></div>
+        <div class="d"><span class="muted">${esc(r.즉시향후)}</span><span>${r.지급액?won(r.지급액):won(r.접수금액)}</span></div>
+        ${r.issue?`<div class="d"><span class="pill r">${esc(r.issue)}</span></div>`:''}</div>`;
+    }).join('')||'<div class="muted" style="font-size:11px;padding:4px">—</div>';
+    return `<div class="col"><h3>${st}</h3><div class="csum">${rows.length}건 · ${won(amt)}</div>${cards}</div>`;
+  }).join('');
+}
+
+function tab(t){
+  cur=t;
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('on',el.dataset.t===t));
+  const p=document.getElementById('panel');
+  if(!DATA){p.innerHTML='';return;}
+  const LIMIT=500;
+  const cap=rows=>rows.length>LIMIT?`<div class="muted" style="padding:8px 10px;font-size:12px">${rows.length.toLocaleString()}건 중 금액 상위 ${LIMIT}건 표시 — 담당자로 좁히면 전체가 보입니다</div>`:'';
+  if(t==='im'){
+    const all=[...VIEW.im].sort((a,b)=>(b.환급예상||0)-(a.환급예상||0)), rows=all.slice(0,LIMIT);
+    p.innerHTML=cap(all)+`<table><thead><tr><th>사업장</th><th>연도</th><th>본지사</th><th>가입</th><th class="num">환급예상</th><th>소멸</th><th>즉시/향후</th><th>진행상황</th><th>담당</th></tr></thead><tbody>`+
+      rows.map(r=>`<tr><td>${esc(r.사업장)}</td><td>${esc(r.연도)}</td><td>${esc(r.본지사)}</td><td>${esc((r.가입유형||'').replace(/\[|\]/g,''))}</td><td class="num">${won(r.환급예상)}</td><td>${sm(r.소멸D,r.소멸일)}</td><td>${esc(r.즉시향후)}</td><td><span class="st">${esc(r.진행상황)}</span></td><td class="muted">${esc((r.담당||[]).join(','))}</td></tr>`).join('')+
+      `</tbody></table>`;
+  }else{
+    const all=[...VIEW.ex].sort((a,b)=>(b.납부보험료||0)-(a.납부보험료||0)), rows=all.slice(0,LIMIT);
+    p.innerHTML=cap(all)+`<table><thead><tr><th>대상자</th><th>연도</th><th>구분</th><th>관계</th><th class="num">납부보험료</th><th>소멸<span class="muted">~근사</span></th><th class="num">고용</th><th class="num">산재</th><th>진행상황</th><th>완료</th><th>담당</th></tr></thead><tbody>`+
+      rows.map(r=>`<tr><td>${esc(r.대상자)}</td><td>${esc([].concat(r.대상연도||[]).join(','))}</td><td>${esc(r.구분)}</td><td>${esc(r.관계)}</td><td class="num">${won(r.납부보험료)}</td><td>${sm(r.소멸D,r.소멸일,r.소멸근사)}</td><td class="num">${won(r.고용)}</td><td class="num">${won(r.산재)}</td><td><span class="st">${esc(r.진행상황)}</span></td><td>${r.환급완료?'✅':''}</td><td class="muted">${esc((r.담당||[]).join(','))}</td></tr>`).join('')+
+      `</tbody></table>`;
+  }
+}
+
+document.getElementById('src').value=localStorage.getItem(DATA_KEY)||'';
+load();
+</script>
+</body>
+</html>

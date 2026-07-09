@@ -11,6 +11,7 @@ const DW_CONFIG = {
     businesses:     'https://n8n-docker.dowonbiz.com/webhook/businesses',
     businessDetail: 'https://n8n-docker.dowonbiz.com/webhook/business-detail',
     logZeroMail:    'https://n8n-docker.dowonbiz.com/webhook/log-zero-mail',
+    insurance:      'https://n8n-docker.dowonbiz.com/webhook/insurance-refund',  // 4대보험 환급 콘솔 (노션 토큰=n8n 크리덴셜)
   },
 
   /** localStorage 키 이름 (도구 간 공유) */

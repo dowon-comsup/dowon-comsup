@@ -223,6 +223,12 @@
       <!-- 4대보험 환급 -->
       <div class="sidebar-section-title">4대보험 환급</div>
 
+      <a href="#" class="sidebar-link" data-page="tools/insurance-refund.html" data-title="4대보험 환급 콘솔" title="4대보험 환급 콘솔" onclick="loadTool(this);return false">
+        <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg></span>
+        <span class="sidebar-link-text">4대보험 환급 콘솔</span>
+        <span class="sidebar-version">NEW</span>
+      </a>
+
       <a href="#" class="sidebar-link" data-page="tools/director-insurance-v2.html" data-title="적용제외 근로자성 판단" title="적용제외 근로자성 판단" onclick="loadTool(this);return false">
         <span class="sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
         <span class="sidebar-link-text">적용제외 판단</span>
@@ -353,9 +359,20 @@
           <div class="section-header">
             <div class="section-header-dot green"></div>
             <span class="section-header-title">4대보험 환급</span>
-            <span class="section-header-count">도구 4종</span>
+            <span class="section-header-count">도구 5종</span>
           </div>
           <div class="tools-grid-2">
+
+            <div class="tool-card-simple" onclick="loadToolByPage('tools/insurance-refund.html','4대보험 환급 콘솔')" style="border-color:#bfdbfe">
+              <div class="tool-card-simple-icon blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>
+              </div>
+              <div class="tool-card-simple-body">
+                <div class="tool-card-simple-name">4대보험 환급 콘솔 <span class="badge-version" style="background:#dbeafe;color:#1e40af">NEW</span></div>
+                <div class="tool-card-simple-desc">노션 연동 — 임채·적용제외 통합 현황 + 단계별 파이프라인(접수→지급→수임료) + 소멸시효 마감 트래킹</div>
+                <div class="tool-card-simple-tags"><span class="tool-tag">노션(n8n)</span><span class="tool-tag">담당자별</span><span class="tool-tag">소멸 D-day</span></div>
+              </div>
+            </div>
 
             <div class="tool-card-simple" onclick="loadToolByPage('tools/director-insurance-v2.html','적용제외 근로자성 판단')">
               <div class="tool-card-simple-icon sky">
