@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>업무 자동화 포털 | 노무법인 도원</title>
   <link rel="stylesheet" href="assets/style.css">
   <style>
@@ -533,12 +536,17 @@
       body.classList.remove('sidebar-open');
     };
 
-    /* ── Restore from hash ── */
-    var hash = location.hash.replace('#', '');
-    if (hash && hash !== '') {
-      var target = document.querySelector('.sidebar-link[data-page="' + hash + '"]');
-      if (target) loadTool(target);
+    /* ── Restore from hash (새로고침·직접진입·해시변경 대응) ── */
+    function applyHash() {
+      var h = location.hash.replace(/^#/, '');
+      if (!h) { if (currentPage !== 'dashboard') showDashboard(); return; }
+      if (h === currentPage) return;
+      var target = document.querySelector('.sidebar-link[data-page="' + h + '"]');
+      var title = target ? (target.getAttribute('data-title') || target.title) : h;
+      if (target || /^tools\/[\w.-]+\.html$/.test(h)) loadToolByPage(h, title);
     }
+    window.addEventListener('hashchange', applyHash);
+    applyHash();
   })();
   </script>
 
