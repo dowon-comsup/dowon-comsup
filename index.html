@@ -49,6 +49,22 @@
     }
     @media (max-width: 900px) { .tools-grid-2 { grid-template-columns: 1fr; } }
 
+    /* ── 부서 2단 레이아웃 (좌: 고용지원금 / 우: 4대보험) ── */
+    .dept-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; margin-bottom: 22px; }
+    @media (max-width: 860px) { .dept-grid { grid-template-columns: 1fr; } }
+    .dept { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+    .dept-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+    .dept-head .bar { width: 4px; height: 18px; border-radius: 2px; flex-shrink: 0; }
+    .dept-head .t { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink-800); }
+    .dept-head .c { margin-left: auto; font-size: 12px; color: var(--ink-400); font-weight: 500; }
+    .dept.blue  .bar { background: #6366f1; }
+    .dept.green .bar { background: #16a34a; }
+    .tools-col { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+    /* 외부 시스템 (하단 전체폭) */
+    .externals { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; }
+    .externals .eh { font-size: 13px; font-weight: 700; color: var(--ink-700); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .externals .eh .bar { width: 4px; height: 16px; border-radius: 2px; background: #9ca3af; }
+
     /* ── 도구 카드 심플 ── */
     .tool-card-simple {
       background: var(--surface);
@@ -309,14 +325,11 @@
           <p>고용지원금 · 4대보험 환급 자동화 도구</p>
         </div>
 
-        <!-- ── 고용지원금 섹션 ── -->
-        <div class="section-block">
-          <div class="section-header">
-            <div class="section-header-dot blue"></div>
-            <span class="section-header-title">고용지원금</span>
-            <span class="section-header-count">도구 3종</span>
-          </div>
-          <div class="tools-grid-2">
+        <div class="dept-grid">
+          <!-- 좌: 고용지원금 -->
+          <div class="dept blue">
+            <div class="dept-head"><span class="bar"></span><span class="t">고용지원금</span><span class="c">3종</span></div>
+            <div class="tools-col">
 
             <div class="tool-card-simple" onclick="loadToolByPage('tools/contract-review.html','청년도약 서류판독')">
               <div class="tool-card-simple-icon violet">
@@ -351,17 +364,12 @@
               </div>
             </div>
 
+            </div>
           </div>
-        </div>
-
-        <!-- ── 4대보험 환급 섹션 ── -->
-        <div class="section-block">
-          <div class="section-header">
-            <div class="section-header-dot green"></div>
-            <span class="section-header-title">4대보험 환급</span>
-            <span class="section-header-count">도구 5종</span>
-          </div>
-          <div class="tools-grid-2">
+          <!-- 우: 4대보험 환급 -->
+          <div class="dept green">
+            <div class="dept-head"><span class="bar"></span><span class="t">4대보험 환급</span><span class="c">5종</span></div>
+            <div class="tools-col">
 
             <div class="tool-card-simple" onclick="loadToolByPage('tools/insurance-refund.html','4대보험 환급 콘솔')" style="border-color:#bfdbfe">
               <div class="tool-card-simple-icon blue">
@@ -418,15 +426,13 @@
               </div>
             </div>
 
+            </div>
           </div>
         </div>
 
-        <!-- ── 빠른 링크 ── -->
-        <div class="section-block">
-          <div class="section-header">
-            <div class="section-header-dot gray"></div>
-            <span class="section-header-title">외부 시스템</span>
-          </div>
+        <!-- 하단: 외부 시스템 (전체폭) -->
+        <div class="externals">
+          <div class="eh"><span class="bar"></span>외부 시스템 연결</div>
           <div class="quick-links-simple">
             <a href="https://www.ei.go.kr" target="_blank" rel="noopener noreferrer" class="quick-link-simple">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
